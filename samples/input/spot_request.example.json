@@ -1,0 +1,22 @@
+{
+  "schema_version": "0.1",
+  "request_id": "spot-example-001",
+  "requested_at": "2026-09-22T12:00:00+09:00",
+  "store": {
+    "name": "KT Plaza 명지 에코델타시티점",
+    "address": "부산광역시 강서구 명지동",
+    "lat": null,
+    "lng": null
+  },
+  "campaign": {
+    "purpose": "신제품 체험 행사 사전 리서치",
+    "product": "Galaxy Z Fold8",
+    "target_hint": null
+  },
+  "research": {
+    "reference_date": "2026-09-22",
+    "radius_m": 1000,
+    "lookback_days": 180,
+    "comparison_area": null
+  }
+}
