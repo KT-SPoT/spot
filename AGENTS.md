@@ -68,3 +68,19 @@ The Integrator owns:
 - Shared interface: documented in Notion and mirrored in `docs/api-contract.md`
 
 If the two disagree, do not guess. Open an Issue and ask the Integrator to reconcile them.
+
+
+## Project knowledge reading order
+
+When starting a fresh AI coding session, read in this order:
+
+1. `AGENTS.md`
+2. `docs/PROJECT.md`
+3. `docs/ARCHITECTURE.md`
+4. `docs/api-contract.md`
+5. `docs/ROADMAP.md`
+6. the relevant `docs/roles/*.md`
+7. the assigned GitHub Issue
+8. current code in the assigned branch
+
+Use `docs/DECISIONS.md` when a design choice needs historical context.
