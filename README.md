@@ -22,22 +22,31 @@ n8n Main Entry
 - **LangGraph**: Scout 실행, 상태 관리, Critic 판단, 재탐색 루프, Brief 생성
 - **Scout modules**: 각 담당자가 공통 JSON 계약에 맞춰 독립 구현
 
+## Collaboration model
+
+- **GitHub**: 구현, AI coding 작업, Issue, branch, PR의 중심
+- **Notion**: 프로젝트 정의, 공통 결정, 로드맵, 공용 문서
+- **Notion MCP**: Integrator/팀장이 공통 문서를 관리
+- Scout 담당 AI는 Notion MCP 없이도 `AGENTS.md`와 `docs/api-contract.md`를 기준으로 작업 가능
+
+AI coding agent를 사용할 때는 먼저 [AGENTS.md](AGENTS.md)를 읽게 합니다.
+
 ## Team ownership
 
-- Quant Scout: 유승우
-- Local Scout: 김태훈
-- Trend Scout: 김건희
-- Integrator / Critic / Research Brief: 김민석
+- Quant Scout: 유승우 — `feat/quant`
+- Local Scout: 김태훈 — `feat/local`
+- Trend Scout: 김건희 — `feat/trend`
+- Integrator / Critic / Research Brief: 김민석 — `feat/critic`
 
 ## Shared contract
-
-모든 Scout는 Notion의 **SPOT 공통 Input/Output JSON Schema**를 기준으로 구현합니다.
 
 - Input: `SpotRequest v0.1`
 - Output: `ScoutResult v0.1`
 - Merge: `ResearchBundle v0.1`
 - Critic: `CriticResult v0.1`
 - Final: `ResearchBrief v0.1`
+
+Implementation contract: [docs/api-contract.md](docs/api-contract.md)
 
 ## Security
 
