@@ -51,3 +51,13 @@ Implementation contract: [docs/api-contract.md](docs/api-contract.md)
 ## Security
 
 실제 API Key, n8n credential, token, password는 저장소에 커밋하지 않습니다.
+
+
+## Project knowledge
+
+- [Project definition](docs/PROJECT.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [API contract](docs/api-contract.md)
+- [Current roadmap](docs/ROADMAP.md)
+- [Decision log](docs/DECISIONS.md)
+- Role guides: [Quant](docs/roles/QUANT.md) · [Local](docs/roles/LOCAL.md) · [Trend](docs/roles/TREND.md) · [Integrator](docs/roles/INTEGRATOR.md)
