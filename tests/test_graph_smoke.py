@@ -2,9 +2,12 @@
 
 import json
 import unittest
+from contextlib import ExitStack
+from unittest.mock import patch
 from pathlib import Path
 
 from src.graph.graph import build_graph
+from src.contracts import mock_scout_result
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -15,7 +18,14 @@ class GraphSmokeTest(unittest.TestCase):
     def test_mock_graph_reaches_research_brief(self) -> None:
         request = json.loads(SAMPLE_REQUEST.read_text(encoding="utf-8"))
 
-        result = build_graph().invoke({"request": request})
+        with ExitStack() as stack:
+            runners = [stack.enter_context(patch(
+                f"src.graph.graph.run_{module}_scout",
+                return_value=mock_scout_result(module, request["request_id"]),
+            )) for module in ("quant", "local", "trend")]
+            result = build_graph().invoke({"request": request})
+            for runner in runners:
+                runner.assert_called_once_with(request)
 
         bundle = result["research_bundle"]
         self.assertEqual(bundle["request_id"], request["request_id"])

@@ -65,12 +65,22 @@ SpotRequest
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.txt -c constraints-test.txt
 python -m unittest discover -s tests -v
 ```
 
 Windows PowerShell에서는 `.venv\Scripts\Activate.ps1`로 가상환경을 활성화합니다.
 현재 mock 흐름에는 API Key나 별도 환경변수가 필요하지 않습니다.
+
+검증 환경은 Python 3.12.14 / Linux입니다. `constraints-test.txt`로 테스트 의존성 버전을 맞춥니다.
+테스트는 Scout 호출을 mock으로 대체하므로 실제 Scout 개발 후에도 외부 API 없이 실행됩니다.
+실제 Scout 샘플은 별도 계약 검사 도구로 확인하세요.
+
+```bash
+python -m src.validation path/to/scout_result.json --module quant --request-id spot-example-001
+```
+
+검사 범위·실패 정책·PR 인수 체크리스트: [통합 준비 가이드](docs/INTEGRATION_READINESS.md).
 
 ## Security
 
