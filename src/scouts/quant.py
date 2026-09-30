@@ -441,23 +441,247 @@ def _build_summary(
     return f"{area_name} 기준 " + " ".join(parts)
 
 
-def _build_sources(finished_at: str) -> list[dict[str, Any]]:
-    sources: list[dict[str, Any]] = []
+def _build_compact_metrics(
+    metrics: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    industry = metrics.get("industry", {}).get("derived_selected_area", {})
+    sales = metrics.get("sales", {}).get("derived_selected_area", {})
+    population = metrics.get("population", {}).get("derived_selected_area", {})
+    area = metrics.get("area", {}).get("derived_selected_area", {})
+    customer = metrics.get("customer", {}).get("derived_selected_area", {})
+    delivery = metrics.get("delivery", {}).get("derived_selected_area", {})
 
-    for report_no in REPORT_NUMBERS:
-        sources.append(
+    store_yoy = industry.get("year_over_year_change_percent_reported")
+    if store_yoy is None:
+        store_yoy = industry.get("year_over_year_change_percent_computed")
+
+    sales_yoy = sales.get("sales_amount_year_over_year_change_percent_reported")
+    if sales_yoy is None:
+        sales_yoy = sales.get("sales_amount_year_over_year_change_percent_computed")
+
+    compact: dict[str, Any] = {
+        # 현재 SBIZ365 상세분석은 선택 업종(G20802) 기준이므로
+        # 전체 업종 점포수/카테고리 분포는 이 수집 범위에서 제공되지 않는다.
+        "total_store_count": None,
+        "telecom_store_count": industry.get("latest_store_count"),
+        "category_counts": [],
+        "telecom_store_yoy_percent": store_yoy,
+        "monthly_avg_sales_10k_krw": sales.get(
+            "latest_monthly_average_sales_amount_10k_krw"
+        ),
+        "monthly_avg_sales_transactions": sales.get(
+            "latest_monthly_average_sales_transactions"
+        ),
+        "sales_yoy_percent": sales_yoy,
+        "peak_sales_day": sales.get("peak_sales_day"),
+        "peak_sales_time_band": sales.get("peak_sales_time_band"),
+        "dominant_sales_gender": sales.get("dominant_sales_gender"),
+        "dominant_sales_age": sales.get("dominant_sales_age"),
+        "daily_avg_floating_population": population.get(
+            "latest_monthly_daily_flow_population"
+        ),
+        "dominant_floating_gender": population.get("dominant_flow_gender"),
+        "dominant_floating_age": population.get("dominant_flow_age"),
+        "peak_floating_day": population.get("peak_day_of_week"),
+        "peak_floating_time_band": population.get("peak_time_band"),
+        "resident_population": population.get(
+            "latest_resident_population_from_trend"
+        ),
+        "worker_population": population.get(
+            "latest_worker_population_from_trend"
+        ),
+        "household_count": area.get("latest_households"),
+        "dominant_facility_type": area.get("dominant_facility_type"),
+        "school_count": area.get("school_count_total"),
+        "student_count": area.get("student_count_total"),
+        "subway_station_count": area.get("subway_station_count"),
+        "bus_stop_count": area.get("bus_stop_count"),
+        "delivery_sales_available": delivery.get("has_delivery_sales_data"),
+    }
+
+    if customer.get("has_customer_data") is True:
+        compact["customer"] = {
+            "dominant_visitor_gender": customer.get("dominant_visitor_gender"),
+            "dominant_customer_type": customer.get("dominant_customer_type"),
+            "top_male_lifestyle": (
+                customer.get("top_male_lifestyle_excluding_other") or {}
+            ).get("name"),
+            "top_female_lifestyle": (
+                customer.get("top_female_lifestyle_excluding_other") or {}
+            ).get("name"),
+            "male_annual_income_10k_krw": customer.get(
+                "male_annual_income_10k_krw"
+            ),
+            "female_annual_income_10k_krw": customer.get(
+                "female_annual_income_10k_krw"
+            ),
+            "regional_average_annual_income_10k_krw": customer.get(
+                "regional_average_annual_income_10k_krw"
+            ),
+        }
+    else:
+        compact["customer"] = None
+
+    return compact
+
+
+def _build_compact_insights(metrics: dict[str, Any]) -> list[dict[str, Any]]:
+    insights: list[dict[str, Any]] = []
+
+    telecom_count = metrics.get("telecom_store_count")
+    telecom_yoy = metrics.get("telecom_store_yoy_percent")
+    if telecom_count is not None:
+        insights.append(
             {
-                "source_id": f"S-Q-{report_no:03d}",
-                "source_name": f"소상공인365 상세분석 {REPORT_TITLES[report_no]}",
-                "source_type": "government",
-                "source_url": "https://bigdata.sbiz.or.kr/",
-                "published_at": None,
-                "collected_at": finished_at,
-                "report": f"sang_gwon{report_no}.sg",
+                "id": "Q-001",
+                "title": "핸드폰 소매업 점포 현황",
+                "evidence": (
+                    f"선택 영역 내 핸드폰 소매업 {telecom_count}개, "
+                    f"전년동월대비 {_percent_text(telecom_yoy)}"
+                ),
+                "metric_refs": [
+                    "telecom_store_count",
+                    "telecom_store_yoy_percent",
+                ],
+                "tags": ["telecom", "competition"],
             }
         )
 
-    return sources
+    sales_amount = metrics.get("monthly_avg_sales_10k_krw")
+    sales_transactions = metrics.get("monthly_avg_sales_transactions")
+    if sales_amount is not None or sales_transactions is not None:
+        insights.append(
+            {
+                "id": "Q-002",
+                "title": "핸드폰 소매업 매출 특성",
+                "evidence": (
+                    f"업소당 월평균 매출액 {_value_text(sales_amount, '만원')}, "
+                    f"월평균 매출건수 {_value_text(sales_transactions, '건')}; "
+                    f"매출 집중 시간대는 "
+                    f"{_label(TIME_LABELS, metrics.get('peak_sales_time_band'))}"
+                ),
+                "metric_refs": [
+                    "monthly_avg_sales_10k_krw",
+                    "monthly_avg_sales_transactions",
+                    "peak_sales_time_band",
+                ],
+                "tags": ["sales", "telecom"],
+            }
+        )
+
+    floating = metrics.get("daily_avg_floating_population")
+    if floating is not None:
+        insights.append(
+            {
+                "id": "Q-003",
+                "title": "유동인구 특성",
+                "evidence": (
+                    f"일평균 유동인구 {floating}명, "
+                    f"주요 성별·연령대는 "
+                    f"{_label(GENDER_LABELS, metrics.get('dominant_floating_gender'))} / "
+                    f"{_label(AGE_LABELS, metrics.get('dominant_floating_age'))}, "
+                    f"최다 시간대는 "
+                    f"{_label(TIME_LABELS, metrics.get('peak_floating_time_band'))}"
+                ),
+                "metric_refs": [
+                    "daily_avg_floating_population",
+                    "dominant_floating_gender",
+                    "dominant_floating_age",
+                    "peak_floating_time_band",
+                ],
+                "tags": ["population", "traffic"],
+            }
+        )
+
+    households = metrics.get("household_count")
+    facility = metrics.get("dominant_facility_type")
+    if households is not None or facility is not None:
+        insights.append(
+            {
+                "id": "Q-004",
+                "title": "지역 생활기반",
+                "evidence": (
+                    f"세대수 {_value_text(households, '세대')}, "
+                    f"주요 시설 유형 {_value_text(facility)}"
+                ),
+                "metric_refs": [
+                    "household_count",
+                    "dominant_facility_type",
+                    "school_count",
+                    "subway_station_count",
+                    "bus_stop_count",
+                ],
+                "tags": ["area", "infrastructure"],
+            }
+        )
+
+    customer = metrics.get("customer")
+    if isinstance(customer, dict):
+        insights.append(
+            {
+                "id": "Q-005",
+                "title": "방문고객 특성",
+                "evidence": (
+                    "주요 방문 성별은 "
+                    f"{_label(GENDER_LABELS, customer.get('dominant_visitor_gender'))}, "
+                    f"남성 주요 라이프스타일은 "
+                    f"{_value_text(customer.get('top_male_lifestyle'))}, "
+                    f"여성 주요 라이프스타일은 "
+                    f"{_value_text(customer.get('top_female_lifestyle'))}입니다."
+                ),
+                "metric_refs": [
+                    "customer.dominant_visitor_gender",
+                    "customer.top_male_lifestyle",
+                    "customer.top_female_lifestyle",
+                ],
+                "tags": ["customer", "lifestyle"],
+            }
+        )
+
+    return insights
+
+
+def _build_compact_summary(
+    admi_nm: str | None,
+    radius_m: int,
+    metrics: dict[str, Any],
+) -> str:
+    area_name = admi_nm or "선택 영역"
+    parts: list[str] = []
+
+    if metrics.get("telecom_store_count") is not None:
+        parts.append(f"핸드폰 소매업 {metrics['telecom_store_count']}개")
+
+    if metrics.get("monthly_avg_sales_10k_krw") is not None:
+        parts.append(
+            f"업소당 월평균 매출액 {metrics['monthly_avg_sales_10k_krw']}만원"
+        )
+
+    if metrics.get("daily_avg_floating_population") is not None:
+        parts.append(
+            f"일평균 유동인구 {metrics['daily_avg_floating_population']}명"
+        )
+
+    if metrics.get("household_count") is not None:
+        parts.append(f"세대수 {metrics['household_count']}세대")
+
+    if not parts:
+        return f"{area_name} 반경 {radius_m}m 상세분석에서 핵심 지표를 추출하지 못했습니다."
+
+    return f"{area_name} 반경 {radius_m}m 기준 " + ", ".join(parts) + "로 확인됐습니다."
+
+
+def _build_sources(finished_at: str) -> list[dict[str, Any]]:
+    return [
+        {
+            "source_id": "S-Q-001",
+            "source_name": "소상공인365 상세분석",
+            "source_type": "government",
+            "source_url": "https://bigdata.sbiz.or.kr/",
+            "published_at": None,
+            "collected_at": finished_at,
+        }
+    ]
 
 
 def run_quant_scout(request: SpotRequest) -> ScoutResult:
@@ -624,8 +848,13 @@ def run_quant_scout(request: SpotRequest) -> ScoutResult:
             }
         )
 
-    insights = _build_insights(metrics)
-    summary = _build_summary(collected.get("admi_nm"), metrics)
+    compact_metrics = _build_compact_metrics(metrics)
+    insights = _build_compact_insights(compact_metrics)
+    summary = _build_compact_summary(
+        collected.get("admi_nm"),
+        radius_m,
+        compact_metrics,
+    )
     finished_at = _now_iso()
 
     result: dict[str, Any] = {
@@ -636,19 +865,20 @@ def run_quant_scout(request: SpotRequest) -> ScoutResult:
         "started_at": started_at,
         "finished_at": finished_at,
         "query_context": {
-            **query_context,
-            "admi_cd": collected.get("admi_cd"),
-            "admi_nm": collected.get("admi_nm"),
+            "radius_m": radius_m,
+            "area_name": collected.get("admi_nm"),
+            "store_address": query_context.get("store_address"),
+            "lat": query_context.get("lat"),
+            "lng": query_context.get("lng"),
             "analysis_date": collected.get("analy_date"),
             "upjong_cd": collected.get("analysis", {}).get("upjong_cd"),
-            "reports_requested": list(REPORT_NUMBERS),
         },
         "summary": summary,
+        "metrics": compact_metrics,
         "insights": insights,
         "sources": _build_sources(finished_at),
         "warnings": warnings,
         "errors": errors,
-        "metrics": metrics,
     }
 
     return cast(ScoutResult, result)
