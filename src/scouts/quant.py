@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, cast
 
 from dotenv import load_dotenv
@@ -84,7 +84,7 @@ REPORT_TITLES = {
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(timezone(timedelta(hours=9))).isoformat()
 
 
 def _label(mapping: dict[str, str], key: Any) -> str:
