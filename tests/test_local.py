@@ -46,8 +46,10 @@ class LocalScoutTest(unittest.TestCase):
         source_ids = {source["source_id"] for source in result["sources"]}
 
         for source in result["sources"]:
-            for field in ("source_url", "published_at", "collected_at"):
+            for field in ("source_url", "published_at", "collected_at", "title"):
                 self.assertTrue(source[field])
+            self.assertTrue(source["verification"]["verified_at"])
+            self.assertTrue(source["verification"]["excerpt"])
 
         for insight in result["insights"]:
             for field in (
@@ -66,7 +68,7 @@ class LocalScoutTest(unittest.TestCase):
         tram = next(
             insight for insight in result["insights"] if insight["insight_id"] == "L-002"
         )
-        self.assertEqual(len(tram["source_ids"]), 3)
+        self.assertEqual(len(tram["source_ids"]), 2)
         self.assertEqual(len(result["insights"]), 3)
 
     def test_unsupported_area_does_not_receive_test_area_evidence(self) -> None:
@@ -92,6 +94,32 @@ class LocalScoutTest(unittest.TestCase):
         self.assertTrue(
             any("INSUFFICIENT_RECENT_EVIDENCE" in warning for warning in result["warnings"])
         )
+        self.assertIn("확인 가능한 지역 변화 근거가 없다", result["summary"])
+        self.assertNotIn("동시에 진행 중", result["summary"])
+
+    def test_single_scheduled_event_summary_mentions_only_that_event(self) -> None:
+        self.request["research"]["reference_date"] = "2026-03-29"
+        self.request["research"]["lookback_days"] = 0
+
+        result = run_local_scout(self.request)
+
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(len(result["insights"]), 1)
+        self.assertEqual(result["insights"][0]["change_state"], "scheduled_launch")
+        self.assertIn("자율주행 모빌리티 오픈식·시범운행 예정 공지", result["summary"])
+        self.assertNotIn("트램", result["summary"])
+        self.assertNotIn("특화", result["summary"])
+
+    def test_reference_date_preserves_scheduled_not_launched_stage(self) -> None:
+        self.request["research"]["reference_date"] = "2026-03-29"
+        self.request["research"]["lookback_days"] = 0
+
+        result = run_local_scout(self.request)
+
+        insight = result["insights"][0]
+        self.assertEqual(insight["change_state"], "scheduled_launch")
+        self.assertIn("예정", insight["evidence"])
+        self.assertTrue(any("실제 운영 개시" in warning for warning in result["warnings"]))
 
 
 if __name__ == "__main__":
