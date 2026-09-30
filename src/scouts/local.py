@@ -39,6 +39,18 @@ FAILED_QUERIES = [
     },
 ]
 
+# These records document the one-time evidence collection for the Week-1 PoC.
+# They are intentionally not represented as live searches made by run_local_scout.
+QUERY_LOG_PROVENANCE = {
+    "mode": "curated_historical_record",
+    "executed_during_run": False,
+    "recorded_at": COLLECTED_AT,
+    "description": (
+        "successful_queries와 failed_queries는 고정 근거를 수집할 때의 기록이며, "
+        "이번 함수 실행에서 수행한 자동 검색 로그가 아니다."
+    ),
+}
+
 SOURCES: list[dict[str, Any]] = [
     {
         "source_id": "S-L-001",
@@ -255,6 +267,7 @@ def _empty_result(
             "requested_store": deepcopy(request.get("store") or {}),
             "successful_queries": deepcopy(SUCCESSFUL_QUERIES),
             "failed_queries": deepcopy(FAILED_QUERIES),
+            "query_log_provenance": deepcopy(QUERY_LOG_PROVENANCE),
         },
         "summary": "검증된 테스트 지역과 일치하지 않아 지역 변화 근거를 반환하지 않았다.",
         "insights": [],
@@ -337,6 +350,7 @@ def run_local_scout(request: SpotRequest) -> ScoutResult:
             "lookback_start": lookback_start.isoformat(),
             "successful_queries": deepcopy(SUCCESSFUL_QUERIES),
             "failed_queries": deepcopy(FAILED_QUERIES),
+            "query_log_provenance": deepcopy(QUERY_LOG_PROVENANCE),
             "duplicate_policy": "동일 사건의 복수 보도는 source_ids로 묶고 insight 1건으로 계산",
         },
         "summary": _build_summary(

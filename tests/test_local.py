@@ -40,6 +40,11 @@ class LocalScoutTest(unittest.TestCase):
         self.assertTrue(result["started_at"])
         self.assertTrue(result["finished_at"])
         self.assertEqual(result["errors"], [])
+        self.assertFalse(result["query_context"]["query_log_provenance"]["executed_during_run"])
+        self.assertEqual(
+            result["query_context"]["query_log_provenance"]["mode"],
+            "curated_historical_record",
+        )
 
     def test_evidence_preserves_required_local_fields(self) -> None:
         result = run_local_scout(self.request)
@@ -83,6 +88,7 @@ class LocalScoutTest(unittest.TestCase):
         self.assertEqual(result["insights"], [])
         self.assertEqual(result["sources"], [])
         self.assertIn("UNSUPPORTED_AREA_WEEK1_POC", result["warnings"][0])
+        self.assertFalse(result["query_context"]["query_log_provenance"]["executed_during_run"])
 
     def test_short_lookback_returns_partial(self) -> None:
         self.request["research"]["lookback_days"] = 30
