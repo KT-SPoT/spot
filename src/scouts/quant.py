@@ -27,7 +27,6 @@ from src.scouts.quant_sales import parse_sales_report
 from src.scouts.quant_sbiz365 import Sbiz365Error, collect_sbiz365_reports
 
 
-DEFAULT_RADIUS_M = 1000
 REPORT_NUMBERS = (2, 3, 4, 6, 7, 8)
 CORE_SECTIONS = {"industry", "sales", "population", "area"}
 
@@ -112,11 +111,13 @@ def _failed_result(
     *,
     code: str,
     message: str,
+    retryable: bool,
+    detail: str,
     query_context: dict[str, Any],
 ) -> ScoutResult:
     return {
         "schema_version": "0.1",
-        "request_id": request.get("request_id", "unknown"),
+        "request_id": request.get("request_id") or "unknown",
         "module": "quant",
         "status": "failed",
         "started_at": started_at,
@@ -130,9 +131,156 @@ def _failed_result(
             {
                 "code": code,
                 "message": message,
+                "retryable": retryable,
+                "detail": detail,
             }
         ],
     }
+
+
+def _validate_request(
+    request: SpotRequest,
+    store: dict[str, Any],
+    campaign: dict[str, Any],
+    research: dict[str, Any],
+) -> tuple[str, str, bool, str] | None:
+    if request.get("schema_version") != "0.1":
+        return (
+            "QUANT_INVALID_SCHEMA_VERSION",
+            "schema_version은 '0.1'이어야 합니다.",
+            False,
+            f"received={request.get('schema_version')!r}",
+        )
+
+    request_id = request.get("request_id")
+    if not isinstance(request_id, str) or not request_id.strip():
+        return (
+            "QUANT_MISSING_REQUEST_ID",
+            "request_id는 필수입니다.",
+            False,
+            "SpotRequest.request_id가 비어 있거나 문자열이 아닙니다.",
+        )
+
+    requested_at = request.get("requested_at")
+    if not isinstance(requested_at, str) or not requested_at.strip():
+        return (
+            "QUANT_INVALID_REQUESTED_AT",
+            "requested_at은 timezone이 포함된 ISO 8601 datetime이어야 합니다.",
+            False,
+            "SpotRequest.requested_at이 비어 있거나 문자열이 아닙니다.",
+        )
+    try:
+        parsed_requested_at = datetime.fromisoformat(
+            requested_at.strip().replace("Z", "+00:00")
+        )
+    except ValueError:
+        return (
+            "QUANT_INVALID_REQUESTED_AT",
+            "requested_at은 timezone이 포함된 ISO 8601 datetime이어야 합니다.",
+            False,
+            f"received={requested_at!r}",
+        )
+    if parsed_requested_at.tzinfo is None:
+        return (
+            "QUANT_INVALID_REQUESTED_AT",
+            "requested_at은 timezone이 포함된 ISO 8601 datetime이어야 합니다.",
+            False,
+            f"timezone missing: received={requested_at!r}",
+        )
+
+    store_name = store.get("name")
+    if not isinstance(store_name, str) or not store_name.strip():
+        return (
+            "QUANT_MISSING_STORE_NAME",
+            "store.name은 필수입니다.",
+            False,
+            "SpotRequest.store.name이 비어 있거나 문자열이 아닙니다.",
+        )
+
+    store_address = store.get("address")
+    if not isinstance(store_address, str) or not store_address.strip():
+        return (
+            "QUANT_MISSING_STORE_ADDRESS",
+            "store.address는 필수입니다.",
+            False,
+            "SpotRequest.store.address가 비어 있거나 문자열이 아닙니다.",
+        )
+
+    campaign_purpose = campaign.get("purpose")
+    if not isinstance(campaign_purpose, str) or not campaign_purpose.strip():
+        return (
+            "QUANT_MISSING_CAMPAIGN_PURPOSE",
+            "campaign.purpose는 필수입니다.",
+            False,
+            "SpotRequest.campaign.purpose가 비어 있거나 문자열이 아닙니다.",
+        )
+
+    reference_date = research.get("reference_date")
+    if not isinstance(reference_date, str):
+        return (
+            "QUANT_INVALID_REFERENCE_DATE",
+            "research.reference_date는 YYYY-MM-DD 형식의 필수 날짜입니다.",
+            False,
+            f"received={reference_date!r}",
+        )
+    try:
+        parsed_reference_date = datetime.strptime(reference_date, "%Y-%m-%d")
+    except ValueError:
+        return (
+            "QUANT_INVALID_REFERENCE_DATE",
+            "research.reference_date는 YYYY-MM-DD 형식의 필수 날짜입니다.",
+            False,
+            f"received={reference_date!r}",
+        )
+    if parsed_reference_date.strftime("%Y-%m-%d") != reference_date:
+        return (
+            "QUANT_INVALID_REFERENCE_DATE",
+            "research.reference_date는 YYYY-MM-DD 형식의 필수 날짜입니다.",
+            False,
+            f"received={reference_date!r}",
+        )
+
+    radius_raw = research.get("radius_m")
+    if isinstance(radius_raw, bool):
+        radius_raw = None
+    try:
+        radius_m = int(radius_raw)
+    except (TypeError, ValueError):
+        return (
+            "QUANT_INVALID_RADIUS",
+            "research.radius_m은 1 이상의 정수여야 합니다.",
+            False,
+            f"received={research.get('radius_m')!r}",
+        )
+    if radius_m <= 0:
+        return (
+            "QUANT_INVALID_RADIUS",
+            "research.radius_m은 1 이상의 정수여야 합니다.",
+            False,
+            f"received={research.get('radius_m')!r}",
+        )
+
+    lookback_raw = research.get("lookback_days")
+    if isinstance(lookback_raw, bool):
+        lookback_raw = None
+    try:
+        lookback_days = int(lookback_raw)
+    except (TypeError, ValueError):
+        return (
+            "QUANT_INVALID_LOOKBACK_DAYS",
+            "research.lookback_days는 1 이상의 정수여야 합니다.",
+            False,
+            f"received={research.get('lookback_days')!r}",
+        )
+    if lookback_days <= 0:
+        return (
+            "QUANT_INVALID_LOOKBACK_DAYS",
+            "research.lookback_days는 1 이상의 정수여야 합니다.",
+            False,
+            f"received={research.get('lookback_days')!r}",
+        )
+
+    return None
 
 
 def _parse_reports(
@@ -155,13 +303,15 @@ def _parse_reports(
         if not html:
             errors.append(
                 {
-                    "code": f"SBIZ365_REPORT_{report_no}_MISSING",
+                    "code": f"QUANT_SBIZ365_REPORT_{report_no}_MISSING",
                     "message": (
                         f"sang_gwon{report_no}.sg ({REPORT_TITLES[report_no]}) "
                         "응답을 찾지 못했습니다."
                     ),
-                    "section": section,
-                    "report": f"sang_gwon{report_no}.sg",
+                    "retryable": True,
+                    "detail": (
+                        f"section={section}; report=sang_gwon{report_no}.sg"
+                    ),
                 }
             )
             continue
@@ -171,10 +321,13 @@ def _parse_reports(
         except Exception as exc:
             errors.append(
                 {
-                    "code": f"SBIZ365_REPORT_{report_no}_PARSE_ERROR",
-                    "message": str(exc),
-                    "section": section,
-                    "report": f"sang_gwon{report_no}.sg",
+                    "code": f"QUANT_SBIZ365_REPORT_{report_no}_PARSE_ERROR",
+                    "message": "소상공인365 상세분석 응답을 파싱하지 못했습니다.",
+                    "retryable": True,
+                    "detail": (
+                        f"section={section}; report=sang_gwon{report_no}.sg; "
+                        f"error={exc}"
+                    ),
                 }
             )
             continue
@@ -464,7 +617,7 @@ def _build_compact_metrics(
         # 전체 업종 점포수/카테고리 분포는 이 수집 범위에서 제공되지 않는다.
         "total_store_count": None,
         "telecom_store_count": industry.get("latest_store_count"),
-        "category_counts": [],
+        "category_counts": None,
         "telecom_store_yoy_percent": store_yoy,
         "monthly_avg_sales_10k_krw": sales.get(
             "latest_monthly_average_sales_amount_10k_krw"
@@ -686,14 +839,18 @@ def _build_sources(finished_at: str) -> list[dict[str, Any]]:
 
 def run_quant_scout(request: SpotRequest) -> ScoutResult:
     started_at = _now_iso()
-    request_id = request.get("request_id", "unknown")
 
-    store = request.get("store") or {}
-    research = request.get("research") or {}
+    store_raw = request.get("store")
+    campaign_raw = request.get("campaign")
+    research_raw = request.get("research")
+
+    store = store_raw if isinstance(store_raw, dict) else {}
+    campaign = campaign_raw if isinstance(campaign_raw, dict) else {}
+    research = research_raw if isinstance(research_raw, dict) else {}
 
     lat = store.get("lat")
     lng = store.get("lng")
-    radius_raw = research.get("radius_m", DEFAULT_RADIUS_M)
+    radius_raw = research.get("radius_m")
 
     query_context: dict[str, Any] = {
         "store_name": store.get("name"),
@@ -704,17 +861,23 @@ def run_quant_scout(request: SpotRequest) -> ScoutResult:
         "provider": "소상공인365",
     }
 
-    if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
-        store_address = store.get("address")
+    validation_error = _validate_request(request, store, campaign, research)
+    if validation_error is not None:
+        code, message, retryable, detail = validation_error
+        return _failed_result(
+            request,
+            started_at,
+            code=code,
+            message=message,
+            retryable=retryable,
+            detail=detail,
+            query_context=query_context,
+        )
 
-        if not isinstance(store_address, str) or not store_address.strip():
-            return _failed_result(
-                request,
-                started_at,
-                code="MISSING_LOCATION",
-                message="store.lat/store.lng 좌표 또는 store.address 주소가 필요합니다.",
-                query_context=query_context,
-            )
+    request_id = str(request["request_id"])
+
+    if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
+        store_address = str(store["address"])
 
         load_dotenv()
         kakao_api_key = os.getenv("KAKAO_REST_API_KEY", "").strip()
@@ -723,8 +886,10 @@ def run_quant_scout(request: SpotRequest) -> ScoutResult:
             return _failed_result(
                 request,
                 started_at,
-                code="MISSING_KAKAO_REST_API_KEY",
+                code="QUANT_MISSING_KAKAO_REST_API_KEY",
                 message="환경변수 KAKAO_REST_API_KEY가 없습니다.",
+                retryable=True,
+                detail="Kakao 주소 좌표 변환을 위해 KAKAO_REST_API_KEY 설정이 필요합니다.",
                 query_context=query_context,
             )
 
@@ -737,8 +902,10 @@ def run_quant_scout(request: SpotRequest) -> ScoutResult:
             return _failed_result(
                 request,
                 started_at,
-                code="ADDRESS_GEOCODING_ERROR",
-                message=str(exc),
+                code="QUANT_ADDRESS_GEOCODING_ERROR",
+                message="매장 주소를 좌표로 변환하지 못했습니다.",
+                retryable=True,
+                detail=str(exc),
                 query_context=query_context,
             )
 
@@ -757,8 +924,10 @@ def run_quant_scout(request: SpotRequest) -> ScoutResult:
         return _failed_result(
             request,
             started_at,
-            code="INVALID_RADIUS",
-            message="research.radius_m은 정수여야 합니다.",
+            code="QUANT_INVALID_RADIUS",
+            message="research.radius_m은 1 이상의 정수여야 합니다.",
+            retryable=False,
+            detail=f"received={radius_raw!r}",
             query_context=query_context,
         )
 
@@ -766,8 +935,10 @@ def run_quant_scout(request: SpotRequest) -> ScoutResult:
         return _failed_result(
             request,
             started_at,
-            code="INVALID_RADIUS",
-            message="research.radius_m은 1 이상이어야 합니다.",
+            code="QUANT_INVALID_RADIUS",
+            message="research.radius_m은 1 이상의 정수여야 합니다.",
+            retryable=False,
+            detail=f"received={radius_raw!r}",
             query_context=query_context,
         )
 
@@ -780,8 +951,10 @@ def run_quant_scout(request: SpotRequest) -> ScoutResult:
         return _failed_result(
             request,
             started_at,
-            code="MISSING_SBIZ365_CERT_KEY",
+            code="QUANT_MISSING_SBIZ365_CERT_KEY",
             message="환경변수 SBIZ365_CERT_KEY가 없습니다.",
+            retryable=True,
+            detail="소상공인365 상세분석 수집을 위해 SBIZ365_CERT_KEY 설정이 필요합니다.",
             query_context=query_context,
         )
 
@@ -797,8 +970,10 @@ def run_quant_scout(request: SpotRequest) -> ScoutResult:
         return _failed_result(
             request,
             started_at,
-            code="SBIZ365_COLLECTION_ERROR",
-            message=str(exc),
+            code="QUANT_SBIZ365_COLLECTION_ERROR",
+            message="소상공인365 상세분석 수집에 실패했습니다.",
+            retryable=True,
+            detail=str(exc),
             query_context=query_context,
         )
 
@@ -811,8 +986,10 @@ def run_quant_scout(request: SpotRequest) -> ScoutResult:
         return _failed_result(
             request,
             started_at,
-            code="SBIZ365_CORE_REPORTS_UNAVAILABLE",
+            code="QUANT_SBIZ365_CORE_REPORTS_UNAVAILABLE",
             message="업종/매출/인구/지역현황 핵심 리포트를 파싱하지 못했습니다.",
+            retryable=True,
+            detail="industry/sales/population/area 핵심 섹션을 하나도 확보하지 못했습니다.",
             query_context={
                 **query_context,
                 "admi_cd": collected.get("admi_cd"),
