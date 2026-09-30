@@ -1,0 +1,299 @@
+{
+  "data_kind": "synthetic",
+  "policy_version": "draft-0.1",
+  "verified_on": "2026-09-30",
+  "environment": {
+    "python": "3.12.14",
+    "platform": "Linux"
+  },
+  "sample_cases": 27,
+  "passed_cases": 27,
+  "rule_status_counts": {
+    "pass": 3,
+    "manual_review": 11,
+    "needs_fix": 13
+  },
+  "unittest_tests": 26,
+  "unittest_result": "pass",
+  "quality_approval": false,
+  "cases": [
+    {
+      "id": "C01",
+      "rule_status": "pass",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C02",
+      "rule_status": "manual_review",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "SCOUT_NOT_SUCCESS",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C03",
+      "rule_status": "manual_review",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "EMPTY_EVIDENCE",
+        "SCOUT_ERRORS_PRESENT",
+        "SCOUT_NOT_SUCCESS",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C04",
+      "rule_status": "manual_review",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "MOCK_EVIDENCE",
+        "SCOUT_WARNINGS_PRESENT",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C05",
+      "rule_status": "needs_fix",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "INVALID_SCOUT_RESULT",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C06",
+      "rule_status": "needs_fix",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "INVALID_SCOUT_RESULT",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C07",
+      "rule_status": "needs_fix",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "INVALID_SCOUT_RESULT",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C08",
+      "rule_status": "needs_fix",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "BROKEN_SOURCE_REFERENCE",
+        "EMPTY_EVIDENCE",
+        "NO_RECENT_CITED_SOURCE",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C09",
+      "rule_status": "manual_review",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "NO_RECENT_CITED_SOURCE",
+        "PUBLICATION_DATE_UNAVAILABLE",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C10",
+      "rule_status": "needs_fix",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "FUTURE_PUBLICATION",
+        "NO_RECENT_CITED_SOURCE",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C11",
+      "rule_status": "manual_review",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "NO_RECENT_CITED_SOURCE",
+        "OUTSIDE_LOOKBACK",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C12",
+      "rule_status": "needs_fix",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "INVALID_PUBLICATION_DATE",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C13",
+      "rule_status": "needs_fix",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "BROKEN_SOURCE_REFERENCE",
+        "NO_RECENT_CITED_SOURCE",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C14",
+      "rule_status": "needs_fix",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "DUPLICATE_SOURCE_ID",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C15",
+      "rule_status": "manual_review",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "DUPLICATE_SOURCE_URL",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C16",
+      "rule_status": "needs_fix",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "DUPLICATE_EVENT_KEY",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C17",
+      "rule_status": "pass",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C18",
+      "rule_status": "manual_review",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "CHANGE_STAGE_UNAVAILABLE",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C19",
+      "rule_status": "needs_fix",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "PATTERN_COUNT_MISMATCH",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C20",
+      "rule_status": "needs_fix",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "BROKEN_PATTERN_CASE_REFERENCE",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C21",
+      "rule_status": "manual_review",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "PATTERN_NOT_REPEATED",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C22",
+      "rule_status": "manual_review",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "EVIDENCE_LINK_UNAVAILABLE",
+        "SOURCE_URL_UNAVAILABLE",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C23",
+      "rule_status": "pass",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C24",
+      "rule_status": "needs_fix",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "FUTURE_PUBLICATION",
+        "NO_RECENT_CITED_SOURCE",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C25",
+      "rule_status": "needs_fix",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "MODULE_STATUS_MISMATCH",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C26",
+      "rule_status": "manual_review",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "SCOUT_WARNINGS_PRESENT",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    },
+    {
+      "id": "C27",
+      "rule_status": "manual_review",
+      "quality_status": "manual_review",
+      "finding_codes": [
+        "PATTERN_CASE_TRACE_UNAVAILABLE",
+        "SYNTHETIC_EVIDENCE"
+      ],
+      "matches_expectation": true
+    }
+  ]
+}

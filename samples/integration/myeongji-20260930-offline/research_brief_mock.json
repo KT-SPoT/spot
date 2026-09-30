@@ -1,0 +1,18 @@
+{
+  "schema_version": "0.1",
+  "request_id": "spot-myeongji-international-20260930-001",
+  "status": "mock",
+  "overview": {
+    "area_summary": "SPOT mock Research Brief",
+    "primary_customer_signal": null
+  },
+  "local_changes": [],
+  "unique_local_signals": [],
+  "trend_patterns": [],
+  "why_here_now": "Mock only. Real Scout evidence is not connected yet.",
+  "research_implications": [],
+  "needs_manual_check": [
+    "Connect real Scout outputs before using this result."
+  ],
+  "source_count": 0
+}

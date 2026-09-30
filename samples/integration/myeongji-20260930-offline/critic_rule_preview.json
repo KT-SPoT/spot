@@ -1,0 +1,111 @@
+{
+  "policy_version": "draft-0.1",
+  "preview_only": true,
+  "request_id": "spot-myeongji-international-20260930-001",
+  "rule_status": "manual_review",
+  "quality_status": "manual_review",
+  "findings": [
+    {
+      "rule_id": "R02",
+      "code": "SCOUT_NOT_SUCCESS",
+      "module": "quant",
+      "level": "manual_review",
+      "path": "results.quant.status",
+      "message": "partial/failed를 전체 실패로 단정하지 않고 부족 사유를 확인한다."
+    },
+    {
+      "rule_id": "R02",
+      "code": "SCOUT_ERRORS_PRESENT",
+      "module": "quant",
+      "level": "manual_review",
+      "path": "results.quant.errors",
+      "message": "Scout 오류를 확인한다."
+    },
+    {
+      "rule_id": "R03",
+      "code": "EMPTY_EVIDENCE",
+      "module": "quant",
+      "level": "manual_review",
+      "path": "results.quant",
+      "message": "인사이트 또는 출처가 없다. 추가 확보 가능 여부를 확인한다."
+    },
+    {
+      "rule_id": "R02",
+      "code": "SCOUT_NOT_SUCCESS",
+      "module": "local",
+      "level": "manual_review",
+      "path": "results.local.status",
+      "message": "partial/failed를 전체 실패로 단정하지 않고 부족 사유를 확인한다."
+    },
+    {
+      "rule_id": "R02",
+      "code": "SCOUT_WARNINGS_PRESENT",
+      "module": "local",
+      "level": "manual_review",
+      "path": "results.local.warnings",
+      "message": "고정 사례·미지원 지역·관련성 미검토 등 Scout 경고를 사람이 확인한다."
+    },
+    {
+      "rule_id": "R02",
+      "code": "SCOUT_WARNINGS_PRESENT",
+      "module": "trend",
+      "level": "manual_review",
+      "path": "results.trend.warnings",
+      "message": "고정 사례·미지원 지역·관련성 미검토 등 Scout 경고를 사람이 확인한다."
+    },
+    {
+      "rule_id": "R05",
+      "code": "PUBLICATION_DATE_UNAVAILABLE",
+      "module": "trend",
+      "level": "manual_review",
+      "path": "results.trend.sources[1].published_at",
+      "message": "게시일이 없으므로 최신성을 확정할 수 없다."
+    },
+    {
+      "rule_id": "R05",
+      "code": "PUBLICATION_DATE_UNAVAILABLE",
+      "module": "trend",
+      "level": "manual_review",
+      "path": "results.trend.sources[5].published_at",
+      "message": "게시일이 없으므로 최신성을 확정할 수 없다."
+    },
+    {
+      "rule_id": "R05",
+      "code": "PUBLICATION_DATE_UNAVAILABLE",
+      "module": "trend",
+      "level": "manual_review",
+      "path": "results.trend.sources[7].published_at",
+      "message": "게시일이 없으므로 최신성을 확정할 수 없다."
+    }
+  ],
+  "counts": {
+    "quant": {
+      "insights": 0,
+      "sources": 0,
+      "unique_source_urls": 0,
+      "cited_sources": 0,
+      "recent_cited_sources": null
+    },
+    "local": {
+      "insights": 2,
+      "sources": 4,
+      "unique_source_urls": 4,
+      "cited_sources": 4,
+      "recent_cited_sources": 4
+    },
+    "trend": {
+      "insights": 10,
+      "sources": 18,
+      "unique_source_urls": 18,
+      "cited_sources": 18,
+      "recent_cited_sources": 15
+    }
+  },
+  "pending_checks": [
+    "원문이 주장 내용을 실제로 뒷받침하는지 확인",
+    "지역 구체 신호 최소 2개 여부 — 기존 MVP 초안, 의미 검토 필요",
+    "유사 상권 대비 차이 최소 1개 여부 — 기존 MVP 초안, 의미 검토 필요",
+    "세 Scout 근거의 논리적 연결과 캠페인 관련성 검토",
+    "Scout별 최소 근거 수 및 retry 정책 팀 합의"
+  ]
+}

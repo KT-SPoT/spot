@@ -1,0 +1,17 @@
+{
+  "mode": "offline",
+  "graph_completed": true,
+  "all_contracts_valid": true,
+  "validation_errors": {
+    "quant": [],
+    "local": [],
+    "trend": []
+  },
+  "module_status": {
+    "quant": "failed",
+    "local": "partial",
+    "trend": "success"
+  },
+  "critic_is_mock": true,
+  "brief_is_mock": true
+}
