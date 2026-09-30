@@ -48,6 +48,40 @@ AI coding agent를 사용할 때는 먼저 [AGENTS.md](AGENTS.md)를 읽게 합�
 
 Implementation contract: [docs/api-contract.md](docs/api-contract.md)
 
+## 로컬 mock smoke test
+
+Week 1 smoke test는 외부 API를 호출하지 않고 다음 통합 경로를 검증합니다.
+
+```text
+SpotRequest
+  -> Quant / Local / Trend placeholders
+  -> Merge
+  -> Mock Critic
+  -> Mock Research Brief
+```
+
+저장소 루트에서 가상환경을 만들고 의존성을 설치한 뒤 테스트를 실행합니다.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt -c constraints-test.txt
+python -m unittest discover -s tests -v
+```
+
+Windows PowerShell에서는 `.venv\Scripts\Activate.ps1`로 가상환경을 활성화합니다.
+현재 mock 흐름에는 API Key나 별도 환경변수가 필요하지 않습니다.
+
+검증 환경은 Python 3.12.14 / Linux입니다. `constraints-test.txt`로 테스트 의존성 버전을 맞춥니다.
+테스트는 Scout 호출을 mock으로 대체하므로 실제 Scout 개발 후에도 외부 API 없이 실행됩니다.
+실제 Scout 샘플은 별도 계약 검사 도구로 확인하세요.
+
+```bash
+python -m src.validation path/to/scout_result.json --module quant --request-id spot-example-001
+```
+
+검사 범위·실패 정책·PR 인수 체크리스트: [통합 준비 가이드](docs/INTEGRATION_READINESS.md).
+
 ## Security
 
 실제 API Key, n8n credential, token, password는 저장소에 커밋하지 않습니다.
