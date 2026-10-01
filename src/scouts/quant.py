@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import os
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, cast
 
@@ -684,7 +685,8 @@ def _build_sources(finished_at: str) -> list[dict[str, Any]]:
     ]
 
 
-def run_quant_scout(request: SpotRequest) -> ScoutResult:
+def run_quant_scout(request: SpotRequest, *, evidence_sink: Callable | None = None) -> ScoutResult:
+    """Optionally retain this run's provider evidence internally; public output unchanged."""
     started_at = _now_iso()
     request_id = request.get("request_id", "unknown")
 
@@ -881,4 +883,13 @@ def run_quant_scout(request: SpotRequest) -> ScoutResult:
         "errors": errors,
     }
 
+    if evidence_sink is not None:
+        evidence_sink(deepcopy({
+            "analysis": {name: collected.get("analysis", {}).get(name)
+                         for name in ("lat", "lng", "radius_m", "upjong_cd")},
+            "analy_date": collected.get("analy_date"),
+            "reports": {number: {"html": report.get("html")}
+                        for number, report in collected.get("reports", {}).items()
+                        if number in (2, 3, 4, 6)},
+        }))
     return cast(ScoutResult, result)

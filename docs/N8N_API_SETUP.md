@@ -87,6 +87,8 @@ request_id를 생략하면 n8n 실행 번호로 생성합니다. 같은 요청�
 완료는 그래프 실행 완료를 뜻합니다. 근거 부족이면 완료된 작업의 Brief 상태가
 `failed`일 수 있습니다. `module_status`, Brief 상태와 `needs_manual_check`를 함께
 확인하세요. 현재 Critic은 Mock이며 `critic_is_mock=true`입니다.
+API 브리프는 같은 실행의 Quant 원문을 내부적으로 연결해 인구 비율을
+표시하고 관련 트렌드 보도를 묶습니다. [기준과 한계](BRIEF_ENRICHMENT.md).
 
 ## HTTP API 동작
 
@@ -118,7 +120,12 @@ node tests/test_n8n_workflow.js
 
 HTTP 테스트는 합성 runner와 실제 그래프의 offline 모드를 사용합니다. 외부 provider를
 호출하지 않습니다. n8n 검증은 가져올 JSON의 연결·인증 설정과 실제 Code 노드 내용을 실행합니다.
-실제 팀 n8n에서 가져오기·Credential 선택·운영 실행은 아직 수행하지 않았습니다.
+2026-10-01 팀의 기존 `SPOT - Main Entry`에 접수·조회 노드와 저장된 인증을
+연결했습니다. 임시 HTTPS 개발 터널을 통한 offline 및 live 테스트에서 접수
+202/조회 200을 확인했습니다. Live 결과에는 세 인구 모집단의 비율과 관련
+보도 4건/1건의 두 후보 묶음, 고유 출처 20개가 포함됐습니다. 유튜브는
+테스트에서 제외했고 실제 인증 값의 응답 노출이 없는지 확인했습니다.
+운영 Publish는 하지 않았으며 PC/터널 종료 시 연결은 끊깁니다.
 
 참고: [HTTP Request](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/),
 [Webhook](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/),

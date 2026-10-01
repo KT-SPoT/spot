@@ -16,7 +16,9 @@ from src.scouts.trend import run_trend_scout
 
 
 def quant_node(state: SpotState) -> dict:
-    return {"quant_result": run_quant_scout(state["request"])}
+    evidence = {}
+    result = run_quant_scout(state["request"], evidence_sink=evidence.update)
+    return {"quant_result": result, "quant_evidence": evidence or None}
 
 
 def local_node(state: SpotState) -> dict:
@@ -57,7 +59,8 @@ def critic_node(state: SpotState) -> dict:
 
 
 def brief_node(state: SpotState) -> dict:
-    return {"research_brief": generate_brief(state["research_bundle"], state.get("critic_result"))}
+    return {"research_brief": generate_brief(state["research_bundle"], state.get("critic_result"),
+                                            quant_evidence=state.get("quant_evidence"))}
 
 
 def build_graph():

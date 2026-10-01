@@ -48,7 +48,7 @@ class TrendContextTests(unittest.TestCase):
     def test_graph_parallel_barrier_and_complete_context_once(self):
         bundle=evidence(); arrived=threading.Barrier(2)
         def runner(module):
-            def run(request):
+            def run(request, **kwargs):
                 arrived.wait(timeout=5)
                 return bundle['results'][module]
             return run

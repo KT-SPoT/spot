@@ -101,13 +101,19 @@ def render_markdown(brief):
                           f"- 범위: {card['scope']}", f"- 근거: {_refs(card)}"])
             lines.extend("- 선정 이유: " + text for text in card.get("why_relevant", []))
             lines.extend("- 한계: " + text for text in card.get("limitations", []))
+            if card.get("article_count", 1) > 1:
+                lines.append(f"- 관련 보도: {card['article_count']}건을 후보 묶음 1개로 표시")
+                for facet in card.get("supporting_facets", []):
+                    lines.append(f"- 함께 묶은 보도: {_cell(facet.get('title'))}; 근거: {', '.join(facet['source_ids'])}")
             for module, entries in card.get("context_sources", {}).items():
                 lines.append("- 맥락 근거: " + ", ".join(f"{module}:{s['source_id']}" for s in entries))
             continue
-        label = "개 후보자료" if card.get("verification_status") == "candidate" else "개 사례"
+        label = "개 후보 묶음(독립 행사 미확인)" if card.get("verification_status") == "candidate" else "개 사례"
         lines.extend(["", f"### {card.get('name', '체험 패턴')} — {card['evidence_count']}{label}", "",
                       str(card.get("description", "")), "",
                       f"- 범위: {card['scope']}", f"- 근거: {_refs(card)}"])
+        if card.get("verification_status") == "candidate":
+            lines.append(f"- 연결된 보도: {card.get('article_count', card['evidence_count'])}건; 보도 묶음 간에도 동일 행사일 수 있어 원문 확인 필요")
 
     lines.extend(["", "## Why here / why now", "", brief["why_here_now"], "",
                   "## 기획 전 조사 질문", ""])
