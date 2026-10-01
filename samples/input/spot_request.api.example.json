@@ -1,0 +1,20 @@
+{
+  "schema_version": "0.1",
+  "request_id": "spot-api-example-001",
+  "store": {
+    "name": "연결 테스트점 (합성 입력)",
+    "address": "연결 테스트 주소 (실제 조사 시 교체)",
+    "lat": null,
+    "lng": null
+  },
+  "campaign": {
+    "purpose": "신제품 체험 행사 사전 리서치",
+    "product": "Galaxy Z Fold8",
+    "target_hint": null
+  },
+  "research": {
+    "radius_m": 1000,
+    "lookback_days": 180,
+    "comparison_area": null
+  }
+}

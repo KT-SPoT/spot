@@ -6,6 +6,8 @@ SPOT은 KT Plaza 홍보기획 전 단계에서 상권·지역 변화·트렌드�
 
 ## Architecture
 
+HTTP API와 n8n 가져오기 파일: [연결 안내](docs/N8N_API_SETUP.md).
+
 ```text
 n8n Main Entry
   -> LangGraph
