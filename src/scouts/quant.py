@@ -1059,7 +1059,7 @@ def run_quant_scout(request: SpotRequest) -> ScoutResult:
             "store_address": query_context.get("store_address"),
             "lat": query_context.get("lat"),
             "lng": query_context.get("lng"),
-            "analysis_date": collected.get("analy_date"),
+            "analysis_date": _date_text(collected.get("analy_date")),
             "upjong_cd": collected.get("analysis", {}).get("upjong_cd"),
         },
         "summary": summary,
