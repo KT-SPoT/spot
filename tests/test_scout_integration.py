@@ -25,7 +25,8 @@ class ScoutIntegrationTest(unittest.TestCase):
         self.assertEqual({i["insight_id"] for i in bundle["results"]["local"]["insights"]}, {"L-002", "L-003"})
         self.assertEqual(len(bundle["results"]["trend"]["insights"]), 10)
         self.assertEqual(run["state"]["critic_result"]["status"], "manual_review")
-        self.assertTrue(run["brief_is_mock"])
+        self.assertFalse(run["brief_is_mock"])
+        self.assertEqual(run["state"]["research_brief"]["status"], "manual_review")
 
     def test_coordinates_skip_geocoding_but_require_sbiz_key(self):
         # Synthetic coordinate input tests routing, not a real store's location.

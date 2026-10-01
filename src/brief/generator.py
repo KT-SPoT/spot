@@ -1,6 +1,266 @@
-"""Research Brief scaffold — owner: 김민석."""
+"""Evidence-based Research Brief draft; no external API or LLM calls."""
 
+from copy import deepcopy
+from math import isfinite
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+from src.critic.rules import evaluate_rules
+from src.validation import validate_scout_result
+
+
+METRICS = {
+    "telecom_store_count": ("핸드폰 소매업 업소 수", "개", "industry"),
+    "telecom_store_yoy_percent": ("업소 수 전년동월 대비", "%", "industry"),
+    "monthly_avg_sales_10k_krw": ("업소당 월평균 매출액", "만원", "sales"),
+    "monthly_avg_sales_transactions": ("업소당 월평균 매출건수", "건", "sales"),
+    "daily_avg_floating_population": ("월별 일평균 유동인구", "명", "population"),
+    "resident_population": ("주거인구", "명", "resident"),
+    "worker_population": ("직장인구", "명", "worker"),
+    "household_count": ("세대수", "세대", "area"),
+}
+AGE_LABELS = {"under_10": "10세 미만", "teens": "10대", "20s": "20대",
+              "30s": "30대", "40s": "40대", "50s": "50대", "60_plus": "60대 이상"}
+
+
+def _number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(value)
+
+
+def _safe_source(source):
+    source = deepcopy(source)
+    url = source.get("source_url")
+    if not isinstance(url, str):
+        return None
+    try:
+        parts = urlsplit(url)
+        if parts.scheme not in ("https", "http") or not parts.netloc or parts.username:
+            return None
+        secret_names = {"certkey", "apikey", "api_key", "key", "token", "access_token", "secret"}
+        query = [(name, "[REDACTED]" if name.lower() in secret_names else value)
+                 for name, value in parse_qsl(parts.query, keep_blank_values=True)]
+        source["source_url"] = urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), ""))
+    except ValueError:
+        return None
+    return source
+
+
+def _period(sections, group):
+    population = sections.get("population", {})
+    if group in ("industry", "sales"):
+        value = sections.get(group, {}).get("derived_selected_area", {}).get("latest_period")
+        if isinstance(value, str) and len(value) == 5 and value[2] == ".":
+            return f"20{value[:2]}년 {value[3:]}월"
+        return value
+    if group == "area":
+        return sections.get("area", {}).get("derived_selected_area", {}).get("latest_household_period")
+    path = {"population": ("floating_population", "monthly_daily_average"),
+            "resident": ("resident_population", "trend"),
+            "worker": ("worker_population", "trend")}[group]
+    periods = population.get(path[0], {}).get(path[1], {}).get("periods", [])
+    value = periods[-1] if periods else None
+    if group == "population" and isinstance(value, str) and len(value) == 5 and value[2] == ".":
+        return f"20{value[:2]}년 {value[3:]}월"
+    return value
+
+
+def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
+    """Preserve Brief v0.1 fields; evidence cards carry their own provenance.
+
+    quant_evidence is an optional local provider archive, not a new Scout field.
+    Never promote the Mock Critic or a deterministic rule pass to quality approval.
+    """
+    if not isinstance(bundle, dict) or not isinstance(bundle.get("request_id"), str):
+        raise ValueError("ResearchBundle request_id가 필요합니다.")
+    request_id = bundle["request_id"]
+    request = bundle.get("request", {})
+    if not isinstance(request, dict) or request.get("request_id") != request_id:
+        raise ValueError("ResearchBundle과 입력의 request_id가 다릅니다.")
+    results = bundle.get("results", {})
+    if not isinstance(results, dict):
+        raise ValueError("ResearchBundle results는 객체여야 합니다.")
+    checks = []
+    valid = {}
+    for module in ("quant", "local", "trend"):
+        result = results.get(module, {})
+        errors = validate_scout_result(result, expected_module=module, request_id=request_id)
+        if errors:
+            checks.append(f"{module}: 공통 계약 오류로 요약에서 제외했습니다: {', '.join(errors)}")
+            continue
+        if result["status"] == "failed" or "MOCK_ONLY_NOT_REAL_DATA" in result["warnings"]:
+            checks.append(f"{module}: 실패 또는 Mock 결과로 근거 요약에서 제외했습니다.")
+            continue
+        valid[module] = result
+        if result["status"] == "partial":
+            checks.append(f"{module}: partial 결과의 부족 사유를 확인하세요.")
+        for issue in result["warnings"] + result["errors"]:
+            text = issue.get("message") or issue.get("code") if isinstance(issue, dict) else str(issue)
+            checks.append(f"{module}: {text}")
+
+    source_maps = {}
+    for module, result in valid.items():
+        source_maps[module] = {}
+        for source in result["sources"]:
+            safe = _safe_source(source)
+            if safe and isinstance(safe.get("source_id"), str):
+                source_maps[module][safe["source_id"]] = safe
+    def sources_for(module, ids):
+        if not isinstance(ids, list) or any(not isinstance(sid, str) for sid in ids):
+            return []
+        return [deepcopy(source_maps.get(module, {})[sid]) for sid in dict.fromkeys(ids)
+                if isinstance(sid, str) and sid in source_maps.get(module, {})]
+
+    sections = {}
+    if quant_evidence is not None:
+        if "quant" not in valid:
+            raise ValueError("유효한 Quant 결과 없이 보조자료를 사용할 수 없습니다.")
+        from src.brief.quant_evidence import read_quant_evidence
+        sections = read_quant_evidence(bundle, quant_evidence)
+
+    quant = valid.get("quant", {})
+    metrics = quant.get("metrics", {})
+    context = quant.get("query_context", {})
+    quant_sources = list(source_maps.get("quant", {}).values())
+    facts = []
+    if quant_sources and isinstance(metrics, dict):
+        for name, (label, unit, group) in METRICS.items():
+            value = metrics.get(name)
+            if not _number(value):
+                continue
+            period = _period(sections, group)
+            facts.append({"module": "quant", "title": label,
+                          "statement": f"{label}: {value:,}{unit}", "value": value, "unit": unit,
+                          "metric_refs": [name], "reference_period": period,
+                          "scope": f"선택 영역 / 요청 반경 {context.get('radius_m', '미확인')}m",
+                          "sources": deepcopy(quant_sources)})
+        if facts and any(fact["reference_period"] is None for fact in facts):
+            checks.append("Quant 지표 기준 시점이 일부 미확보입니다. 조회일·분석 생성일을 지표 기준일로 사용하지 마세요.")
+    elif metrics:
+        checks.append("Quant 수치의 사용 가능한 출처가 없어 수치 요약에서 제외했습니다.")
+
+    demographics = []
+    for field, label, group in (("floating_population", "유동인구", "population"),
+                                ("resident_population", "주거인구", "resident"),
+                                ("worker_population", "직장인구", "worker")):
+        selected = sections.get("population", {}).get(field, {}).get("demographics", {}).get("regions", {}).get("선택 영역", {})
+        if not selected or not quant_sources:
+            continue
+        shares = {key: deepcopy(value) for key, value in selected.items()
+                  if isinstance(value, dict) and _number(value.get("share_pct"))}
+        male = shares.get("male", {}).get("share_pct")
+        female = shares.get("female", {}).get("share_pct")
+        if male is not None and female is not None:
+            demographics.append({"module": "quant", "title": f"{label} 성별·연령 구성",
+                                 "statement": f"{label}: 남성 {male:g}%, 여성 {female:g}%",
+                                 "population_kind": field, "shares": shares,
+                                 "reference_period": _period(sections, group),
+                                 "scope": "선택 영역", "sources": deepcopy(quant_sources)})
+
+    local_changes = []
+    for item in valid.get("local", {}).get("insights", []):
+        ids = item.get("source_ids", [])
+        sources = sources_for("local", ids)
+        if not sources or len(sources) != len(set(ids)):
+            checks.append("Local의 출처 연결이 불완전한 주장을 요약에서 제외했습니다.")
+            continue
+        card = deepcopy(item)
+        card.update(module="local", sources=sources,
+                    scope="Scout가 보고한 지역 범위; 점포 반경 관련성 별도 확인")
+        local_changes.append(card)
+
+    trend_patterns = []
+    trend = valid.get("trend", {})
+    cases = {item.get("case_id"): item for item in trend.get("insights", []) if item.get("case_id")}
+    patterns = trend.get("patterns", [])
+    if not isinstance(patterns, list):
+        checks.append("Trend 패턴 형식 오류를 확인하세요.")
+        patterns = []
+    for item in patterns:
+        if not isinstance(item, dict):
+            checks.append("Trend 패턴 형식 오류를 확인하세요.")
+            continue
+        raw_case_ids = item.get("example_case_ids", [])
+        if not isinstance(raw_case_ids, list) or any(not isinstance(cid, str) for cid in raw_case_ids):
+            checks.append("Trend 사례 참조 형식 오류를 확인하세요.")
+            continue
+        case_ids = list(dict.fromkeys(raw_case_ids))
+        linked = [cases[cid] for cid in case_ids if cid in cases
+                  and sources_for("trend", cases[cid].get("source_ids", []))
+                  and len(sources_for("trend", cases[cid].get("source_ids", []))) == len(set(cases[cid]["source_ids"]))]
+        sources = sources_for("trend", item.get("example_source_ids", []))
+        linked_source_ids = {sid for case in linked for sid in case["source_ids"]}
+        if (not linked or not sources or len(linked) != len(case_ids)
+                or len(sources) != len(set(item.get("example_source_ids", [])))
+                or any(source["source_id"] not in linked_source_ids for source in sources)):
+            checks.append("Trend의 사례·출처 연결이 불완전한 패턴을 요약에서 제외했습니다.")
+            continue
+        card = deepcopy(item)
+        card.update(module="trend", evidence_count=len(linked), sources=sources,
+                    scope="수집된 사례 목록; 요청 지역·제품 관련성 미확정")
+        trend_patterns.append(card)
+
+    preview = evaluate_rules(bundle)
+    checks.extend(preview["pending_checks"])
+    for finding in preview["findings"]:
+        if finding["level"] in ("needs_fix", "manual_review"):
+            checks.append(f"{finding.get('module', '공통')}: {finding['message']}")
+    if critic_result:
+        checks.append(f"Graph Critic 상태: {critic_result.get('status', '미확인')}. 규칙 preview와 의미 검토는 별개입니다.")
+        checks.extend(str(warning) for warning in critic_result.get("warnings", []))
+    checks.extend(["이 브리프는 근거 요약 초안이며 품질 최종 승인이 아닙니다.",
+                   "지표의 기준 시점·지역 범위·집계 방법을 확인하세요. 매출 비중을 고객 수 비중으로 해석하지 마세요.",
+                   "트렌드 패턴은 중복 사례를 포함하므로 패턴별 건수를 합산하지 마세요."])
+    if sections.get("area"):
+        checks.append("교통시설 원문 표의 시군구 기준 표기와 선택 영역 행의 범위를 확인하세요.")
+
+    primary = None
+    if demographics:
+        primary = " / ".join(card["statement"] for card in demographics)
+    elif facts:
+        population_facts = [fact for fact in facts if fact["metric_refs"][0] in
+                            ("daily_avg_floating_population", "resident_population", "worker_population")]
+        if population_facts:
+            primary = " / ".join(fact["statement"] for fact in population_facts)
+
+    implications = []
+    fact_by_metric = {fact["metric_refs"][0]: fact for fact in facts}
+    if facts:
+        implications.append({"statement": "상권·인구 수치를 함께 검토하되 자료 시점과 모집단을 구분해 조사 가설을 세우세요.",
+                             "basis": deepcopy(facts), "kind": "research_question"})
+    competition = fact_by_metric.get("telecom_store_count")
+    change = fact_by_metric.get("telecom_store_yoy_percent")
+    if competition and change:
+        implications.append({"statement": f"핸드폰 소매업 {competition['value']:,}개, 전년동월 대비 {change['value']:g}%라는 관측을 바탕으로 경쟁 점포의 실제 영업 상태와 구성 변화를 확인하세요. 점포 수 변화만으로 경쟁 강도나 매출 기회를 확정할 수 없습니다.",
+                             "basis": deepcopy([competition, change]), "kind": "research_question"})
+    if demographics:
+        implications.append({"statement": " / ".join(card["statement"] for card in demographics) + ". 생활·통근·통행 맥락을 구분해 제품 체험 수요를 추가 조사하세요. 인구 구성만으로 구매 고객을 정하지 않습니다.",
+                             "basis": deepcopy(demographics), "kind": "research_question"})
+    if local_changes:
+        implications.append({"statement": "지역 변화의 사업 단계와 점포 생활권 관련성을 확인하세요. 계획·선정 발표를 현재 운영 또는 입주로 해석하지 마세요.",
+                             "basis": deepcopy(local_changes), "kind": "research_question"})
+    if trend_patterns:
+        pattern_names = ", ".join(str(card.get("name", "체험 패턴")) for card in trend_patterns)
+        campaign = request.get("campaign", {})
+        product = campaign.get("product") or "요청 제품"
+        implications.append({"statement": f"{pattern_names} 패턴을 {product} 체험 목적과 대조해 적합성을 검토하세요. 방문 증가나 매출 효과는 이번 근거로 확정할 수 없습니다.",
+                             "basis": deepcopy(trend_patterns), "kind": "research_question"})
+
+    cards = facts + demographics + local_changes + trend_patterns
+    urls = {source["source_url"] for card in cards for source in card.get("sources", [])}
+    store = request.get("store", {})
+    address = store.get("address") or context.get("area_name") or "조사 지역 미확인"
+    area_summary = f"{address}: 정량 지표 {len(facts)}개, 지역 변화 {len(local_changes)}건, 체험 패턴 {len(trend_patterns)}개를 근거와 함께 요약했습니다."
+    if not cards:
+        area_summary = f"{address}: 요약할 출처 연결 근거가 없습니다. 재수집 또는 자료 보완이 필요합니다."
+    return {"schema_version": "0.1", "request_id": request_id,
+            "status": "manual_review" if cards else "failed",
+            "overview": {"area_summary": area_summary, "primary_customer_signal": primary},
+            "local_changes": local_changes, "unique_local_signals": facts + demographics,
+            "trend_patterns": trend_patterns,
+            "why_here_now": ("위 주소의 상권·인구 자료와 조회 기간의 생활권 변화, 체험 사례를 함께 검토할 수 있습니다. "
+                             "지금 실행해야 할 이유나 다른 상권 대비 차별성은 근거의 시점·지역 관련성을 확인하기 전까지 확정하지 않습니다.") if cards else "근거 부족으로 why here / why now를 판단할 수 없습니다.",
+            "research_implications": implications,
+            "needs_manual_check": list(dict.fromkeys(checks)), "source_count": len(urls)}
 
 
 def mock_brief(request_id: str) -> dict[str, Any]:

@@ -50,14 +50,14 @@ Implementation contract: [docs/api-contract.md](docs/api-contract.md)
 
 ## 로컬 mock smoke test
 
-Week 1 smoke test는 외부 API를 호출하지 않고 다음 통합 경로를 검증합니다.
+Scout를 Mock으로 대체한 smoke test는 외부 API를 호출하지 않고 다음 통합 경로를 검증합니다.
 
 ```text
 SpotRequest
   -> Quant / Local / Trend placeholders
   -> Merge
   -> Mock Critic
-  -> Mock Research Brief
+  -> Research Brief (Mock 근거는 제외하며 근거 부족을 표시)
 ```
 
 저장소 루트에서 가상환경을 만들고 의존성을 설치한 뒤 테스트를 실행합니다.
@@ -106,8 +106,21 @@ python -m src.integration_smoke samples/input/myeongji_international.provisional
 
 offline은 Local·Trend 실제 구현과 Quant의 키 없음 실패 경로를 실행합니다.
 전체 JSON, 계약 검사, Critic 기준표 preview, 사람이 읽는 `SUMMARY.md`를 저장합니다.
-Graph 안의 Critic과 Brief는 계속 Mock이며, 명령 성공은 리서치 품질 승인을 뜻하지 않습니다.
+Graph 안의 Critic은 Mock이며 Brief는 근거 요약 초안입니다. 명령 성공은 리서치 품질 승인을 뜻하지 않습니다.
 live 실행 준비와 이번 결과: [Scout 통합 기록](docs/SCOUT_INTEGRATION_2026-09-30.md).
+
+## 근거 기반 Research Brief
+
+Graph는 Scout의 실제 근거를 요약하는 Research Brief 초안을 생성합니다.
+Critic은 아직 Mock이며, 출처·자료 시점·지역 관련성의 검토가 필요합니다.
+저장된 결과로 API 재호출 없이 JSON과 Markdown 보고서를 만들 수도 있습니다.
+
+```bash
+python -m src.brief path/to/research_bundle.json --output path/to/brief
+```
+
+성비·연령대·자료 기준 시점을 위한 원문 보조자료 연결과 검증 방법:
+[Research Brief 실행 가이드](docs/RESEARCH_BRIEF.md).
 
 ## Security
 
