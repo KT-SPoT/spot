@@ -183,7 +183,7 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
     trend_patterns = []
     trend = valid.get("trend", {})
     cases = {item.get("case_id"): item for item in trend.get("insights", []) if item.get("case_id")}
-    patterns = trend.get("patterns", [])
+    patterns = trend.get("reference_patterns", trend.get("patterns", []))
     if not isinstance(patterns, list):
         checks.append("Trend 패턴 형식 오류를 확인하세요.")
         patterns = []
@@ -210,6 +210,38 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         card.update(module="trend", evidence_count=len(linked), sources=sources,
                     scope=("검색 후보자료; 독립 행사·제품 적합성·실제 체험 구조 확인 필요"
                            if item.get("verification_status") == "candidate" else "수집된 사례 목록; 요청 지역·제품 관련성 미확정"))
+        trend_patterns.append(card)
+
+    # Reference candidates are separate cards, never counted as repeated patterns.
+    for reference in trend.get("reference_cases", []):
+        if not isinstance(reference, dict):
+            continue
+        case = cases.get(reference.get("case_id"), {})
+        if case.get("origin") != "live_search_candidate":
+            continue
+        ids = case.get("source_ids", [])
+        sources = sources_for("trend", ids)
+        if not sources or len(sources) != len(set(ids)):
+            checks.append("Trend 참고 후보의 출처 연결을 확인하세요.")
+            continue
+        card = deepcopy(case)
+        context_sources = {}
+        for ref in case.get("context_source_refs", []):
+            if not isinstance(ref, dict) or ref.get("module") not in ("quant", "local"):
+                continue
+            module = ref["module"]
+            linked = sources_for(module, [ref.get("source_id")])
+            for source in linked:
+                context_sources.setdefault(module, {})[source["source_id"]] = source
+        expected = {(r.get("module"), r.get("source_id")) for r in case.get("context_source_refs", []) if isinstance(r, dict)}
+        actual = {(module, sid) for module, entries in context_sources.items() for sid in entries}
+        if expected != actual:
+            # Keep the source-backed candidate, omit unsupported context reasoning.
+            card["why_relevant"] = ["요청 제품·카테고리와 비교할 체험 후보입니다. 맥락 근거 연결은 확인 필요합니다."]
+            checks.append("Trend 후보의 인구·지역 맥락 출처가 일부 누락되어 맥락 선정 이유를 제외했습니다.")
+        card.update(module="trend", type="reference_case", sources=sources,
+                    context_sources={m: list(entries.values()) for m, entries in context_sources.items()},
+                    evidence_count=1, scope="검색 후보; 실제 행사·체험 구조·고객 적합성 미확인")
         trend_patterns.append(card)
 
     preview = evaluate_rules(bundle)
@@ -255,17 +287,19 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         implications.append({"statement": "주변 행정구역 변화와 지역 배경 자료를 조사 질문으로 활용하세요. 점포 생활권 연결과 영향 여부를 추가 확인하고 최근 지역 변화·고객 증가와 구분하세요.",
                              "basis": deepcopy(local_context), "kind": "research_question"})
     if trend_patterns:
-        pattern_names = ", ".join(str(card.get("name", "체험 패턴")) for card in trend_patterns)
+        pattern_names = ", ".join(str(card.get("name") or card.get("event_name") or "체험 후보") for card in trend_patterns)
         campaign = request.get("campaign", {})
         product = campaign.get("product") or "요청 제품"
-        implications.append({"statement": f"{pattern_names} 패턴을 {product} 체험 목적과 대조해 적합성을 검토하세요. 방문 증가나 매출 효과는 이번 근거로 확정할 수 없습니다.",
+        implications.append({"statement": f"{pattern_names} 자료를 {product} 체험 목적과 대조해 적합성을 검토하세요. 방문 증가나 매출 효과는 이번 근거로 확정할 수 없습니다.",
                              "basis": deepcopy(trend_patterns), "kind": "research_question"})
 
     cards = facts + demographics + local_context + local_changes + trend_patterns
     urls = {source["source_url"] for card in cards for source in card.get("sources", [])}
+    urls.update(source["source_url"] for card in cards for entries in card.get("context_sources", {}).values() for source in entries)
     store = request.get("store", {})
     address = store.get("address") or context.get("area_name") or "조사 지역 미확인"
-    area_summary = f"{address}: 정량 지표 {len(facts)}개, 직접 지역 변화 {len(local_changes)}건, 보조 맥락·배경 {len(local_context)}건, 체험 패턴 {len(trend_patterns)}개를 근거와 함께 요약했습니다. 자료 수는 독립 사건 수의 확정값이 아닙니다."
+    reference_count = sum(card.get("type") == "reference_case" for card in trend_patterns)
+    area_summary = f"{address}: 정량 지표 {len(facts)}개, 직접 지역 변화 {len(local_changes)}건, 보조 맥락·배경 {len(local_context)}건, 체험 패턴 {len(trend_patterns)-reference_count}개·참고 후보 {reference_count}건을 근거와 함께 요약했습니다. 자료 수는 독립 사건 수의 확정값이 아닙니다."
     if not cards:
         area_summary = f"{address}: 요약할 출처 연결 근거가 없습니다. 재수집 또는 자료 보완이 필요합니다."
     return {"schema_version": "0.1", "request_id": request_id,

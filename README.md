@@ -9,9 +9,9 @@ SPOT은 KT Plaza 홍보기획 전 단계에서 상권·지역 변화·트렌드�
 ```text
 n8n Main Entry
   -> LangGraph
-      -> Quant Scout
-      -> Local Scout
-      -> Trend Scout
+      -> Quant Scout / Local Scout (parallel)
+      -> internal context summary
+      -> Trend Scout (context-aware discovery)
       -> Critic
           -> retry selected Scout(s) when needed
           -> Research Brief
@@ -54,7 +54,8 @@ Scout를 Mock으로 대체한 smoke test는 외부 API를 호출하지 않고 �
 
 ```text
 SpotRequest
-  -> Quant / Local / Trend placeholders
+  -> Quant / Local placeholders (parallel)
+  -> internal context summary -> Trend placeholder
   -> Merge
   -> Mock Critic
   -> Research Brief (Mock 근거는 제외하며 근거 부족을 표시)
