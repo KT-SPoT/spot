@@ -3,7 +3,7 @@
 import json
 import unittest
 from contextlib import ExitStack
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 from pathlib import Path
 
 from src.graph.graph import build_graph
@@ -24,8 +24,8 @@ class GraphSmokeTest(unittest.TestCase):
                 return_value=mock_scout_result(module, request["request_id"]),
             )) for module in ("quant", "local", "trend")]
             result = build_graph().invoke({"request": request})
-            for runner in runners[:2]:
-                runner.assert_called_once_with(request)
+            runners[0].assert_called_once_with(request, evidence_sink=ANY)
+            runners[1].assert_called_once_with(request)
             runners[2].assert_called_once_with(request, context=result["trend_context"])
             self.assertEqual(result["trend_context"]["population_signals"], [])
 

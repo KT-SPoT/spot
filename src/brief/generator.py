@@ -7,6 +7,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from src.critic.rules import evaluate_rules
 from src.validation import validate_scout_result
+from src.brief.trend_groups import group_coverage
 
 
 METRICS = {
@@ -153,10 +154,12 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
             demographics.append({"module": "quant", "title": f"{label} 성별·연령 구성",
                                  "statement": f"{label}: 남성 {male:g}%, 여성 {female:g}%",
                                  "population_kind": field, "shares": shares,
-                                 "reference_period": _period(sections, group),
+                                 "reference_period": sections.get("population", {}).get(field, {}).get("demographics", {}).get("reference_period"),
                                  "scope": "선택 영역", "sources": deepcopy(quant_sources)})
 
     local_changes = []
+    if demographics and any(card["reference_period"] is None for card in demographics):
+        checks.append("성별·연령 표의 기준 시점이 미확보입니다. 다른 인구 추이 표의 최신 월이나 분석 생성일을 비율의 기준일로 사용하지 마세요.")
     local_context = []
     for item in valid.get("local", {}).get("insights", []):
         if item.get("article_checked") and item.get("verification_status") not in ("text_corroborated", "context_corroborated"):
@@ -182,6 +185,7 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
 
     trend_patterns = []
     trend = valid.get("trend", {})
+    product = request.get("campaign", {}).get("product", "")
     cases = {item.get("case_id"): item for item in trend.get("insights", []) if item.get("case_id")}
     patterns = trend.get("reference_patterns", trend.get("patterns", []))
     if not isinstance(patterns, list):
@@ -207,16 +211,21 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
             checks.append("Trend의 사례·출처 연결이 불완전한 패턴을 요약에서 제외했습니다.")
             continue
         card = deepcopy(item)
-        card.update(module="trend", evidence_count=len(linked), sources=sources,
+        groups = group_coverage(linked, product) if item.get("verification_status") == "candidate" else [[case] for case in linked]
+        if item.get("verification_status") == "candidate" and len(groups) < 2:
+            checks.append("Trend 관련 보도를 묶은 뒤 반복 패턴을 뒷받침할 서로 다른 후보 묶음이 부족해 패턴 요약에서 제외했습니다.")
+            continue
+        card.update(module="trend", evidence_count=len(groups), sources=sources,
+                    article_count=len(linked), candidate_group_count=len(groups),
+                    candidate_groups=[[case["case_id"] for case in group] for group in groups],
                     scope=("검색 후보자료; 독립 행사·제품 적합성·실제 체험 구조 확인 필요"
                            if item.get("verification_status") == "candidate" else "수집된 사례 목록; 요청 지역·제품 관련성 미확정"))
         trend_patterns.append(card)
 
     # Reference candidates are separate cards, never counted as repeated patterns.
+    references = []
     for reference in trend.get("reference_cases", []):
-        if not isinstance(reference, dict):
-            continue
-        case = cases.get(reference.get("case_id"), {})
+        case = cases.get(reference.get("case_id"), {}) if isinstance(reference, dict) else {}
         if case.get("origin") != "live_search_candidate":
             continue
         ids = case.get("source_ids", [])
@@ -224,7 +233,24 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         if not sources or len(sources) != len(set(ids)):
             checks.append("Trend 참고 후보의 출처 연결을 확인하세요.")
             continue
+        if case not in references:
+            references.append(case)
+    for group in group_coverage(references, product):
+        case = deepcopy(group[0])
+        ids = list(dict.fromkeys(sid for member in group for sid in member.get("source_ids", [])))
+        sources = sources_for("trend", ids)
+        case["source_ids"] = ids
+        case["context_source_refs"] = [ref for member in group for ref in member.get("context_source_refs", [])]
+        case["why_relevant"] = list(dict.fromkeys(text for member in group for text in member.get("why_relevant", [])))
+        case["limitations"] = list(dict.fromkeys(text for member in group for text in member.get("limitations", [])))
         card = deepcopy(case)
+        card["article_count"] = len(group)
+        card["grouped_case_ids"] = [member["case_id"] for member in group]
+        card["supporting_facets"] = [{"case_id": member["case_id"], "title": member.get("event_name"),
+                                      "observation": member.get("observation"), "source_ids": member["source_ids"]}
+                                     for member in group[1:]]
+        if len(group) > 1:
+            card["limitations"].append("같은 날짜·브랜드·고유명 표현을 공유하는 관련 보도 묶음입니다. 동일 행사 여부는 원문 대조가 필요합니다.")
         context_sources = {}
         for ref in case.get("context_source_refs", []):
             if not isinstance(ref, dict) or ref.get("module") not in ("quant", "local"):

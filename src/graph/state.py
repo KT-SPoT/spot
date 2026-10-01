@@ -9,6 +9,8 @@ class SpotState(TypedDict, total=False):
     request: SpotRequest
 
     quant_result: ScoutResult
+    # Internal only; never part of ResearchBundle or HTTP results.
+    quant_evidence: dict[str, Any] | None
     local_result: ScoutResult
     trend_result: ScoutResult
     trend_context: dict[str, Any]
