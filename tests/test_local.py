@@ -11,6 +11,14 @@ def article(title, url="https://example.org/article"):
             "source_type": "news", "published_at": "2026-10-01T10:00:00+09:00", "collected_at": now()}
 
 class LocalTests(unittest.TestCase):
+    def setUp(self):
+        self.verifier = patch("src.scouts.local.verify_source", return_value={
+            "status": "text_corroborated", "article_published_at": "2026-10-01",
+            "excerpt": "합성 명지국제신도시 개관 예정 근거", "change_state": "scheduled",
+            "evidence_fingerprint": "synthetic", "full_text_verified": True})
+        self.verifier.start()
+        self.addCleanup(self.verifier.stop)
+
     def test_filters_wrong_neighborhood_and_duplicates(self):
         rows = [article("에코델타시티 개관"), article("명지국제신도시 개관", "https://example.org/right")]
         with patch("src.scouts.search_runtime.news", return_value=rows):
@@ -33,3 +41,18 @@ class LocalTests(unittest.TestCase):
             result = run_local_scout(dict(REQUEST, store={"lat": 35, "lng": 129}))
         provider.assert_not_called()
         self.assertEqual(result["status"], "failed")
+
+    def test_identical_report_sentence_merges_source_references(self):
+        rows = [article("명지국제신도시 개관", "https://example.org/one"),
+                article("명지국제신도시 개관", "https://example.org/two")]
+        with patch("src.scouts.search_runtime.news", return_value=rows):
+            result = run_local_scout(REQUEST)
+        self.assertEqual(len(result["sources"]), 2)
+        self.assertEqual(len(result["insights"]), 1)
+        self.assertEqual(len(result["insights"][0]["source_ids"]), 2)
+
+    def test_unreadable_source_does_not_inherit_snippet_stage(self):
+        with patch("src.scouts.local.verify_source", return_value={"status": "unavailable", "reason": "SOURCE_HTTP_ERROR"}), patch("src.scouts.search_runtime.news", return_value=[article("명지국제신도시 개관 예정")]):
+            result = run_local_scout(REQUEST)
+        self.assertEqual(result["insights"][0]["change_state"], "unverified")
+        self.assertEqual(result["insights"][0]["evidence_basis"], "search_passage")
