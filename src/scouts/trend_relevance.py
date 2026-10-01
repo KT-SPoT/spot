@@ -732,4 +732,3 @@ def select_reference_cases(
     )
 
     return ranked[:limit]
-
