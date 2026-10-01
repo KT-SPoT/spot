@@ -12,6 +12,11 @@ def _refs(card):
                      for source in card.get("sources", [])) or "출처 확인 필요"
 
 
+def _date_basis(card):
+    return {"naver_provided_at": "뉴스 제공일(원문 게시일 미확인)",
+            "article_published_at": "원문 게시일"}.get(card.get("date_basis"), "날짜 종류 확인 필요")
+
+
 def render_markdown(brief):
     status = {"manual_review": "검토 필요", "failed": "근거 미확보"}.get(brief["status"], brief["status"])
     lines = ["# SPOT Research Brief", "", f"- 요청: {brief['request_id']}",
@@ -47,6 +52,17 @@ def render_markdown(brief):
         lines.extend(["", "주요 인구 신호: " + signal, "",
                       "유동·주거·직장 인구는 서로 다른 모집단입니다. 행사 고객을 확정하지 않습니다."])
 
+    for role, heading in (("surrounding_context", "주변 행정구역 맥락"), ("background", "지역 배경 자료")):
+        context_cards = [c for c in brief["unique_local_signals"] if c.get("evidence_role") == role]
+        if not context_cards:
+            continue
+        lines.extend(["", "## " + heading, "", "아래 자료는 직접적인 최근 지역 변화 건수에 포함하지 않습니다."])
+        for card in context_cards:
+            lines.extend(["", f"### {card.get('title', heading)}", "", str(card.get("evidence") or "내용 확인 필요"), "",
+                          f"- 자료 날짜: {_cell(card.get('published_at'))}; 날짜 종류: {_date_basis(card)}",
+                          f"- 해석 범위: {card['scope']}", f"- 활용·한계: {_cell(card.get('context_note'))}",
+                          f"- 근거: {_refs(card)}"])
+
     lines.extend(["", "## 최근 지역 변화", ""])
     if not brief["local_changes"]:
         lines.append("출처가 연결된 지역 변화 근거가 없습니다.")
@@ -54,6 +70,8 @@ def render_markdown(brief):
         stage = {"approved_plan": "계획 승인", "selected_future_project": "미래 사업 선정",
                  "scheduled": "계획·예정(완료 확인 아님)", "launched": "시작",
                  "reported_opening": "개관·운영 시작 보도(현장 미확인)",
+                 "reported_plan_approval": "계획 변경·승인 보도(공사·운영 완료 아님)",
+                 "not_applicable": "배경·주변 맥락",
                  "reported_construction_or_move_in": "공사·입주 단계 보도(현장 미확인)",
                  "unverified": "단계 확인 필요"}.get(card.get("change_state"), card.get("change_state"))
         lines.extend(["", f"### {card.get('title', '지역 변화')}", "",
@@ -62,7 +80,13 @@ def render_markdown(brief):
                       f"- 사업 단계: {_cell(stage)}",
                       f"- 범위: {card['scope']}", f"- 근거: {_refs(card)}"])
         if card.get("article_checked"):
-            lines.append("- 확인 수준: 원문 지역·변화 문장과 게시일 대조; 사건 발생 자체는 미검증")
+            label = "지역·변화 문장과 원문 게시일 대조" if card.get("verification_status") == "text_corroborated" else "원문 문맥에 따른 분류; 지역 연결·게시일은 추가 확인 가능"
+            lines.append("- 확인 수준: " + label + "; 사건 발생 자체는 미검증")
+            lines.append(f"- 날짜 종류: {_date_basis(card)}")
+            if card.get("context_note"):
+                lines.append("- 활용·한계: " + card["context_note"])
+            for facet in card.get("supporting_facets", []):
+                lines.append(f"- 관련 보도 {facet['source_id']}: {_cell(facet.get('evidence'))}")
         if card.get("why_it_matters"):
             lines.extend(["", "자료 해석(검토 필요): " + card["why_it_matters"]])
 

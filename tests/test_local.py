@@ -56,3 +56,16 @@ class LocalTests(unittest.TestCase):
             result = run_local_scout(REQUEST)
         self.assertEqual(result["insights"][0]["change_state"], "unverified")
         self.assertEqual(result["insights"][0]["evidence_basis"], "search_passage")
+
+    def test_same_plan_revision_groups_different_report_sentences(self):
+        rows=[article("명지국제신도시 계획 변경", "https://example.org/one"),
+              article("명지국제신도시 계획 승인", "https://example.org/two")]
+        verifications=[{"status":"context_corroborated","article_published_at":"2026-09-22",
+                        "evidence_role":"direct_change","event_key":"same-revision",
+                        "evidence_fingerprint":str(i),"excerpt":"합성 계획 관련 보도",
+                        "change_state":"scheduled" if i==0 else "reported_plan_approval"} for i in range(2)]
+        with patch("src.scouts.search_runtime.news",return_value=rows),patch("src.scouts.local.verify_source",side_effect=verifications):
+            result=run_local_scout(REQUEST)
+        self.assertEqual(len(result["insights"]),1)
+        self.assertEqual(result["insights"][0]["source_ids"],["S-L-001","S-L-002"])
+        self.assertEqual(result["insights"][0]["supporting_facets"][0]["change_state"],"reported_plan_approval")

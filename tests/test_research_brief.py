@@ -43,6 +43,22 @@ def fixture():
 
 
 class ResearchBriefTest(unittest.TestCase):
+    def test_local_context_is_cited_but_not_counted_as_recent_change(self):
+        bundle = fixture()
+        card = bundle["results"]["local"]["insights"][0]
+        card.update(article_checked=True,verification_status="context_corroborated",
+                    evidence_role="surrounding_context",date_basis="naver_provided_at",
+                    context_note="같은 행정구역이며 점포 영향 미확인")
+        brief=generate_brief(bundle)
+        self.assertEqual(brief["local_changes"],[])
+        contextual=[i for i in brief["unique_local_signals"] if i.get("module")=="local"]
+        self.assertEqual(len(contextual),1)
+        self.assertEqual(brief["source_count"],3)
+        text=render_markdown(brief)
+        self.assertIn("주변 행정구역 맥락",text)
+        self.assertIn("원문 게시일 미확인",text)
+        self.assertIn("local:local-source",text)
+
     def test_checked_but_uncorroborated_local_candidate_is_excluded(self):
         bundle = fixture()
         item = bundle["results"]["local"]["insights"][0]

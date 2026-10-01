@@ -16,6 +16,40 @@ def page(body=SENTENCE, pub="2026-09-20"):
 
 
 class LocalEvidenceTests(unittest.TestCase):
+    def test_cross_paragraph_project_context_is_retained_with_scope(self):
+        html = page("명지지구 개발사업 실시계획 25차 변경 승인을 완료하고 23일 고시할 예정이라고 관계 기관은 밝혔다.")
+        html += '<article><p>명지 중앙공원은 명지국제신도시의 핵심 공원으로 특화 계획에 따라 조성될 예정이다.</p></article>'
+        with patch.object(evidence, "fetch_article", return_value=(html, ITEM["source_url"])):
+            result = evidence.verify_source(ITEM,"명지국제신도시",START,END,{"address":"부산광역시 강서구 명지국제8로 246"})
+        self.assertEqual(result["evidence_role"],"direct_change")
+        self.assertIsNotNone(result["event_key"])
+
+    def test_old_move_in_can_be_background_without_becoming_recent_change(self):
+        html = page("명지국제신도시에서 2020년 7월 입주 완료한 아파트 단지는 올해 거래가격이 상승해 비교 자료로 언급됐다.")
+        with patch.object(evidence,"fetch_article",return_value=(html,ITEM["source_url"])):
+            result = evidence.verify_source(ITEM,"명지국제신도시",START,END,{"address":"부산광역시 강서구"})
+        self.assertEqual(result["status"],"context_corroborated")
+        self.assertEqual(result["evidence_role"],"background")
+        self.assertEqual(result["change_state"],"not_applicable")
+
+    def test_same_district_transport_is_context_without_claiming_store_area(self):
+        html = page("강서구에서는 에코델타시티와 강서구청을 잇는 신설 버스 노선을 추진하며 대중교통 이용 여건을 개선할 계획이다.")
+        with patch.object(evidence,"fetch_article",return_value=(html,ITEM["source_url"])):
+            result = evidence.verify_source(ITEM,"명지국제신도시",START,END,{"address":"부산광역시 강서구"})
+        self.assertEqual(result["evidence_role"],"surrounding_context")
+        self.assertEqual(result["classification_basis"],"same_administrative_district")
+
+    def test_unrelated_district_does_not_become_context(self):
+        self.assertIsNone(evidence.context_evidence(["다른 도시의 새로운 아파트 공급이 임대 시장의 흐름과 관련된 보도에서 소개되고 있다."],"명지국제신도시",{"address":"부산광역시 강서구"},START))
+
+    def test_missing_article_date_keeps_provided_date_caveat(self):
+        html='<article><p>'+SENTENCE+'</p></article>'
+        with patch.object(evidence,"fetch_article",return_value=(html,ITEM["source_url"])):
+            result=evidence.verify_source(ITEM,"명지국제신도시",START,END,{"address":"부산광역시 강서구"})
+        self.assertEqual(result["status"],"context_corroborated")
+        self.assertEqual(result["date_basis"],"naver_provided_at")
+        self.assertIsNone(result["article_published_at"])
+
     def check(self, html):
         with patch.object(evidence, "fetch_article", return_value=(html, ITEM["source_url"])):
             return evidence.verify_source(ITEM, "명지국제신도시", START, END)
