@@ -59,7 +59,10 @@ The current graph runs Quant and Local in parallel, joins both results, then
 passes a bounded context to Trend. SpotRequest v0.1 is unchanged. Trend still
 supports `run_trend_scout(request)`; its optional keyword `context` is internal
 to the graph. See [context-aware Trend](CONTEXT_AWARE_TREND.md).
-The current Critic remains a mock; conditional retries below are the target flow.
+The Critic now uses real deterministic checks and at most one selected-module
+retry for explicitly transient provider failures. Semantic/factual approval
+remains manual. See [current retry policy](CRITIC_RETRY.md); broader quality retries
+below remain the target flow.
 
 ```text
 SpotRequest v0.1

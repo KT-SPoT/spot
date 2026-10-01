@@ -24,7 +24,7 @@ class ScoutIntegrationTest(unittest.TestCase):
         self.assertEqual(bundle["results"]["quant"]["errors"][0]["code"], "MISSING_KAKAO_REST_API_KEY")
         self.assertEqual({i["insight_id"] for i in bundle["results"]["local"]["insights"]}, set())
         self.assertEqual(len(bundle["results"]["trend"]["insights"]), 0)
-        self.assertEqual(run["state"]["critic_result"]["status"], "manual_review")
+        self.assertEqual(run["state"]["critic_result"]["status"], "failed")
         self.assertFalse(run["brief_is_mock"])
         self.assertEqual(run["state"]["research_brief"]["status"], "failed")
 
