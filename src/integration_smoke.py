@@ -30,6 +30,7 @@ def run_smoke(request, *, mode="offline"):
         if mode == "offline":
             stack.enter_context(patch.dict(os.environ, {
                 "KAKAO_REST_API_KEY": "", "SBIZ365_CERT_KEY": "",
+                "SPOT_SCOUT_MODE": "offline",
             }))
             stack.enter_context(patch("src.scouts.quant.load_dotenv"))
         state = build_graph().invoke({"request": request})

@@ -65,7 +65,8 @@ def render_markdown(brief):
     if not brief["trend_patterns"]:
         lines.append("사례와 출처가 연결된 트렌드 패턴이 없습니다.")
     for card in brief["trend_patterns"]:
-        lines.extend(["", f"### {card.get('name', '체험 패턴')} — {card['evidence_count']}개 사례", "",
+        label = "개 후보자료" if card.get("verification_status") == "candidate" else "개 사례"
+        lines.extend(["", f"### {card.get('name', '체험 패턴')} — {card['evidence_count']}{label}", "",
                       str(card.get("description", "")), "",
                       f"- 범위: {card['scope']}", f"- 근거: {_refs(card)}"])
 
