@@ -29,6 +29,7 @@ from src.scouts.quant_sbiz365 import Sbiz365Error, collect_sbiz365_reports
 
 REPORT_NUMBERS = (2, 3, 4, 6, 7, 8)
 CORE_SECTIONS = {"industry", "sales", "population", "area"}
+QUANT_SOURCE_ID = "S-Q-001"
 
 GENDER_LABELS = {
     "male": "남성",
@@ -708,6 +709,7 @@ def _build_compact_insights(metrics: dict[str, Any]) -> list[dict[str, Any]]:
                     "telecom_store_count",
                     "telecom_store_yoy_percent",
                 ],
+                "source_ids": [QUANT_SOURCE_ID],
                 "tags": ["telecom", "competition"],
             }
         )
@@ -730,6 +732,7 @@ def _build_compact_insights(metrics: dict[str, Any]) -> list[dict[str, Any]]:
                     "monthly_avg_sales_transactions",
                     "peak_sales_time_band",
                 ],
+                "source_ids": [QUANT_SOURCE_ID],
                 "tags": ["sales", "telecom"],
             }
         )
@@ -754,6 +757,7 @@ def _build_compact_insights(metrics: dict[str, Any]) -> list[dict[str, Any]]:
                     "dominant_floating_age",
                     "peak_floating_time_band",
                 ],
+                "source_ids": [QUANT_SOURCE_ID],
                 "tags": ["population", "traffic"],
             }
         )
@@ -776,6 +780,7 @@ def _build_compact_insights(metrics: dict[str, Any]) -> list[dict[str, Any]]:
                     "subway_station_count",
                     "bus_stop_count",
                 ],
+                "source_ids": [QUANT_SOURCE_ID],
                 "tags": ["area", "infrastructure"],
             }
         )
@@ -799,6 +804,7 @@ def _build_compact_insights(metrics: dict[str, Any]) -> list[dict[str, Any]]:
                     "customer.top_male_lifestyle",
                     "customer.top_female_lifestyle",
                 ],
+                "source_ids": [QUANT_SOURCE_ID],
                 "tags": ["customer", "lifestyle"],
             }
         )
@@ -839,7 +845,7 @@ def _build_compact_summary(
 def _build_sources(finished_at: str) -> list[dict[str, Any]]:
     return [
         {
-            "source_id": "S-Q-001",
+            "source_id": QUANT_SOURCE_ID,
             "source_name": "소상공인365 상세분석",
             "source_type": "government",
             "source_url": "https://bigdata.sbiz.or.kr/",
