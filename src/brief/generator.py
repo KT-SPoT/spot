@@ -158,6 +158,9 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
 
     local_changes = []
     for item in valid.get("local", {}).get("insights", []):
+        if item.get("article_checked") and item.get("verification_status") != "text_corroborated":
+            checks.append("Local 원문·게시일 대조가 부족한 검색 후보를 지역 변화 요약에서 제외했습니다. 수집 결과의 verification_log를 확인하세요.")
+            continue
         ids = item.get("source_ids", [])
         sources = sources_for("local", ids)
         if not sources or len(sources) != len(set(ids)):
@@ -165,7 +168,8 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
             continue
         card = deepcopy(item)
         card.update(module="local", sources=sources,
-                    scope="Scout가 보고한 지역 범위; 점포 반경 관련성 별도 확인")
+                    scope=("원문 보도 내용 대조; 실제 사건·점포 반경 관련성 별도 확인"
+                           if item.get("article_checked") else "Scout가 보고한 지역 범위; 점포 반경 관련성 별도 확인"))
         local_changes.append(card)
 
     trend_patterns = []

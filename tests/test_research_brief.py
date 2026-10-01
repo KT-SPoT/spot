@@ -43,6 +43,16 @@ def fixture():
 
 
 class ResearchBriefTest(unittest.TestCase):
+    def test_checked_but_uncorroborated_local_candidate_is_excluded(self):
+        bundle = fixture()
+        item = bundle["results"]["local"]["insights"][0]
+        item.update(article_checked=True, verification_status="unconfirmed")
+        brief = generate_brief(bundle)
+        self.assertEqual(brief["local_changes"], [])
+        self.assertIn("Local 원문", " ".join(brief["needs_manual_check"]))
+        item["verification_status"] = "text_corroborated"
+        self.assertEqual(len(generate_brief(bundle)["local_changes"]), 1)
+
     def test_grounded_draft_does_not_mutate_or_claim_approval(self):
         bundle = fixture()
         before = copy.deepcopy(bundle)

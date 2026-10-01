@@ -52,12 +52,17 @@ def render_markdown(brief):
         lines.append("출처가 연결된 지역 변화 근거가 없습니다.")
     for card in brief["local_changes"]:
         stage = {"approved_plan": "계획 승인", "selected_future_project": "미래 사업 선정",
-                 "scheduled": "예정", "launched": "시작"}.get(card.get("change_state"), card.get("change_state"))
+                 "scheduled": "계획·예정(완료 확인 아님)", "launched": "시작",
+                 "reported_opening": "개관·운영 시작 보도(현장 미확인)",
+                 "reported_construction_or_move_in": "공사·입주 단계 보도(현장 미확인)",
+                 "unverified": "단계 확인 필요"}.get(card.get("change_state"), card.get("change_state"))
         lines.extend(["", f"### {card.get('title', '지역 변화')}", "",
                       str(card.get("evidence") or card.get("statement") or "내용 확인 필요"), "",
                       f"- 발표일: {_cell(card.get('published_at'))}",
                       f"- 사업 단계: {_cell(stage)}",
                       f"- 범위: {card['scope']}", f"- 근거: {_refs(card)}"])
+        if card.get("article_checked"):
+            lines.append("- 확인 수준: 원문 지역·변화 문장과 게시일 대조; 사건 발생 자체는 미검증")
         if card.get("why_it_matters"):
             lines.extend(["", "자료 해석(검토 필요): " + card["why_it_matters"]])
 
