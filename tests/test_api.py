@@ -121,7 +121,8 @@ class ApiTests(unittest.TestCase):
             'unique_local_signals':[],'local_changes':[],'trend_patterns':[],
             'why_here_now':'draft','research_implications':[],
             'needs_manual_check':['https://example.org/?certKey='+TOKEN]}
-        run={'all_contracts_valid':True,'module_status':{},'state':{'research_brief':brief}}
+        run={'all_contracts_valid':True,'module_status':{},'state':{'research_brief':brief,
+             'critic_result':{'status':'manual_review','warnings':[TOKEN]}}}
         with patch('src.integration_smoke.run_smoke',return_value=run),patch.dict('os.environ',{'SPOT_API_TOKEN':TOKEN}):
             result=research_result(bundle['request'],mode='live')
         self.assertNotIn(TOKEN,json.dumps(result))
@@ -133,6 +134,8 @@ class ApiTests(unittest.TestCase):
             job=await_job(client,response.json()['job_id'])
             self.assertEqual(job['status'],'completed')
             self.assertEqual(job['result']['mode'],'offline')
+            self.assertFalse(job['result']['critic_is_mock'])
+            self.assertEqual(job['result']['critic_result']['status'], 'failed')
             self.assertEqual(job['result']['research_brief']['status'],'failed')
             self.assertEqual(job['result']['research_brief']['source_count'],0)
 

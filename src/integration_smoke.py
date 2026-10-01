@@ -46,7 +46,7 @@ def run_smoke(request, *, mode="offline"):
         "all_contracts_valid": not any(validation.values()),
         "validation_errors": validation,
         "module_status": bundle["module_status"],
-        "critic_is_mock": True,
+        "critic_is_mock": False,
         "brief_is_mock": state["research_brief"].get("status") == "mock",
         "state": state,
         "critic_rule_preview": evaluate_rules(bundle),
@@ -59,7 +59,7 @@ def save_run(run, output):
     artifacts = {
         "request": state["request"],
         "research_bundle": state["research_bundle"],
-        "critic_mock": state["critic_result"],
+        "critic_result": state["critic_result"],
         "research_brief_mock" if run["brief_is_mock"] else "research_brief": state["research_brief"],
         "critic_rule_preview": run["critic_rule_preview"],
         "validation": {k: v for k, v in run.items()
@@ -76,7 +76,7 @@ def save_run(run, output):
              f"- 실행 모드: {run['mode']}",
              f"- Graph 종료까지 도달: {run['graph_completed']}",
              f"- 공통 계약 검증 통과: {run['all_contracts_valid']}",
-             "- Graph Critic은 Mock입니다. Research Brief는 근거 요약 초안이며 검토가 필요합니다.",
+             "- Critic은 실제 규칙을 검사합니다. 의미·사실 검토는 미완료이며 Research Brief는 조사 초안입니다.",
              "- 별도 Critic 기준표 검사는 품질 승인이나 사실 검증을 대신하지 않습니다.",
              "", "| 모듈 | 상태 | 인사이트 | 출처 |", "|---|---|---:|---:|"]
     for module, result in state["research_bundle"]["results"].items():

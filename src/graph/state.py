@@ -21,3 +21,4 @@ class SpotState(TypedDict, total=False):
 
     retry_targets: list[str]
     retry_count: int
+    retry_history: list[dict[str, Any]]

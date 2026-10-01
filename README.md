@@ -59,7 +59,7 @@ SpotRequest
   -> Quant / Local placeholders (parallel)
   -> internal context summary -> Trend placeholder
   -> Merge
-  -> Mock Critic
+  -> Rule Critic
   -> Research Brief (Mock 근거는 제외하며 근거 부족을 표시)
 ```
 
@@ -89,7 +89,8 @@ python -m src.validation path/to/scout_result.json --module quant --request-id s
 
 Scout 인수용 독립 규칙 preview를 실행할 수 있습니다. [기준표와 검증 결과](docs/critic/CRITIC_RULES_V0_1.md)를 먼저 읽으세요.
 `rule_status` 통과는 품질 최종 승인이 아니며, `quality_status`는 의미 검토 전까지 `manual_review`입니다.
-현재 graph는 기존 Mock Critic을 사용합니다.
+현재 graph는 실제 규칙 Critic과 제한된 일시 오류 재조사를 사용합니다.
+[현재 정책](docs/CRITIC_RETRY.md). 의미·사실 검토는 수동으로 남습니다.
 
 ```bash
 python -m src.critic.rules samples/critic/research_bundle.synthetic.json
@@ -112,13 +113,13 @@ python -m src.integration_smoke samples/input/myeongji_international.provisional
 
 offline은 외부 호출을 막고 세 Scout의 자료 미확보 경로를 실행합니다.
 전체 JSON, 계약 검사, Critic 기준표 preview, 사람이 읽는 `SUMMARY.md`를 저장합니다.
-Graph 안의 Critic은 Mock이며 Brief는 근거 요약 초안입니다. 명령 성공은 리서치 품질 승인을 뜻하지 않습니다.
+Graph의 Critic은 규칙을 검사하며 Brief는 근거 요약 초안입니다. 명령 성공은 리서치 품질 승인을 뜻하지 않습니다.
 live 실행 준비와 이번 결과: [Scout 통합 기록](docs/SCOUT_INTEGRATION_2026-09-30.md).
 
 ## 근거 기반 Research Brief
 
 Graph는 Scout의 실제 근거를 요약하는 Research Brief 초안을 생성합니다.
-Critic은 아직 Mock이며, 출처·자료 시점·지역 관련성의 검토가 필요합니다.
+Critic은 실제 규칙을 검사하며, 출처 원문의 의미·사실·지역 관련성은 추가 검토가 필요합니다.
 저장된 결과로 API 재호출 없이 JSON과 Markdown 보고서를 만들 수도 있습니다.
 
 ```bash

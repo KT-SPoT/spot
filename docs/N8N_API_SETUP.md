@@ -86,7 +86,9 @@ request_id를 생략하면 n8n 실행 번호로 생성합니다. 같은 요청�
 
 완료는 그래프 실행 완료를 뜻합니다. 근거 부족이면 완료된 작업의 Brief 상태가
 `failed`일 수 있습니다. `module_status`, Brief 상태와 `needs_manual_check`를 함께
-확인하세요. 현재 Critic은 Mock이며 `critic_is_mock=true`입니다.
+확인하세요. Critic은 실제 규칙을 검사하며 `critic_is_mock=false`입니다.
+`critic_result`와 `retry_history`에 검증 및 최대 1회 재조사 결과가 있습니다.
+의미·사실 검토는 아직 수동입니다. [종료·재조사 정책](CRITIC_RETRY.md).
 API 브리프는 같은 실행의 Quant 원문을 내부적으로 연결해 인구 비율을
 표시하고 관련 트렌드 보도를 묶습니다. [기준과 한계](BRIEF_ENRICHMENT.md).
 

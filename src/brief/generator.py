@@ -276,7 +276,7 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         if finding["level"] in ("needs_fix", "manual_review"):
             checks.append(f"{finding.get('module', '공통')}: {finding['message']}")
     if critic_result:
-        checks.append(f"Graph Critic 상태: {critic_result.get('status', '미확인')}. 규칙 preview와 의미 검토는 별개입니다.")
+        checks.append(f"Graph Critic 상태: {critic_result.get('status', '미확인')}. 규칙 검사와 의미·사실 검토는 별개입니다.")
         checks.extend(str(warning) for warning in critic_result.get("warnings", []))
     checks.extend(["이 브리프는 근거 요약 초안이며 품질 최종 승인이 아닙니다.",
                    "지표의 기준 시점·지역 범위·집계 방법을 확인하세요. 매출 비중을 고객 수 비중으로 해석하지 마세요.",

@@ -48,7 +48,9 @@ def research_result(request, *, mode):
     secrets = [v for k, v in os.environ.items() if v and len(v) >= 8 and
                any(word in k.upper() for word in ("KEY", "SECRET", "TOKEN", "CLIENT_ID", "PASSWORD"))]
     brief = redact(state["research_brief"], secrets)
-    return {"mode": mode, "module_status": run["module_status"], "critic_is_mock": True,
+    return {"mode": mode, "module_status": run["module_status"], "critic_is_mock": False,
+            "critic_result": redact(state["critic_result"], secrets),
+            "retry_history": state.get("retry_history", []),
             "research_brief": brief, "research_brief_markdown": redact(render_markdown(brief), secrets)}
 
 

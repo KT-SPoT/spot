@@ -1,5 +1,9 @@
 # Critic 규칙 기준표와 검증 샘플 — draft-0.1
 
+2026-10-01 업데이트: 이 preview 엔진의 기준은 유지하고, 별도 실제
+Critic wrapper와 graph 라우팅을 연결했습니다. 현재 실행 정책은
+[CRITIC_RETRY.md](../CRITIC_RETRY.md)를 따릅니다. 아래는 preview 작성 당시의 범위 기록입니다.
+
 작성·검증일: 2026-09-30 / 담당: 김민석 / 브랜치: `feat/critic`
 
 ## 목적과 적용 범위
