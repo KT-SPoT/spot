@@ -52,7 +52,7 @@ def run_local_scout(request):
                 continue
             seen.add(item["source_url"])
             checked += 1
-            verification = verify_source(item, anchor, start, end)
+            verification = verify_source(item, anchor, start, end, request.get("store") or {})
             output["query_context"]["verification_log"].append({"source_url": item["source_url"],
                 "status": verification["status"], "reason": verification.get("reason")})
             if verification["status"] == "rejected":
@@ -64,23 +64,34 @@ def run_local_scout(request):
                 source.update(published_at=verification["article_published_at"],
                               provider_published_at=item["published_at"], date_basis="article_published_at")
             output["sources"].append(source)
+            role = verification.get("evidence_role", "unclassified")
             fingerprint = verification.get("evidence_fingerprint")
             duplicate = next((i for i in output["insights"]
-                if verification["status"] == "text_corroborated" and i.get("verification_status") == "text_corroborated"
-                and i.get("evidence_fingerprint") == fingerprint and i["change_state"] == verification.get("change_state")
+                if verification["status"] in ("text_corroborated", "context_corroborated")
+                and i.get("verification_status") in ("text_corroborated", "context_corroborated")
+                and i.get("evidence_role") == role
+                and ((i.get("evidence_fingerprint") == fingerprint and i["change_state"] == verification.get("change_state"))
+                     or (role == "direct_change" and verification.get("event_key") and i.get("event_key") == verification["event_key"]))
                 and abs((date.fromisoformat(i["published_at"][:10]) - date.fromisoformat(source["published_at"][:10])).days) <= 7), None)
             if duplicate:
                 duplicate["source_ids"].append(sid)
-                duplicate["duplicate_basis"] = "identical_region_change_sentence_within_7_days"
+                duplicate["duplicate_basis"] = "same_plan_revision_or_identical_sentence_within_7_days"
+                duplicate.setdefault("supporting_facets", []).append({"source_id": sid,
+                    "evidence": verification.get("excerpt"), "change_state": verification.get("change_state"),
+                    "published_at": source["published_at"], "date_basis": source.get("date_basis")})
                 continue
             output["insights"].append({"insight_id": f"L-{number:03}", "type": "local_change_candidate",
                 "title": item["title"], "evidence": verification.get("excerpt") or item["description"], "published_at": source["published_at"],
                 "change_state": verification.get("change_state", "unverified"),
                 "article_checked": True, "evidence_fingerprint": fingerprint,
+                "evidence_role": role, "event_key": verification.get("event_key"),
+                "context_note": verification.get("context_note"), "classification_basis": verification.get("classification_basis"),
+                "date_basis": source.get("date_basis"),
                 "evidence_basis": "article_text" if verification.get("excerpt") else "search_passage",
                 "locality_tags": [anchor], "source_ids": [sid], "verification_status": verification["status"]})
     output["status"] = "partial" if output["insights"] else "failed"
     corroborated = sum(i["verification_status"] == "text_corroborated" for i in output["insights"])
-    output["summary"] = f"{anchor}: 원문·게시일 대조 {corroborated}건, 나머지 미확인 후보 {len(output['insights']) - corroborated}건. 실제 사건·반경은 별도 검토 필요."
+    roles = {role: sum(i.get("evidence_role") == role for i in output["insights"]) for role in ("direct_change", "surrounding_context", "background")}
+    output["summary"] = f"{anchor}: 직접 변화 {roles['direct_change']}건, 주변 행정구역 맥락 {roles['surrounding_context']}건, 배경 자료 {roles['background']}건. 원문·게시일 엄격 대조 {corroborated}건이며 문맥 분류·실제 영향은 별도 검토 필요."
     output["finished_at"] = search.now()
     return output

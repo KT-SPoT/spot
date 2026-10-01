@@ -157,8 +157,9 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
                                  "scope": "선택 영역", "sources": deepcopy(quant_sources)})
 
     local_changes = []
+    local_context = []
     for item in valid.get("local", {}).get("insights", []):
-        if item.get("article_checked") and item.get("verification_status") != "text_corroborated":
+        if item.get("article_checked") and item.get("verification_status") not in ("text_corroborated", "context_corroborated"):
             checks.append("Local 원문·게시일 대조가 부족한 검색 후보를 지역 변화 요약에서 제외했습니다. 수집 결과의 verification_log를 확인하세요.")
             continue
         ids = item.get("source_ids", [])
@@ -170,7 +171,14 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         card.update(module="local", sources=sources,
                     scope=("원문 보도 내용 대조; 실제 사건·점포 반경 관련성 별도 확인"
                            if item.get("article_checked") else "Scout가 보고한 지역 범위; 점포 반경 관련성 별도 확인"))
-        local_changes.append(card)
+        if item.get("evidence_role") in ("surrounding_context", "background"):
+            card["scope"] = ("같은 행정구역의 보조 맥락; 거리·생활권 연결·점포 영향 미확인"
+                             if item["evidence_role"] == "surrounding_context" else "지역 설명을 위한 배경 자료; 최근 변화로 집계하지 않음")
+            local_context.append(card)
+        else:
+            local_changes.append(card)
+        if item.get("verification_status") == "context_corroborated":
+            checks.append("Local 문맥 분류에는 규칙 기반 연결과 보조 본문 추출이 포함됩니다. 원문 게시일이 없으면 뉴스 제공일을 사용하며 사업 범위·실제 영향은 추가 확인이 필요합니다.")
 
     trend_patterns = []
     trend = valid.get("trend", {})
@@ -243,6 +251,9 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
     if local_changes:
         implications.append({"statement": "지역 변화의 사업 단계와 점포 생활권 관련성을 확인하세요. 계획·선정 발표를 현재 운영 또는 입주로 해석하지 마세요.",
                              "basis": deepcopy(local_changes), "kind": "research_question"})
+    if local_context:
+        implications.append({"statement": "주변 행정구역 변화와 지역 배경 자료를 조사 질문으로 활용하세요. 점포 생활권 연결과 영향 여부를 추가 확인하고 최근 지역 변화·고객 증가와 구분하세요.",
+                             "basis": deepcopy(local_context), "kind": "research_question"})
     if trend_patterns:
         pattern_names = ", ".join(str(card.get("name", "체험 패턴")) for card in trend_patterns)
         campaign = request.get("campaign", {})
@@ -250,17 +261,17 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         implications.append({"statement": f"{pattern_names} 패턴을 {product} 체험 목적과 대조해 적합성을 검토하세요. 방문 증가나 매출 효과는 이번 근거로 확정할 수 없습니다.",
                              "basis": deepcopy(trend_patterns), "kind": "research_question"})
 
-    cards = facts + demographics + local_changes + trend_patterns
+    cards = facts + demographics + local_context + local_changes + trend_patterns
     urls = {source["source_url"] for card in cards for source in card.get("sources", [])}
     store = request.get("store", {})
     address = store.get("address") or context.get("area_name") or "조사 지역 미확인"
-    area_summary = f"{address}: 정량 지표 {len(facts)}개, 지역 변화 {len(local_changes)}건, 체험 패턴 {len(trend_patterns)}개를 근거와 함께 요약했습니다."
+    area_summary = f"{address}: 정량 지표 {len(facts)}개, 직접 지역 변화 {len(local_changes)}건, 보조 맥락·배경 {len(local_context)}건, 체험 패턴 {len(trend_patterns)}개를 근거와 함께 요약했습니다. 자료 수는 독립 사건 수의 확정값이 아닙니다."
     if not cards:
         area_summary = f"{address}: 요약할 출처 연결 근거가 없습니다. 재수집 또는 자료 보완이 필요합니다."
     return {"schema_version": "0.1", "request_id": request_id,
             "status": "manual_review" if cards else "failed",
             "overview": {"area_summary": area_summary, "primary_customer_signal": primary},
-            "local_changes": local_changes, "unique_local_signals": facts + demographics,
+            "local_changes": local_changes, "unique_local_signals": facts + demographics + local_context,
             "trend_patterns": trend_patterns,
             "why_here_now": ("위 주소의 상권·인구 자료와 조회 기간의 생활권 변화, 체험 사례를 함께 검토할 수 있습니다. "
                              "지금 실행해야 할 이유나 다른 상권 대비 차별성은 근거의 시점·지역 관련성을 확인하기 전까지 확정하지 않습니다.") if cards else "근거 부족으로 why here / why now를 판단할 수 없습니다.",
