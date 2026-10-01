@@ -105,6 +105,18 @@ def _percent_text(value: Any) -> str:
     return f"{sign}{value}%"
 
 
+def _date_text(value: Any) -> Any:
+    """Normalize a date-only value to YYYY-MM-DD when possible."""
+    if isinstance(value, str):
+        text = value.strip()
+        if len(text) == 8 and text.isdigit():
+            try:
+                return datetime.strptime(text, "%Y%m%d").strftime("%Y-%m-%d")
+            except ValueError:
+                return value
+    return value
+
+
 def _failed_result(
     request: SpotRequest,
     started_at: str,
@@ -994,7 +1006,7 @@ def run_quant_scout(request: SpotRequest) -> ScoutResult:
                 **query_context,
                 "admi_cd": collected.get("admi_cd"),
                 "admi_nm": collected.get("admi_nm"),
-                "analysis_date": collected.get("analy_date"),
+                "analysis_date": _date_text(collected.get("analy_date")),
                 "upjong_cd": collected.get("analysis", {}).get("upjong_cd"),
             },
         )
