@@ -39,7 +39,7 @@ class GraphIntegrationTest(unittest.TestCase):
         self.assertEqual(nodes[3:], ["merge", "critic", "brief"])
         bundle = events[3]["merge"]["research_bundle"]
         self.assertEqual(bundle["results"], results)
-        self.assertEqual(events[-1]["brief"]["research_brief"]["status"], "mock")
+        self.assertEqual(events[-1]["brief"]["research_brief"]["status"], "failed")
 
     def test_uncaught_exception_currently_aborts_before_merge(self):
         request, results = self.fixtures()
@@ -50,7 +50,7 @@ class GraphIntegrationTest(unittest.TestCase):
                     if module == failing_module:
                         runner.side_effect = RuntimeError("synthetic API failure")
                 merge = stack.enter_context(patch("src.graph.graph.merge_node"))
-                brief = stack.enter_context(patch("src.graph.graph.mock_brief"))
+                brief = stack.enter_context(patch("src.graph.graph.generate_brief"))
                 with self.assertRaisesRegex(RuntimeError, "synthetic API failure"):
                     build_graph().invoke({"request": request})
                 merge.assert_not_called()

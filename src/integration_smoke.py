@@ -1,4 +1,4 @@
-"""Run integrated Scouts and save evidence; Critic and Brief remain mocks.
+"""Run integrated Scouts and save evidence plus a Research Brief draft.
 
 Offline mode runs the actual Local/Trend code and actual Quant missing-key path.
 It disables dotenv loading and credentials, rather than fabricating Quant data.
@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from src.critic.rules import evaluate_rules
+from src.brief.renderer import render_markdown
 from src.graph.graph import build_graph
 from src.validation import validate_scout_result
 
@@ -58,7 +59,7 @@ def save_run(run, output):
         "request": state["request"],
         "research_bundle": state["research_bundle"],
         "critic_mock": state["critic_result"],
-        "research_brief_mock": state["research_brief"],
+        "research_brief_mock" if run["brief_is_mock"] else "research_brief": state["research_brief"],
         "critic_rule_preview": run["critic_rule_preview"],
         "validation": {k: v for k, v in run.items()
                        if k not in ("state", "critic_rule_preview")},
@@ -68,11 +69,13 @@ def save_run(run, output):
     for name, value in artifacts.items():
         (output / f"{name}.json").write_text(
             json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if not run["brief_is_mock"]:
+        (output / "RESEARCH_BRIEF.md").write_text(render_markdown(state["research_brief"]), encoding="utf-8")
     lines = ["# Scout 통합 실행 요약", "",
              f"- 실행 모드: {run['mode']}",
              f"- Graph 종료까지 도달: {run['graph_completed']}",
              f"- 공통 계약 검증 통과: {run['all_contracts_valid']}",
-             "- Graph의 Critic / Research Brief는 Mock입니다.",
+             "- Graph Critic은 Mock입니다. Research Brief는 근거 요약 초안이며 검토가 필요합니다.",
              "- 별도 Critic 기준표 검사는 품질 승인이나 사실 검증을 대신하지 않습니다.",
              "", "| 모듈 | 상태 | 인사이트 | 출처 |", "|---|---|---:|---:|"]
     for module, result in state["research_bundle"]["results"].items():

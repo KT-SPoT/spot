@@ -43,7 +43,8 @@ class GraphSmokeTest(unittest.TestCase):
             self.assertEqual(scout_result["warnings"], ["MOCK_ONLY_NOT_REAL_DATA"])
 
         self.assertEqual(result["critic_result"]["status"], "manual_review")
-        self.assertEqual(result["research_brief"]["status"], "mock")
+        self.assertEqual(result["research_brief"]["status"], "failed")
+        self.assertEqual(result["research_brief"]["source_count"], 0)
         self.assertEqual(
             result["research_brief"]["request_id"], request["request_id"]
         )

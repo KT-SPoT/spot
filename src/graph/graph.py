@@ -7,7 +7,7 @@ Week-1 goal:
 
 from langgraph.graph import END, START, StateGraph
 
-from src.brief.generator import mock_brief
+from src.brief.generator import generate_brief
 from src.critic.critic import mock_critic
 from src.graph.state import SpotState
 from src.scouts.local import run_local_scout
@@ -52,8 +52,7 @@ def critic_node(state: SpotState) -> dict:
 
 
 def brief_node(state: SpotState) -> dict:
-    request_id = state["request"].get("request_id", "unknown")
-    return {"research_brief": mock_brief(request_id)}
+    return {"research_brief": generate_brief(state["research_bundle"], state.get("critic_result"))}
 
 
 def build_graph():
