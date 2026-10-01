@@ -18,15 +18,15 @@ class ScoutIntegrationTest(unittest.TestCase):
         collect.assert_not_called()
         self.assertTrue(run["graph_completed"])
         self.assertTrue(run["all_contracts_valid"])
-        self.assertEqual(run["module_status"], {"quant": "failed", "local": "partial", "trend": "success"})
+        self.assertEqual(run["module_status"], {"quant": "failed", "local": "failed", "trend": "failed"})
         bundle = run["state"]["research_bundle"]
         self.assertEqual(bundle["request"], request)
         self.assertEqual(bundle["results"]["quant"]["errors"][0]["code"], "MISSING_KAKAO_REST_API_KEY")
-        self.assertEqual({i["insight_id"] for i in bundle["results"]["local"]["insights"]}, {"L-002", "L-003"})
-        self.assertEqual(len(bundle["results"]["trend"]["insights"]), 10)
+        self.assertEqual({i["insight_id"] for i in bundle["results"]["local"]["insights"]}, set())
+        self.assertEqual(len(bundle["results"]["trend"]["insights"]), 0)
         self.assertEqual(run["state"]["critic_result"]["status"], "manual_review")
         self.assertFalse(run["brief_is_mock"])
-        self.assertEqual(run["state"]["research_brief"]["status"], "manual_review")
+        self.assertEqual(run["state"]["research_brief"]["status"], "failed")
 
     def test_coordinates_skip_geocoding_but_require_sbiz_key(self):
         # Synthetic coordinate input tests routing, not a real store's location.

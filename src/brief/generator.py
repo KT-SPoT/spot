@@ -196,7 +196,8 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
             continue
         card = deepcopy(item)
         card.update(module="trend", evidence_count=len(linked), sources=sources,
-                    scope="수집된 사례 목록; 요청 지역·제품 관련성 미확정")
+                    scope=("검색 후보자료; 독립 행사·제품 적합성·실제 체험 구조 확인 필요"
+                           if item.get("verification_status") == "candidate" else "수집된 사례 목록; 요청 지역·제품 관련성 미확정"))
         trend_patterns.append(card)
 
     preview = evaluate_rules(bundle)

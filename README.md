@@ -97,14 +97,16 @@ python -m unittest discover -s tests -v
 
 ## Scout 통합 실행
 
-Local / Trend는 PR의 기존 공개 자료 목록을 사용합니다. Quant는 실제 조회에 키가 필요합니다.
+Local은 요청 지역의 네이버 뉴스, Trend는 제품·인접 카테고리 관련 뉴스와 유튜브 메타데이터를 실행 시 조회합니다.
+고정 사례는 사용하지 않으며 검색 결과는 원문·영상 확인 전까지 `partial` 후보자료입니다.
+키 설정·조회 범위·실패 정책: [실제 검색 가이드](docs/LIVE_SCOUT_RESEARCH.md).
 현재 통합 입력은 조사 중심점이 미확정인 지역명이며, 반경 분석 결과로 사용하지 않습니다.
 
 ```bash
 python -m src.integration_smoke samples/input/myeongji_international.provisional.json --mode offline --output samples/integration/myeongji-20260930-offline
 ```
 
-offline은 Local·Trend 실제 구현과 Quant의 키 없음 실패 경로를 실행합니다.
+offline은 외부 호출을 막고 세 Scout의 자료 미확보 경로를 실행합니다.
 전체 JSON, 계약 검사, Critic 기준표 preview, 사람이 읽는 `SUMMARY.md`를 저장합니다.
 Graph 안의 Critic은 Mock이며 Brief는 근거 요약 초안입니다. 명령 성공은 리서치 품질 승인을 뜻하지 않습니다.
 live 실행 준비와 이번 결과: [Scout 통합 기록](docs/SCOUT_INTEGRATION_2026-09-30.md).

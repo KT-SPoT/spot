@@ -31,7 +31,7 @@ Critic은 아직 Mock이다. 별도 규칙 preview의 finding과 의미 검토 �
 - `research_brief.json`: 근거 카드가 있는 Brief
 - `RESEARCH_BRIEF.md`: 사람이 읽을 보고서
 
-Quant 실패 상태의 offline 실행도 Local·Trend 근거를 요약하며 Quant 미확보를 표시한다.
+offline 실행은 세 Scout의 외부 호출을 막으며 근거 부족을 표시한다. 실제 수집은 `--mode live`를 사용한다.
 전부 Mock 또는 실패라면 Brief의 status는 failed다. 기존 CLI 종료 코드는 Graph와 계약
 검증 성공 여부이므로 Brief와 모듈 상태를 함께 확인한다.
 
