@@ -1,5 +1,10 @@
 # n8n
 
+Importable inactive adapter: [spot-research-api.json](spot-research-api.json).
+Setup, API execution, credentials and submit/status usage:
+[N8N_API_SETUP.md](../../docs/N8N_API_SETUP.md).
+The exported template has no credential values or IDs and does not replace the team's cloud workflow.
+
 n8n is intentionally kept lightweight.
 
 Current `SPOT - Main Entry` responsibility:

@@ -1,0 +1,329 @@
+{
+  "name": "SPOT - Research API Entry (submit + status)",
+  "nodes": [
+    {
+      "id": "submit-research",
+      "name": "Submit research",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "spot/research",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "submit-research"
+    },
+    {
+      "id": "research-status",
+      "name": "Research status",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "spot/research/status",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "research-status"
+    },
+    {
+      "id": "normalize-request",
+      "name": "Normalize request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const b = $json.body;\nconst valid = b && typeof b === 'object' && !Array.isArray(b)\n  && b.store && typeof b.store === 'object'\n  && b.campaign && typeof b.campaign === 'object';\nif (!valid) return [{json:{valid:false,statusCode:422,body:{error:{code:'INVALID_REQUEST'}}}}];\nconst request = {\n  ...b,\n  schema_version: b.schema_version ?? '0.1',\n  request_id: b.request_id ?? `spot-n8n-${$execution.id}`,\n  research: {\n    ...(b.research ?? {}),\n    reference_date: b.research?.reference_date ?? $now.setZone('Asia/Seoul').toISODate(),\n    radius_m: b.research?.radius_m ?? 1000,\n    lookback_days: b.research?.lookback_days ?? 180,\n  },\n};\nreturn [{json:{valid:true,request}}];"
+      },
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "id": "validate-job-id",
+      "name": "Validate job ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const job_id = $json.query?.job_id;\nif (typeof job_id !== 'string' || !/^[a-f0-9]{32}$/.test(job_id)) {\n  return [{json:{valid:false,statusCode:422,body:{error:{code:'INVALID_JOB_ID'}}}}];\n}\nreturn [{json:{valid:true,job_id}}];"
+      },
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "id": "valid-request",
+      "name": "Valid request",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "id": "valid-job-id",
+      "name": "Valid job ID",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "id": "create-spot-job",
+      "name": "Create SPOT job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "https://spot-api.example.invalid/v1/research/jobs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "position": [
+        670,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "get-spot-job",
+      "name": "Get SPOT job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://spot-api.example.invalid/v1/research/jobs/' + $json.job_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "position": [
+        670,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "return-response",
+      "name": "Return response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.body ?? { error: { code: 'SPOT_API_UNREACHABLE' } } }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode ?? 503 }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "position": [
+        920,
+        150
+      ]
+    }
+  ],
+  "connections": {
+    "Submit research": {
+      "main": [
+        [
+          {
+            "node": "Normalize request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research status": {
+      "main": [
+        [
+          {
+            "node": "Validate job ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize request": {
+      "main": [
+        [
+          {
+            "node": "Valid request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate job ID": {
+      "main": [
+        [
+          {
+            "node": "Valid job ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid request": {
+      "main": [
+        [
+          {
+            "node": "Create SPOT job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid job ID": {
+      "main": [
+        [
+          {
+            "node": "Get SPOT job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create SPOT job": {
+      "main": [
+        [
+          {
+            "node": "Return response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get SPOT job": {
+      "main": [
+        [
+          {
+            "node": "Return response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}
