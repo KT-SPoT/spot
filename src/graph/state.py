@@ -11,6 +11,7 @@ class SpotState(TypedDict, total=False):
     quant_result: ScoutResult
     local_result: ScoutResult
     trend_result: ScoutResult
+    trend_context: dict[str, Any]
 
     research_bundle: dict[str, Any]
     critic_result: dict[str, Any]

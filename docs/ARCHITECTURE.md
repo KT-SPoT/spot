@@ -11,9 +11,10 @@ n8n Main Entry
 - required-field validation
     ↓
 LangGraph
-    ├─ Quant Scout
-    ├─ Local Scout
-    └─ Trend Scout
+    ├─ Quant Scout ─┐
+    └─ Local Scout ─┴─ Internal context summary
+                            ↓
+                        Trend Scout
           ↓
        Merge
           ↓
@@ -53,6 +54,12 @@ Responsibilities:
 ## Scout boundary
 
 Each Scout is an independent module.
+
+The current graph runs Quant and Local in parallel, joins both results, then
+passes a bounded context to Trend. SpotRequest v0.1 is unchanged. Trend still
+supports `run_trend_scout(request)`; its optional keyword `context` is internal
+to the graph. See [context-aware Trend](CONTEXT_AWARE_TREND.md).
+The current Critic remains a mock; conditional retries below are the target flow.
 
 ```text
 SpotRequest v0.1

@@ -1,8 +1,7 @@
 """LangGraph integration scaffold for SPOT.
 
-Week-1 goal:
-- prove that three independently owned Scout interfaces can join into one state;
-- keep Critic / retry routing replaceable while real Scout PoCs are developed.
+Quant and Local run in parallel; Trend consumes their bounded context.
+Critic remains a mock review step; Brief cites available evidence.
 """
 
 from langgraph.graph import END, START, StateGraph
@@ -10,6 +9,7 @@ from langgraph.graph import END, START, StateGraph
 from src.brief.generator import generate_brief
 from src.critic.critic import mock_critic
 from src.graph.state import SpotState
+from src.graph.trend_context import build_trend_context
 from src.scouts.local import run_local_scout
 from src.scouts.quant import run_quant_scout
 from src.scouts.trend import run_trend_scout
@@ -24,7 +24,12 @@ def local_node(state: SpotState) -> dict:
 
 
 def trend_node(state: SpotState) -> dict:
-    return {"trend_result": run_trend_scout(state["request"])}
+    return {"trend_result": run_trend_scout(state["request"], context=state.get("trend_context"))}
+
+
+def trend_context_node(state: SpotState) -> dict:
+    return {"trend_context": build_trend_context(state["request"],
+        state.get("quant_result"), state.get("local_result"))}
 
 
 def merge_node(state: SpotState) -> dict:
@@ -61,17 +66,19 @@ def build_graph():
     graph.add_node("quant", quant_node)
     graph.add_node("local", local_node)
     graph.add_node("trend", trend_node)
+    graph.add_node("trend_context", trend_context_node)
     graph.add_node("merge", merge_node)
     graph.add_node("critic", critic_node)
     graph.add_node("brief", brief_node)
 
-    # Fan-out: each Scout owns an independent module.
+    # Gather independent measurements before context-dependent discovery.
     graph.add_edge(START, "quant")
     graph.add_edge(START, "local")
-    graph.add_edge(START, "trend")
+    graph.add_edge(["quant", "local"], "trend_context")
+    graph.add_edge("trend_context", "trend")
 
-    # Fan-in: wait for all three results before merging.
-    graph.add_edge(["quant", "local", "trend"], "merge")
+    # Trend starts only after both upstream results are available.
+    graph.add_edge("trend", "merge")
     graph.add_edge("merge", "critic")
 
     # Week-1 smoke-test path only.

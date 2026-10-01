@@ -24,8 +24,10 @@ class GraphSmokeTest(unittest.TestCase):
                 return_value=mock_scout_result(module, request["request_id"]),
             )) for module in ("quant", "local", "trend")]
             result = build_graph().invoke({"request": request})
-            for runner in runners:
+            for runner in runners[:2]:
                 runner.assert_called_once_with(request)
+            runners[2].assert_called_once_with(request, context=result["trend_context"])
+            self.assertEqual(result["trend_context"]["population_signals"], [])
 
         bundle = result["research_bundle"]
         self.assertEqual(bundle["request_id"], request["request_id"])
