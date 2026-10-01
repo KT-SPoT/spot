@@ -82,6 +82,33 @@ python -m src.validation path/to/scout_result.json --module quant --request-id s
 
 검사 범위·실패 정책·PR 인수 체크리스트: [통합 준비 가이드](docs/INTEGRATION_READINESS.md).
 
+## Critic 기준 초안 및 합성 검증
+
+Scout 인수용 독립 규칙 preview를 실행할 수 있습니다. [기준표와 검증 결과](docs/critic/CRITIC_RULES_V0_1.md)를 먼저 읽으세요.
+`rule_status` 통과는 품질 최종 승인이 아니며, `quality_status`는 의미 검토 전까지 `manual_review`입니다.
+현재 graph는 기존 Mock Critic을 사용합니다.
+
+```bash
+python -m src.critic.rules samples/critic/research_bundle.synthetic.json
+python -m unittest discover -s tests -v
+```
+
+`samples/critic/rule_cases.synthetic.json`에는 실제 근거와 구분된 합성 시나리오 27개가 있습니다.
+
+## Scout 통합 실행
+
+Local / Trend는 PR의 기존 공개 자료 목록을 사용합니다. Quant는 실제 조회에 키가 필요합니다.
+현재 통합 입력은 조사 중심점이 미확정인 지역명이며, 반경 분석 결과로 사용하지 않습니다.
+
+```bash
+python -m src.integration_smoke samples/input/myeongji_international.provisional.json --mode offline --output samples/integration/myeongji-20260930-offline
+```
+
+offline은 Local·Trend 실제 구현과 Quant의 키 없음 실패 경로를 실행합니다.
+전체 JSON, 계약 검사, Critic 기준표 preview, 사람이 읽는 `SUMMARY.md`를 저장합니다.
+Graph 안의 Critic과 Brief는 계속 Mock이며, 명령 성공은 리서치 품질 승인을 뜻하지 않습니다.
+live 실행 준비와 이번 결과: [Scout 통합 기록](docs/SCOUT_INTEGRATION_2026-09-30.md).
+
 ## Security
 
 실제 API Key, n8n credential, token, password는 저장소에 커밋하지 않습니다.
