@@ -35,7 +35,7 @@ def trend_node(state: SpotState) -> dict:
 
 def trend_context_node(state: SpotState) -> dict:
     return {"trend_context": build_trend_context(state["request"],
-        state.get("quant_result"), state.get("local_result"))}
+        state.get("quant_result"), state.get("local_result"), quant_evidence=state.get("quant_evidence"))}
 
 
 def merge_node(state: SpotState) -> dict:
@@ -95,7 +95,8 @@ def retry_node(state: SpotState) -> dict:
         accept("local", run_local_scout(state["request"]))
     upstream_changed = any(f"{module}_result" in updates for module in ("quant", "local"))
     context = build_trend_context(state["request"], updates.get("quant_result", state.get("quant_result")),
-                                  updates.get("local_result", state.get("local_result")))
+                                  updates.get("local_result", state.get("local_result")),
+                                  quant_evidence=updates.get("quant_evidence", state.get("quant_evidence")))
     updates["trend_context"] = context
     if "trend" in targets:
         accept("trend", run_trend_scout(state["request"], context=context))

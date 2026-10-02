@@ -8,6 +8,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from src.critic.rules import evaluate_rules
 from src.validation import validate_scout_result
 from src.brief.trend_groups import group_coverage
+from src.brief.quant_policy import quant_basis
 
 
 METRICS = {
@@ -19,9 +20,33 @@ METRICS = {
     "resident_population": ("주거인구", "명", "resident"),
     "worker_population": ("직장인구", "명", "worker"),
     "household_count": ("세대수", "세대", "area"),
+    "school_count": ("학교 수", "개", "area"),
+    "subway_station_count": ("지하철역 수", "개", "area"),
+    "bus_stop_count": ("버스정류장 수", "개", "area"),
 }
 AGE_LABELS = {"under_10": "10세 미만", "teens": "10대", "20s": "20대",
               "30s": "30대", "40s": "40대", "50s": "50대", "60_plus": "60대 이상"}
+CATEGORY_METRICS = {
+    "dominant_floating_gender": ("유동인구 주요 성별", {"male": "남성", "female": "여성"}),
+    "dominant_floating_age": ("유동인구 주요 연령대", AGE_LABELS),
+    "dominant_sales_gender": ("매출 비중 주요 성별", {"male": "남성", "female": "여성"}),
+    "dominant_sales_age": ("매출 비중 주요 연령대", AGE_LABELS),
+    "peak_floating_day": ("유동인구 최다 요일", {}),
+    "peak_floating_time_band": ("유동인구 최다 시간대", {}),
+    "peak_sales_day": ("매출 최다 요일", {}),
+    "peak_sales_time_band": ("매출 최다 시간대", {}),
+    "dominant_facility_type": ("최다 주요시설 유형", {}),
+}
+DAY_LABELS = dict(zip(("mon", "tue", "wed", "thu", "fri", "sat", "sun"),
+                      ("월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일")))
+
+
+def _category_label(name, value, labels):
+    if name.endswith("_day"):
+        return DAY_LABELS.get(value, value)
+    if name.endswith("_time_band") and value.count("_") == 1:
+        return value.replace("_", "~") + "시"
+    return labels.get(value, value)
 
 
 def _number(value):
@@ -134,6 +159,16 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
                           "metric_refs": [name], "reference_period": period,
                           "scope": f"선택 영역 / 요청 반경 {context.get('radius_m', '미확인')}m",
                           "sources": deepcopy(quant_sources)})
+        for name, (label, labels) in CATEGORY_METRICS.items():
+            value = metrics.get(name)
+            if not isinstance(value, str) or not value.strip():
+                continue
+            display = _category_label(name, value, labels)
+            facts.append({"module": "quant", "title": label,
+                          "statement": f"{label}: {display}", "value": display, "unit": "",
+                          "reported_value": value, "metric_refs": [name], "reference_period": None,
+                          "scope": f"선택 영역 / 요청 반경 {context.get('radius_m', '미확인')}m",
+                          "sources": deepcopy(quant_sources)})
         if facts and any(fact["reference_period"] is None for fact in facts):
             checks.append("Quant 지표 기준 시점이 일부 미확보입니다. 조회일·분석 생성일을 지표 기준일로 사용하지 마세요.")
     elif metrics:
@@ -158,6 +193,8 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
                                  "scope": "선택 영역", "sources": deepcopy(quant_sources)})
 
     local_changes = []
+    for card in facts + demographics:
+        card["evidence_basis"] = quant_basis(card["sources"])
     if demographics and any(card["reference_period"] is None for card in demographics):
         checks.append("성별·연령 표의 기준 시점이 미확보입니다. 다른 인구 추이 표의 최신 월이나 분석 생성일을 비율의 기준일로 사용하지 마세요.")
     local_context = []
@@ -218,8 +255,8 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         card.update(module="trend", evidence_count=len(groups), sources=sources,
                     article_count=len(linked), candidate_group_count=len(groups),
                     candidate_groups=[[case["case_id"] for case in group] for group in groups],
-                    scope=("검색 후보자료; 독립 행사·제품 적합성·실제 체험 구조 확인 필요"
-                           if item.get("verification_status") == "candidate" else "수집된 사례 목록; 요청 지역·제품 관련성 미확정"))
+                    scope=("전국·다업종 검색 후보; 독립 행사·체험 구조·매장 응용 가설 확인 필요"
+                           if item.get("verification_status") == "candidate" else "전국 체험 사례; 매장 응용 가설 검토"))
         trend_patterns.append(card)
 
     # Reference candidates are separate cards, never counted as repeated patterns.
@@ -263,7 +300,9 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         actual = {(module, sid) for module, entries in context_sources.items() for sid in entries}
         if expected != actual:
             # Keep the source-backed candidate, omit unsupported context reasoning.
-            card["why_relevant"] = ["요청 제품·카테고리와 비교할 체험 후보입니다. 맥락 근거 연결은 확인 필요합니다."]
+            card["why_relevant"] = ["전국 체험 사례의 매장 응용 후보입니다. 맥락 근거 연결은 확인 필요합니다."]
+            card.pop("audience_hypothesis", None)
+            card.pop("adaptation_hypotheses", None)
             checks.append("Trend 후보의 인구·지역 맥락 출처가 일부 누락되어 맥락 선정 이유를 제외했습니다.")
         card.update(module="trend", type="reference_case", sources=sources,
                     context_sources={m: list(entries.values()) for m, entries in context_sources.items()},

@@ -15,7 +15,7 @@ class TrendTests(unittest.TestCase):
                 article("갤럭시 Z 폴드8 온라인 리뷰", "https://example.org/4")]
         with patch("src.scouts.search_runtime.news", return_value=rows), patch("src.scouts.search_runtime.videos", return_value=rows):
             result = run_trend_scout(REQUEST)
-        self.assertEqual(len(result["insights"]), 2)
+        self.assertEqual(len(result["insights"]), 3)
         self.assertEqual(result["status"], "partial")
         self.assertEqual(result["patterns"][0]["verification_status"], "candidate")
         self.assertEqual(result["query_context"]["lookback_days"], 0)

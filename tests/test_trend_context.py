@@ -69,17 +69,17 @@ class TrendContextTests(unittest.TestCase):
         with patch('src.scouts.search_runtime.news',return_value=rows) as news, patch('src.scouts.search_runtime.videos',return_value=[]):
             result=run_trend_scout(request,context=ctx)
         self.assertEqual(news.call_count,3)
-        self.assertEqual(len(result['insights']),2)
+        self.assertEqual(len(result['insights']),3)
         self.assertIn('30대',result['reference_cases'][0]['event_name'])
         self.assertEqual({r['module'] for r in result['reference_cases'][0]['context_source_refs']},{'quant','local'})
         bundle['results']['trend']=result
         brief=generate_brief(bundle); text=render_markdown(brief)
         refs=[c for c in brief['trend_patterns'] if c.get('type')=='reference_case']
-        self.assertEqual(len(refs),2)
+        self.assertEqual(len(refs),3)
         self.assertIn('quant',refs[0]['context_sources'])
         self.assertIn('선정 이유',text)
         self.assertIn('실제 행사 참여자의 성별·연령',text)
-        self.assertEqual(brief['source_count'],4)
+        self.assertEqual(brief['source_count'],5)
 
     def test_single_candidate_in_brief_without_repeated_pattern(self):
         bundle=evidence()

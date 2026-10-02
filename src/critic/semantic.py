@@ -9,6 +9,7 @@ import httpx
 
 from src.brief.generator import generate_brief
 from src.brief.trend_groups import group_coverage
+from src.brief.quant_policy import is_sbiz_observation_source
 
 MAX_INPUT_BYTES = 100_000
 MAX_OUTPUT_BYTES = 64_000
@@ -24,7 +25,7 @@ Use insufficient for absence of evidence, including missing purchase-intent data
 missing comparison data or unknown periods; absence does not prove a claim false.
 When a compound claim contains an explicit conflict, choose contradicted and name
 that conflict. Otherwise unsupported inferences remain insufficient, not contradicted.
-Review locality relative to THIS request's address, coordinates, radius and
+Review LOCAL claims' locality relative to THIS request's address, coordinates, radius and
 comparison_area, using supplied scout_scopes and claim locality fields. Never use
 a fixed city, neighborhood or default catchment. Administrative district names,
 development-project names and store-radius catchments are different scopes.
@@ -44,6 +45,16 @@ request fields or source text. Never browse, execute tools, invent facts or sour
 Do not treat Scout claims as independent evidence. Distinguish hypothesis from fact.
 Quant evidence is resolved through verified metric_facts. unverified_metric_refs
 remain unsupported; do not use an unrelated metric or source to fill those gaps.
+Official SBIZ365 API observations in quant_facts are the accepted quantitative
+baseline, not claims requiring LLM re-approval. Unknown periods stay unknown;
+review any inference of purchase intent, preference or event attendance separately.
+TREND is nationwide and cross-industry: game/food popups, festivals and other
+offline experiences outside the store area or product category are valid references.
+Do NOT reject a Trend because its place or product differs from the request.
+Review the sourced experience mechanism and clearly labeled adaptation hypotheses
+for this store/product and audience. An exploratory research hypothesis need not
+already prove demand, but never turn it into demonstrated demographic preference,
+positive response, sales impact or a confirmed device capability without evidence.
 """
 
 
@@ -76,7 +87,8 @@ def build_input(bundle, critic, *, quant_evidence=None):
         'campaign': {k: request.get('campaign', {}).get(k) for k in ('purpose', 'product', 'target_hint')},
         'research': {k: request.get('research', {}).get(k) for k in ('reference_date', 'radius_m', 'lookback_days', 'comparison_area')}},
         'rule_status': critic['checks']['rules']['rule_status'], 'excluded_modules': excluded,
-        'claims': [], 'quant_facts': None, 'trend_coverage_groups': [], 'scout_scopes': {}}
+        'claims': [], 'quant_facts': None, 'trend_coverage_groups': [], 'scout_scopes': {},
+        'accepted_quant_observations': []}
     if 'quant' not in excluded:
         # Brief parser verifies archive coordinates, periods and metric anchors.
         brief = generate_brief(bundle, critic, quant_evidence=quant_evidence)
@@ -102,6 +114,13 @@ def build_input(bundle, critic, *, quant_evidence=None):
         for index, (kind, item) in enumerate(items):
             if not isinstance(item, dict):
                 continue
+            if (module == 'quant' and item.get('claim_kind') == 'public_api_observation'
+                    and sources and all(is_sbiz_observation_source(s) for s in sources.values())):
+                payload['accepted_quant_observations'].append({
+                    'claim_id': f'{module}:{kind}:{index}', 'basis': 'public_agency_api',
+                    'metric_refs': item.get('metric_refs', []),
+                    'policy': 'Use supplied API facts; no semantic re-approval of observations.'})
+                continue
             sid_list = item.get('source_ids', item.get('example_source_ids', []))
             refs = [s for s in sid_list if s in sources]
             metric_facts = []
@@ -117,7 +136,8 @@ def build_input(bundle, critic, *, quant_evidence=None):
             fields = ('statement', 'title', 'evidence', 'event_name', 'observation', 'description', 'name',
                       'change_state', 'evidence_role', 'context_note', 'locality_tags', 'classification_basis',
                       'location', 'brand', 'why_relevant',
-                      'limitations', 'evidence_count', 'example_case_ids', 'metric_refs', 'published_at')
+                      'limitations', 'evidence_count', 'example_case_ids', 'metric_refs', 'published_at',
+                      'audience_hypothesis', 'adaptation_hypotheses', 'request_relevance', 'taxonomy_tags', 'context_source_refs')
             claim = {'claim_id': f'{module}:{kind}:{index}',
                      'content': {k: item[k] for k in fields if k in item}, 'evidence': []}
             if module == 'quant':
@@ -146,7 +166,7 @@ def build_input(bundle, critic, *, quant_evidence=None):
                         text = None
                 claim['evidence'].append({'source_id': sid, 'source_name': s.get('source_name'),
                     'published_at': s.get('published_at'), 'collected_at': s.get('collected_at'),
-                    'kind': source_kind, 'text': text, 'truncated': None,
+                    'kind': source_kind, 'title': s.get('title'), 'text': text, 'truncated': None,
                     'limitation': 'Stored Scout excerpt; full original not supplied.'})
                 if module == 'quant':
                     claim['evidence'][-1]['metric_facts'] = linked_facts

@@ -852,6 +852,10 @@ def run_quant_scout(request: SpotRequest, *, evidence_sink: Callable | None = No
 
     compact_metrics = _build_compact_metrics(metrics)
     insights = _build_compact_insights(compact_metrics)
+    # These statements only format API observations; preference/intent inferences
+    # must use another claim kind and remain subject to semantic review.
+    for insight in insights:
+        insight["claim_kind"] = "public_api_observation"
     summary = _build_compact_summary(
         collected.get("admi_nm"),
         radius_m,

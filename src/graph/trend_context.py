@@ -3,11 +3,12 @@ from copy import deepcopy
 from urllib.parse import urlsplit
 
 from src.validation import validate_scout_result
+from src.brief.generator import generate_brief
 
 
-def build_trend_context(request, quant=None, local=None):
+def build_trend_context(request, quant=None, local=None, *, quant_evidence=None):
     output = {"request_id": request.get("request_id"), "population_signals": [],
-              "local_signals": [], "sources": {"quant": [], "local": []},
+              "local_signals": [], "timing_signals": [], "sources": {"quant": [], "local": []},
               "module_status": {}, "limitations": [
                   "인구 구성은 실제 구매 고객이나 선호를 뜻하지 않습니다.",
                   "매출·유동·주거·직장 인구는 서로 다른 모집단입니다.",
@@ -56,7 +57,41 @@ def build_trend_context(request, quant=None, local=None):
                     "source_ids": [s["source_id"] for s in output["sources"]["quant"]],
                     "area_scope": deepcopy({k: v for k, v in result.get("query_context", {}).items()
                         if k in ("radius_m", "lat", "lng", "area_name")})})
-        output["limitations"].append("현재 Quant 공통 결과의 주요 성별·연령을 사용합니다. 전체 비율 분포·모집단별 기준 시점은 미확보로 표시합니다.")
+        for population, day_key, time_key in (
+                ('floating_population', 'peak_floating_day', 'peak_floating_time_band'),
+                ('sales', 'peak_sales_day', 'peak_sales_time_band')):
+            if metrics.get(day_key) or metrics.get(time_key):
+                output['timing_signals'].append({'population_kind': population,
+                    'peak_day': metrics.get(day_key), 'peak_time_band': metrics.get(time_key),
+                    'reference_period': None,
+                    'source_ids': [s['source_id'] for s in output['sources']['quant']]})
+        if quant_evidence is not None:
+            # Reuse coordinate/metric matching and bounded cards, never pass HTML.
+            bundle = {'request_id': request['request_id'], 'request': request,
+                      'results': {'quant': result}}
+            cards = generate_brief(bundle, quant_evidence=quant_evidence)['unique_local_signals']
+            for card in cards:
+                if 'shares' not in card:
+                    continue
+                shares = deepcopy(card['shares'])
+                gender_keys = [k for k in ('male', 'female') if k in shares]
+                age_keys = [k for k in ('under_10', 'teens', '20s', '30s', '40s', '50s', '60_plus') if k in shares]
+                gender = max(gender_keys, key=lambda k: shares[k]['share_pct']) if gender_keys else None
+                age = max(age_keys, key=lambda k: shares[k]['share_pct']) if age_keys else None
+                profile = {'population_kind': card['population_kind'], 'dominant_gender': gender,
+                    'dominant_age': age, 'shares': shares,
+                    'gender_share_pct': shares[gender]['share_pct'] if gender else None,
+                    'age_share_pct': shares[age]['share_pct'] if age else None,
+                    'reference_period': card['reference_period'], 'evidence_basis': card['evidence_basis'],
+                    'source_ids': [s['source_id'] for s in card['sources']], 'area_scope': card['scope']}
+                index = next((i for i, p in enumerate(output['population_signals'])
+                              if p['population_kind'] == card['population_kind']), None)
+                if index is not None:
+                    profile['metric_refs'] = output['population_signals'][index]['metric_refs']
+                    output['population_signals'][index] = profile
+                else:
+                    output['population_signals'].append(profile)
+        output["limitations"].append("소상공인365 관측값을 조사 기준으로 사용합니다. 비율이 없는 항목·표의 미표시 기준 시점은 추정하지 않습니다.")
     if "local" in valid:
         available_ids = {s["source_id"] for s in output["sources"]["local"]}
         for item in valid["local"].get("insights", []):

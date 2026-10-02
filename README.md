@@ -24,6 +24,11 @@ n8n Main Entry
 - **LangGraph**: Scout 실행, 상태 관리, Critic 판단, 재탐색 루프, Brief 생성
 - **Scout modules**: 각 담당자가 공통 JSON 계약에 맞춰 독립 구현
 
+소상공인365의 성별·연령·최다 시간대 등 관측값을 정량 기준으로 사용합니다.
+Trend는 전국의 게임·음식 팝업, 지역 축제 등 다양한 업종의 체험을 조사하고,
+관측된 인구·매출 구성과 연결해 핸드폰 매장에 응용할 조사 가설을 제시합니다.
+사례가 대상 지역·기기와 같아야 한다는 조건은 없습니다.
+
 ## Collaboration model
 
 - **GitHub**: 구현, AI coding 작업, Issue, branch, PR의 중심
