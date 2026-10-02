@@ -157,7 +157,7 @@ def build_input(bundle, critic, *, quant_evidence=None):
     return payload
 
 
-def validate_response(raw, payload):
+def validate_response(raw, payload, *, action_normalizations=None):
     if isinstance(raw, str):
         if len(raw.encode()) > MAX_OUTPUT_BYTES:
             raise SemanticError('OUTPUT_LIMIT_EXCEEDED')
@@ -168,6 +168,8 @@ def validate_response(raw, payload):
         raise SemanticError('OUTPUT_LIMIT_EXCEEDED')
     claims = {c['claim_id']: c for c in payload['claims']}
     seen = set()
+    normalized = []
+    adjustments = []
     actions = {'supported': 'keep', 'contradicted': 'qualify', 'insufficient': 'manual_check'}
     for finding in raw['findings']:
         if not isinstance(finding, dict) or set(finding) != {'claim_id', 'verdict', 'source_ids', 'reason', 'suggested_action'}:
@@ -180,12 +182,23 @@ def validate_response(raw, payload):
                 or len(refs) != len(set(refs)) or (verdict != 'insufficient' and not refs)):
             raise SemanticError('INVALID_SOURCE_REFERENCE')
         if (not isinstance(finding['reason'], str) or not finding['reason'].strip() or len(finding['reason']) > 1000
-                or finding['suggested_action'] != actions[verdict]):
+                or not isinstance(finding['suggested_action'], str)
+                or finding['suggested_action'] not in set(actions.values())):
             raise SemanticError('INVALID_RESPONSE')
+        # The model judges evidence; our policy owns the resulting action.
+        # Preserve verdict/reason and audit any known action overridden here.
+        item = dict(finding)
+        item['suggested_action'] = actions[verdict]
+        if finding['suggested_action'] != item['suggested_action']:
+            adjustments.append({'claim_id': cid, 'model_action': finding['suggested_action'],
+                                'applied_action': item['suggested_action']})
+        normalized.append(item)
         seen.add(cid)
     if seen != set(claims):
         raise SemanticError('INCOMPLETE_RESPONSE')
-    return _clean(raw['findings'])
+    if action_normalizations is not None:
+        action_normalizations.extend(adjustments)
+    return _clean(normalized)
 
 
 class ChatCaller:
@@ -233,9 +246,11 @@ def run_semantic(bundle, critic, *, caller=None, mode=None, quant_evidence=None)
         if not payload['claims']:
             return {**review, 'code': 'NO_USABLE_CLAIMS'}
         review['call_count'] = 1
-        findings = validate_response(caller(payload), payload)
+        adjustments = []
+        findings = validate_response(caller(payload), payload, action_normalizations=adjustments)
         return {**review, 'performed': True, 'code': 'EVALUATED', 'findings': findings,
-                'claim_count': len(payload['claims']), 'truth_verified': False}
+                'claim_count': len(payload['claims']), 'truth_verified': False,
+                'action_normalizations': adjustments}
     except SemanticError as error:
         # Exceptions created here carry only predefined codes.
         return {**review, 'code': str(error) if str(error) in {

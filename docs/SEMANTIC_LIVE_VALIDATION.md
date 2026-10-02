@@ -56,3 +56,30 @@ metric_refs → 같은 Quant source registry로만 연결하도록 보완했다.
 보완은 로컬 자동 테스트와 저장 자료 입력 재생으로 확인한다. 승인된 1회 호출을
 소비했으므로 수정 입력으로 추가 모델 호출은 하지 않았다. 자동 평가도 off로 유지했다.
 실제 자료의 모델 판정 채택 및 정확도 검토는 아직 완료되지 않았다.
+
+## 수정 입력 재평가와 조치 정책 보완
+
+사용자의 다음 단계 요청으로 수정 입력(Quant 출처 연결 포함)을 실제 모델에
+1회 재전송했다. 주장은 16개였으며 새 Scout 조회는 없었다. 이번 응답은
+키 값 검사 후 로컬에 기록했고, 출처·주장 연결 오류는 발견되지 않았다.
+
+초기 검증 결과는 INVALID_RESPONSE였다. 정확한 원인은 8개 insufficient 판정에
+모델이 qualify 조치를 제안한 것이다. 모델 판정과 코드의 조치 대응표가 맞지 않았다.
+
+알려진 모델 조치를 정책에 맞춰 적용하도록 보완했다. verdict와 reason은 유지한다.
+insufficient는 manual_check, contradicted는 qualify, supported는 keep으로 적용하며
+모델 제안과 적용 값을 action_normalizations에 기록한다. 알 수 없는 조치,
+잘못된 출처, 없는 주장, 누락·중복 응답은 여전히 거부한다.
+
+추가 API 호출 없이 기록된 실제 응답을 Graph에 재생한 결과:
+
+- performed=true, code=EVALUATED, claim_count=16.
+- supported 8개, insufficient 8개. 모델의 판정을 바꾸지 않았다.
+- 조치 정책 적용 내역 8개. 최종 상태 manual_review, truth_verified=false.
+- 기존 Brief 동일, source_count=17. 재생 시 모델/Scout 외부 호출 0회.
+- 자동 테스트 134개, n8n 연결 구조 검증, 키 유출 검사 통과.
+
+이는 실제 응답의 형식·출처 연결 및 정책 적용이 통과했다는 결과다.
+모든 주장의 사실 진위, 타 지역 품질, 반복 안정성 검증 완료를 의미하지 않는다.
+전체 응답·조치 적용 기록·읽기용 결과는 `.venv/verification/semantic-live-replay-v2-accepted/`에만
+저장하며 Git에 넣지 않는다. 서버의 자동 의미 평가는 off를 유지했다.

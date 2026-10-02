@@ -61,7 +61,9 @@ Quant 보조자료 검증이 실패하면 Brief의 기존 정책대로 그 자�
 ## 응답 검증 및 종료
 
 모든 입력 claim_id에 정확히 한 개의 판정이 있어야 한다. 중복·누락·없는 claim_id·
-다른 주장에만 연결된 source_id는 거부한다. 추가 필드나 잘못된 verdict/action도 거부한다.
+다른 주장에만 연결된 source_id는 거부한다. 추가 필드나 알 수 없는 verdict/action도 거부한다.
+알려진 action이 verdict 정책과 다르면 코드에서 정책 action을 적용하고
+`action_normalizations`에 모델 제안과 적용 값을 기록한다. verdict와 reason은 바꾸지 않는다.
 
 | verdict | action | 뜻 |
 | --- | --- | --- |
