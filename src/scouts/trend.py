@@ -6,6 +6,7 @@ from datetime import date
 from copy import deepcopy
 from src.scouts import search_runtime as search
 from src.scouts import trend_relevance as relevance
+from src.brief.trend_groups import group_coverage
 
 PATTERNS = {
     "mission_journey": ("미션 기반 참여 동선", ("미션", "스탬프", "단서")),
@@ -29,39 +30,42 @@ def product_alias(product):
 
 
 def build_queries(request, context):
-    # Category breadth is independent of gender. One broad query remains ungated
-    # by cohort words; demographics guide discovery, never establish preference.
-    queries = ['게임 팝업 체험', '음식 팝업 체험', '지역 축제 참여 체험']
-    age = next((s.get('dominant_age') for s in context.get('population_signals',[]) if s.get('population_kind')=='floating_population'),None)
-    if age in AGE_LABELS:
-        queries[-1] += ' ' + AGE_LABELS[age]
-    sales_age = next((s.get('dominant_age') for s in context.get('population_signals',[]) if s.get('population_kind')=='sales'),None)
-    if sales_age in AGE_LABELS:
-        queries[1] += ' ' + AGE_LABELS[sales_age]
+    # Demographics guide selection/interpretation, not mandatory search terms.
+    queries = ['게임 팝업 체험', '음식 팝업 체험', '지역 축제 체험']
     return list(dict.fromkeys(queries))[:MAX_QUERIES]
 
 
-def event_category(text):
-    lowered = text.lower()
-    if any(w in lowered for w in ('게임', '게이밍', 'game', '챌린지')):
-        return 'game'
-    if any(w in lowered for w in ('음식', '푸드', '디저트', '시식', '라면', '커피', '맛보기')):
-        return 'food'
-    if any(w in lowered for w in ('축제', '페스티벌', '지역 행사', '지역행사')):
-        return 'festival'
+def event_category(title):
+    # An event's industry is separate from its game/photo participation mechanic.
+    lowered = title.lower()
+    for category, words in (
+            ('food', ('음식', '푸드', '디저트', '시식', '라면', '커피', '맛보기', '버거', '식품')),
+            ('beauty', ('화장품', '뷰티', '코스메틱', '안티에이징')),
+            ('festival', ('축제', '페스티벌', '지역 행사', '지역행사')),
+            ('culture', ('문화', '콘텐츠', '캐릭터', '공연', '음악', '뮤지컬')),
+            ('game', ('게임', '게이밍', 'game'))):
+        if any(w in lowered for w in words):
+            return category
     return 'other'
 
 
 def diversified_references(cases, limit=5):
+    groups = group_coverage([c for c in cases if c.get('evidence_role') != 'audience_context'])
+    representatives = []
+    for group in groups:
+        representative = deepcopy(group[0])
+        representative['related_case_ids'] = [c['case_id'] for c in group]
+        representatives.append(representative)
     selected, seen = [], set()
-    for case in cases:
+    ordered = [c for c in representatives if c['event_category'] != 'other'] + [c for c in representatives if c['event_category'] == 'other']
+    for case in ordered:
         category = case['event_category']
         if category not in seen:
             selected.append(case)
             seen.add(category)
         if len(selected) >= limit:
             return deepcopy(selected)
-    selected.extend(c for c in cases if c not in selected)
+    selected.extend(c for c in representatives if c not in selected)
     return deepcopy(selected[:limit])
 
 
@@ -129,7 +133,7 @@ def library_references(request,start,end):
 def build_patterns(cases):
     patterns=[]
     for key,(name,_) in PATTERNS.items():
-        examples=[i for i in cases if key in i['taxonomy_tags']]
+        examples=[i for i in cases if i.get('evidence_role') != 'audience_context' and key in i['taxonomy_tags']]
         if len(examples)>=2:
             patterns.append({'pattern_id':key,'name':name,
                 'description':'검색 메타데이터에서 관련 표현이 반복됨. 실제 경험 구조·독립 행사 여부·적합성은 확인 필요.',
@@ -141,7 +145,7 @@ def build_patterns(cases):
 
 def run_trend_scout(request, *, context=None):
     output=search.result(request,'trend')
-    output.update(patterns=[],reference_cases=[],reference_patterns=[],reference_library=[])
+    output.update(patterns=[],reference_cases=[],reference_patterns=[],reference_library=[],audience_contexts=[])
     try:
         start,end,days=search.window(request)
     except (ValueError,TypeError):
@@ -191,13 +195,28 @@ def run_trend_scout(request, *, context=None):
                       if any(relevance.contains_experience_keyword(w, text.lower(), text.lower().replace(' ', '')) for w in words)]
         score_delta,why,refs,limits=context_fit(text,context)
         # Product/geographic match never determines inclusion or priority.
-        ranked.append(dict(item,score=3+min(len(mechanisms),3)+score_delta,
+        audience_context = any(w in text for w in ('참여 의사', '참여의사', '참여 의향', '설문조사', '선호도 조사')) and not any(w in item['title'] for w in ('팝업', '개막', '개최', '열린다', '연다'))
+        ranked.append(dict(item,event_name=item['title'],event_category=event_category(item['title']),
+            evidence_role='audience_context' if audience_context else 'experience_candidate',
+            score=3+min(len(mechanisms),3)+score_delta,
             product_match_level=title_match,relevance_reasons=['전국 오프라인 체험 후보', '체험 방식 표현: ' + ', '.join(mechanisms)],
             context_fit_reasons=why,context_source_refs=refs,context_limitations=limits,
             request_relevance='same_product' if title_match=='exact' else 'adjacent_category' if category else 'cross_industry_transfer'))
     ranked.sort(key=lambda i:(-i['score'],i['source_url']))
+    # Select coverage-group representatives with category breadth before the
+    # provider cap, then retain additional coverage where capacity remains.
+    groups = group_coverage(ranked, product)
+    representatives = [g[0] for g in groups]
+    priority, seen = [], set()
+    ordered = [i for i in representatives if i['event_category'] != 'other'] + [i for i in representatives if i['event_category'] == 'other']
+    for item in ordered:
+        if item['event_category'] not in seen and item['evidence_role'] != 'audience_context':
+            priority.append(item)
+            seen.add(item['event_category'])
+    priority.extend(i for i in representatives if i not in priority)
+    priority.extend(i for i in ranked if i not in priority)
     provider_counts={}
-    for item in ranked:
+    for item in priority:
         kind=item['source_type']
         if provider_counts.get(kind,0)>=10:
             continue
@@ -216,11 +235,13 @@ def run_trend_scout(request, *, context=None):
             'request_relevance':item['request_relevance'],'product_match_level':item['product_match_level'],
             'reference_priority_score':item['score'],'fit_signals':item['relevance_reasons'],
             'context_source_refs':refs,'why_relevant':why,
-            'event_category':event_category(text), 'audience_hypothesis':audience_hypothesis(context),
-            'adaptation_hypotheses':adaptation_hypotheses(tags,product),
+            'event_category':item['event_category'], 'evidence_role':item['evidence_role'],
+            'audience_hypothesis':audience_hypothesis(context),
+            'adaptation_hypotheses':adaptation_hypotheses(tags,product) if item['evidence_role'] != 'audience_context' else [],
             'limitations':['원문·영상·실제 행사 여부와 대상 고객은 확인하지 않았습니다.','인구 구성과 단어 겹침은 효과·취향·수요를 증명하지 않습니다.']+item['context_limitations'],
             'origin':'live_search_candidate'})
     output['reference_cases']=diversified_references(output['insights'])
+    output['audience_contexts'] = deepcopy([i for i in output['insights'] if i['evidence_role'] == 'audience_context'])
     output['patterns']=build_patterns(output['insights'])
     output['reference_patterns']=build_patterns(output['reference_cases'])
     output['status']='partial' if output['insights'] else 'failed'

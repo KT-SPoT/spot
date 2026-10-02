@@ -21,7 +21,7 @@ python -m src.integration_smoke samples/input/myeongji_international.confirmed.j
 ## 조사 범위
 
 - Local: 점포명의 신도시명, 주소의 동/읍/면 또는 도로명 접두어로 지역 검색어를 만든다. 명지국제신도시와 에코델타시티를 한 지역으로 묶지 않는다. 지역 문맥을 추출할 수 없으면 실패한다. 기사 제목/요약의 지역명과 변화 표현을 대조한다.
-- Trend: 제품명과 한국어 별칭으로 검색한다. 스마트폰 제품은 인접 카테고리 검색을 추가하고 `same_product` / `adjacent_category`를 구분한다. 뉴스는 제목에 제품/카테고리와 오프라인 체험 관련 표현이 있어야 한다. 유튜브는 업로드일과 제목·설명을 확인하며 영상을 시청했다고 표시하지 않는다.
+- Trend: 게임 팝업·음식 팝업·지역 축제를 전국에서 검색한다. 연령·성별은 검색어 필수 조건 대신 후보 선정과 매장 응용 가설의 맥락으로 사용한다. 지역·제품 일치는 필수 조건이 아니며 `same_product` / `adjacent_category` / `cross_industry_transfer`는 설명용 메타데이터다. 뉴스 제목에는 오프라인 행사 표현이 있어야 한다. 유튜브는 업로드일과 제목·설명을 확인하며 영상을 시청했다고 표시하지 않는다.
 - 네이버는 검색어당 최대 2페이지, 유튜브는 검색어당 검색 1회와 영상 메타데이터 조회 1회로 제한한다. Local 최대 15자료, Trend는 제공자별 최대 10자료를 반환한다. 같은 URL은 중복 제거한다. 전체 검색 결과를 빠짐없이 조사하는 방식은 아니다.
 - 429 응답을 받은 제공자는 해당 실행에서 후속 검색을 건너뛴다. 다른 제공자의 자료는 계속 사용할 수 있다.
 
@@ -31,6 +31,8 @@ python -m src.integration_smoke samples/input/myeongji_international.confirmed.j
 Local은 [원문 대조·문맥 분류](LOCAL_SOURCE_VERIFICATION.md)를 추가 수행한다. 직접 변화와 주변 행정구역 맥락·배경 자료를 나누고 날짜·추출·지역 연결의 한계를 표시한다. 원문을 읽지 못하거나 연결 근거가 없는 자료는 수동 확인 후보로 남긴다. Trend는 검색 메타데이터 기반 후보를 유지한다.
 네이버 `pubDate`는 네이버에 제공된 시각이고, 유튜브는 영상 업로드일이다. 행사 개최일과 다를 수 있다.
 기사별 후보 수는 사건 수가 아니다. Trend 패턴은 관련 표현이 최소 2자료에서 반복된 후보이며 실제 경험 구조와 효과를 증명하지 않는다.
-도로명에서 만든 지역 검색어와 기사 표현은 행정 경계·거리 검증을 대신하지 않는다. 약칭으로만 쓰인 기사와 제목에 제품·행사가 없는 기사는 누락될 수 있다.
+도로명에서 만든 Local 지역 검색어와 기사 표현은 행정 경계·거리 검증을 대신하지 않는다. 약칭으로만 쓰인 기사와 제목에 행사 표현이 없는 Trend 기사는 누락될 수 있다. 업종 분류는 제목 기반 추정이며 게임·촬영 등 참여 방식과 구분한다. 같은 날짜·지역·고유명 표현을 공유하는 관련 보도는 참고 슬롯 하나로 묶고 출처를 보존한다. 행사 참여 의사·설문 보도는 고객층 조사 맥락으로 별도 표시한다.
+
+전국 실제 검색 및 보완 결과: [2026-10-02 검증](TREND_LIVE_VALIDATION.md).
 
 공식 API 계약: [네이버 뉴스 검색](https://developers.naver.com/docs/serviceapi/search/news/news.md), [API Hub 뉴스 검색](https://api.ncloud-docs.com/docs/naver-api-hub-search-news), [YouTube 검색](https://developers.google.com/youtube/v3/docs/search/list), [영상 메타데이터](https://developers.google.com/youtube/v3/docs/videos/list).

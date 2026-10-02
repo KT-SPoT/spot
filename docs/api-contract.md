@@ -110,6 +110,10 @@ May add:
   store's area, device or product category. Audience response is a hypothesis unless
   separately evidenced; adaptation questions identify how the mechanism could be
   used in a phone store.
+- `reference_cases[].related_case_ids` may link selected related-coverage cases
+  within the same conservative group; one group occupies one reference slot.
+- `audience_contexts` may carry survey/participation-intent evidence separately
+  from event cases. Such context is not counted as a repeated experience pattern.
 
 ## ResearchBundle v0.1
 

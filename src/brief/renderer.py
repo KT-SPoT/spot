@@ -96,6 +96,11 @@ def render_markdown(brief):
     if not brief["trend_patterns"]:
         lines.append("사례와 출처가 연결된 트렌드 패턴이 없습니다.")
     for card in brief["trend_patterns"]:
+        if card.get('type') == 'audience_context':
+            lines.extend(['', f"### 고객층 조사 맥락: {card.get('event_name', '조사 보도')}", '',
+                          str(card.get('observation', '')), '',
+                          f"- 범위: {card['scope']}", f"- 근거: {_refs(card)}"])
+            continue
         if card.get("type") == "reference_case":
             lines.extend(["", f"### 참고 후보: {card.get('event_name', '체험 후보')}", "",
                           str(card.get("observation", "")), "",

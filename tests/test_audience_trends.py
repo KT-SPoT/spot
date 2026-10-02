@@ -36,6 +36,8 @@ class AudienceTrendTests(unittest.TestCase):
         self.assertNotIn('부산', ' '.join(queries))
         self.assertNotIn('폴드', ' '.join(queries))
         self.assertNotIn('Galaxy', ' '.join(queries))
+        self.assertNotIn('30대', ' '.join(queries))
+        self.assertNotIn('40대', ' '.join(queries))
         swapped = copy.deepcopy(ctx)
         for p in swapped['population_signals']:
             p['dominant_gender'] = 'female' if p['dominant_gender'] == 'male' else 'male'
@@ -79,7 +81,7 @@ class AudienceTrendTests(unittest.TestCase):
         with patch('src.scouts.search_runtime.news', return_value=rows), \
              patch('src.scouts.search_runtime.videos', return_value=[]):
             result = run_trend_scout(bundle['request'])
-        self.assertEqual(len(result['reference_cases']), 5)
+        self.assertEqual(len(result['reference_cases']), 3)
         self.assertEqual({c['event_category'] for c in result['reference_cases']}, {'game', 'food', 'festival'})
 
     def test_official_demographic_and_peak_values_are_cards_without_llm_reapproval(self):

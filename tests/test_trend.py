@@ -19,7 +19,7 @@ class TrendTests(unittest.TestCase):
         self.assertEqual(result["status"], "partial")
         self.assertEqual(result["patterns"][0]["verification_status"], "candidate")
         self.assertEqual(result["query_context"]["lookback_days"], 0)
-        self.assertEqual(result["insights"][0]["request_relevance"], "same_product")
+        self.assertTrue(any(c['request_relevance'] == 'same_product' for c in result['insights']))
         self.assertIsNone(result["insights"][0]["location"])
 
     def test_provider_failure_still_collects_other_provider(self):

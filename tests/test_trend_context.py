@@ -58,11 +58,11 @@ class TrendContextTests(unittest.TestCase):
         self.assertEqual(len(result['trend_context']['population_signals']),2)
         self.assertEqual(len(result['trend_context']['local_signals']),1)
 
-    def test_age_query_bounded_soft_ranking_and_cited_brief(self):
+    def test_broad_queries_bounded_soft_ranking_and_cited_brief(self):
         bundle=evidence(); request=bundle['request']
         ctx=build_trend_context(request,bundle['results']['quant'],bundle['results']['local'])
         self.assertEqual(len(build_queries(request,ctx)),3)
-        self.assertIn('30대',build_queries(request,ctx)[-1])
+        self.assertNotIn('30대',' '.join(build_queries(request,ctx)))
         rows=[article('갤럭시 Z 폴드8 팝업 체험','https://example.org/a'),
               article('갤럭시 Z 폴드8 팝업 체험 30대 남성 문화 공원','https://example.org/b'),
               article('화장품 팝업 30대 남성 문화 공원','https://example.org/c')]
@@ -128,7 +128,8 @@ class TrendContextTests(unittest.TestCase):
         rows=[article('갤럭시 폴드8 팝업 체험',f'https://example.org/{i}') for i in range(8)]
         with patch('src.scouts.search_runtime.news',return_value=rows), patch('src.scouts.search_runtime.videos',return_value=[]):
             result=run_trend_scout(request)
-        self.assertEqual(len(result['reference_cases']),5)
+        self.assertEqual(len(result['reference_cases']),1)
+        self.assertEqual(len(result['reference_cases'][0]['related_case_ids']),8)
 
     def test_failed_quant_keeps_local_context_and_continues(self):
         bundle=evidence(); bundle['results']['quant']['status']='failed'
