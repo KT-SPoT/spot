@@ -75,6 +75,33 @@ class SemanticCriticTests(unittest.TestCase):
             with self.assertRaises(SemanticError):
                 validate_response(raw, self.payload)
 
+    def test_policy_derives_known_actions_without_changing_model_judgment(self):
+        raw = answer(self.payload)
+        raw['findings'][0]['suggested_action'] = 'qualify'
+        before = copy.deepcopy(raw)
+        adjustments = []
+        findings = validate_response(raw, self.payload, action_normalizations=adjustments)
+        self.assertEqual(findings[0]['verdict'], 'insufficient')
+        self.assertEqual(findings[0]['reason'], before['findings'][0]['reason'])
+        self.assertEqual(findings[0]['suggested_action'], 'manual_check')
+        self.assertEqual(raw, before)
+        self.assertEqual(adjustments, [{'claim_id': raw['findings'][0]['claim_id'],
+            'model_action': 'qualify', 'applied_action': 'manual_check'}])
+        result = self.run_review(lambda payload: raw)
+        self.assertTrue(result['performed'])
+        self.assertEqual(result['status'], 'manual_review')
+        self.assertEqual(len(result['action_normalizations']), 1)
+
+    def test_policy_cannot_normalize_an_unknown_action_or_invalid_reference(self):
+        for field, value in [('suggested_action', 'execute_search'), ('source_ids', ['invented-source'])]:
+            raw = answer(self.payload)
+            raw['findings'][0]['suggested_action'] = 'qualify'
+            raw['findings'][0][field] = value
+            adjustments = []
+            with self.assertRaises(SemanticError):
+                validate_response(raw, self.payload, action_normalizations=adjustments)
+            self.assertEqual(adjustments, [])
+
     def test_excluded_module_and_sensitive_material_not_sent(self):
         self.critic['checks']['excluded_modules'] = ['local']
         secret = 'synthetic-secret-value-for-redaction'
