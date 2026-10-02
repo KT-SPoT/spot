@@ -17,6 +17,13 @@ For EVERY input claim return exactly one object with ONLY claim_id, verdict,
 source_ids, reason, suggested_action. verdict is supported/contradicted/insufficient;
 actions are respectively keep/qualify/manual_check. Cite only sources attached to
 that claim. Supported or contradicted needs at least one source. Explain in Korean.
+Use contradicted ONLY for an explicit conflict with the supplied evidence, such
+as changing planned into operating or relabeling resident population as floating
+population. A wrong population label is a conflict even when the period is unknown.
+Use insufficient for absence of evidence, including missing purchase-intent data,
+missing comparison data or unknown periods; absence does not prove a claim false.
+When a compound claim contains an explicit conflict, choose contradicted and name
+that conflict. Otherwise unsupported inferences remain insufficient, not contradicted.
 Review locality relative to THIS request's address, coordinates, radius and
 comparison_area, using supplied scout_scopes and claim locality fields. Never use
 a fixed city, neighborhood or default catchment. Administrative district names,
