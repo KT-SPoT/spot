@@ -91,6 +91,8 @@ Scout 인수용 독립 규칙 preview를 실행할 수 있습니다. [기준표�
 `rule_status` 통과는 품질 최종 승인이 아니며, `quality_status`는 의미 검토 전까지 `manual_review`입니다.
 현재 graph는 실제 규칙 Critic과 제한된 일시 오류 재조사를 사용합니다.
 [현재 정책](docs/CRITIC_RETRY.md). 의미·사실 검토는 수동으로 남습니다.
+선택적 [의미 Critic shadow 평가](docs/SEMANTIC_CRITIC.md)를 연결했습니다. 기본 꺼짐이며,
+설정된 모델의 판정을 기록해 사람이 대조합니다. Brief 자동 변경·품질 승인·추가 재검색은 없습니다.
 
 ```bash
 python -m src.critic.rules samples/critic/research_bundle.synthetic.json
