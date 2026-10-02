@@ -23,7 +23,7 @@
 이 저장 자료 검증에서
 새 Scout·기사·YouTube 호출은 0회다.
 
-Python 전체 169개와 실제 n8n export의 Code 노드 검사가 통과했다.
+Python 전체 170개와 실제 n8n export의 Code 노드 검사가 통과했다.
 새 합성 검사는 출처 ID를 모델에 요구하지 않는 경로, 사례 누락·추가·중복 거절,
 모순된 유용 판정 거절, 다른 지역 입력, 미완료 보존·비밀값 없는 오류를 확인한다.
 offline 로컬 HTTP에서도 다음 상태를 실제로 확인했다.
@@ -54,16 +54,26 @@ YouTube는 이전 보류를 유지했다. 이 과정은 한 번 실행하고 종
 ## 외부 연결 및 운영 설정
 
 기존 `SPOT - Main Entry`에는 접수·조회 Webhook과 저장된 Header Auth가 있다.
-현재 HTTP 노드들은 만료된 개발 터널 주소를 가리킨다. 새 공개 HTTPS 터널과 지속적인
-live/GPT 활성화는 자동 승인 검토가 별도 명시 승인을 요구해 아직 수행하지 않았다.
-현재 새 로컬 검증 서버는 8767에서 offline으로 실행했다. 기존 서버·키는 보존했다.
+사용자 승인 후 새 공개 HTTPS 개발 터널로 HTTP 노드 2개를 갱신했고, 기존 인증을 유지했다.
+8767 서버는 live / semantic shadow / research Critic / 원문 확인으로 실행 중이다.
+YouTube 키는 보존하고 `SPOT_TREND_VIDEO_MODE=off`로 조회만 보류한다.
+실제 n8n Test Webhook에서 새 조사 접수 202 → 조회 200 completed를 확인했다.
+Quant success / Local partial / Trend partial, 고유 출처 20개였다.
+이 작업의 GPT 1회는 INVALID_RESPONSE로 종료됐으며 브리프는 보존됐다.
+저장된 같은 브리프로 수동 GPT 재검토 1회를 수행한 결과 사례 5개의 형식 검사가 통과했다.
+최초 응답 원문을 보관하지 않아 정확한 실패 원인은 확정하지 않는다.
+수동 재검토 성공을 최초 작업의 Critic 성공으로 바꿔 보고하지 않는다.
 
-승인 후에는 인증을 유지한 새 개발 터널 주소로 HTTP 노드 2개를 갱신하고,
-Test Webhook의 접수·조회 및 실제 조사 브리프 반환을 확인한다. 공개 연결 승인과
-지속적인 유료 호출 승인은 별개다. 후자가 없으면 일회성 검증 후 off/offline을 유지한다.
+운영 게시에 대한 별도 명시 승인을 받은 뒤 `SPOT - Main Entry`를 Publish했다.
+운영 `/webhook/spot-research` 재접수는 200·동일 job_id,
+`/webhook/spot-research-status`는 200·completed였다. 기존 입력을 재사용해
+새 Scout/GPT 호출 없이 검증했다. 인증 없는 요청은 n8n Header Auth에서 403,
+잘못된 job_id와 필수 입력 누락은 422로 거절됐다.
+검증 기록은 `n8n-production-checks.json`, 실제 브리프는 `N8N_RESEARCH_BRIEF.md`다.
 
-현재 이 문서는 외부 n8n 실행을 완료했다고 보고하지 않는다. 웹 구현은 외부 연결 검증을
-마친 뒤 진행하며, 임시 터널·단일 메모리 worker의 한계는 운영 배포와 별도로 관리한다.
+웹 화면·웹 서버 구현을 시작할 수 있는 개발 연결을 확인했다.
+임시 터널·단일 메모리 worker의 한계는 운영 배포와 별도로 관리한다.
+PC·터널 종료 시 연결이 끊기고 주소가 바뀔 수 있으므로 상시 호스팅은 후속 작업이다.
 
 설계 참고: [OpenAI prompting](https://developers.openai.com/api/docs/guides/prompt-engineering),
 [n8n Webhook의 test/production 경로](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/).
