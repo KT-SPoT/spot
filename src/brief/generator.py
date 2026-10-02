@@ -311,10 +311,22 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
             card["why_relevant"] = ["전국 체험 사례의 매장 응용 후보입니다. 맥락 근거 연결은 확인 필요합니다."]
             card.pop("audience_hypothesis", None)
             card.pop("adaptation_hypotheses", None)
+            card.pop('audience_fit', None)
             checks.append("Trend 후보의 인구·지역 맥락 출처가 일부 누락되어 맥락 선정 이유를 제외했습니다.")
         card.update(module="trend", type="reference_case", sources=sources,
                     context_sources={m: list(entries.values()) for m, entries in context_sources.items()},
                     evidence_count=1, scope="검색 후보; 실제 행사·체험 구조·고객 적합성 미확인")
+        if card.get('case_detail', {}).get('status') == 'text_corroborated':
+            card['scope'] = '원문 제목·참여 방식 표현 대조; 실제 개최·고객 호응은 미확인'
+        # Resolve fit provenance independently; do not publish unsupported cohort reasoning.
+        card['audience_fit'] = [fit for fit in card.get('audience_fit', [])
+            if isinstance(fit, dict) and fit.get('context_source_refs')
+            and all((ref.get('module'), ref.get('source_id')) in actual
+                    for ref in fit['context_source_refs'] if isinstance(ref, dict))
+            and all(isinstance(ref, dict) for ref in fit['context_source_refs'])
+            and fit.get('mechanism_source_ids')
+            and fit.get('fit_status') == 'hypothesis_not_proven_preference'
+            and set(fit['mechanism_source_ids']).issubset(set(ids))]
         trend_patterns.append(card)
 
     for item in trend.get('audience_contexts', []):

@@ -137,7 +137,8 @@ def build_input(bundle, critic, *, quant_evidence=None):
                       'change_state', 'evidence_role', 'context_note', 'locality_tags', 'classification_basis',
                       'location', 'brand', 'why_relevant',
                       'limitations', 'evidence_count', 'example_case_ids', 'metric_refs', 'published_at',
-                      'audience_hypothesis', 'adaptation_hypotheses', 'request_relevance', 'taxonomy_tags', 'context_source_refs')
+                      'audience_hypothesis', 'adaptation_hypotheses', 'request_relevance', 'taxonomy_tags', 'context_source_refs',
+                      'case_detail', 'audience_fit')
             claim = {'claim_id': f'{module}:{kind}:{index}',
                      'content': {k: item[k] for k in fields if k in item}, 'evidence': []}
             if module == 'quant':

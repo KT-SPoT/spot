@@ -1,12 +1,14 @@
 """Context-aware live Trend discovery; historical references never imply success."""
 import json
 import re
+import os
 from pathlib import Path
 from datetime import date
 from copy import deepcopy
 from src.scouts import search_runtime as search
 from src.scouts import trend_relevance as relevance
 from src.brief.trend_groups import group_coverage
+from src.scouts.trend_detail import check_detail, enrich_references
 
 PATTERNS = {
     "mission_journey": ("미션 기반 참여 동선", ("미션", "스탬프", "단서")),
@@ -143,7 +145,7 @@ def build_patterns(cases):
     return patterns
 
 
-def run_trend_scout(request, *, context=None):
+def run_trend_scout(request, *, context=None, detail_reader=None):
     output=search.result(request,'trend')
     output.update(patterns=[],reference_cases=[],reference_patterns=[],reference_library=[],audience_contexts=[])
     try:
@@ -241,6 +243,13 @@ def run_trend_scout(request, *, context=None):
             'limitations':['원문·영상·실제 행사 여부와 대상 고객은 확인하지 않았습니다.','인구 구성과 단어 겹침은 효과·취향·수요를 증명하지 않습니다.']+item['context_limitations'],
             'origin':'live_search_candidate'})
     output['reference_cases']=diversified_references(output['insights'])
+    mode = os.getenv('SPOT_TREND_DETAIL_MODE', 'off')
+    reader = detail_reader or (check_detail if mode == 'article' else None)
+    if os.getenv('SPOT_SCOUT_MODE') == 'offline':
+        reader = None
+    if mode not in ('off', 'article'):
+        output['warnings'].append('INVALID_TREND_DETAIL_MODE')
+    enrich_references(output, context, PATTERNS, start, end, reader=reader)
     output['audience_contexts'] = deepcopy([i for i in output['insights'] if i['evidence_role'] == 'audience_context'])
     output['patterns']=build_patterns(output['insights'])
     output['reference_patterns']=build_patterns(output['reference_cases'])
