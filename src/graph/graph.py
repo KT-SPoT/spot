@@ -9,6 +9,7 @@ from langgraph.graph import END, START, StateGraph
 from src.brief.generator import generate_brief
 from copy import deepcopy
 from src.critic.critic import run_critic
+from src.critic.semantic import run_semantic
 from src.validation import validate_scout_result
 from src.critic.rules import evaluate_rules
 from src.graph.state import SpotState
@@ -117,7 +118,7 @@ def brief_node(state: SpotState) -> dict:
                                             quant_evidence=None if "quant" in excluded else state.get("quant_evidence"))}
 
 
-def build_graph(*, max_retry_rounds=1):
+def build_graph(*, max_retry_rounds=1, semantic_caller=None, semantic_mode=None):
     if type(max_retry_rounds) is not int or max_retry_rounds not in (0, 1):
         raise ValueError("max_retry_rounds must be 0 or 1")
     graph = StateGraph(SpotState)
@@ -129,6 +130,12 @@ def build_graph(*, max_retry_rounds=1):
     graph.add_node("merge", merge_node)
     graph.add_node("critic", lambda state: critic_node(state, max_retry_rounds=max_retry_rounds))
     graph.add_node("retry", retry_node)
+    def semantic_node(state):
+        critic = deepcopy(state['critic_result'])
+        critic['checks']['semantic_review'] = run_semantic(state['research_bundle'], critic,
+            caller=semantic_caller, mode=semantic_mode, quant_evidence=state.get('quant_evidence'))
+        return {'critic_result': critic}
+    graph.add_node("semantic", semantic_node)
     graph.add_node("brief", brief_node)
 
     # Gather independent measurements before context-dependent discovery.
@@ -141,8 +148,9 @@ def build_graph(*, max_retry_rounds=1):
     graph.add_edge("trend", "merge")
     graph.add_edge("merge", "critic")
 
-    graph.add_conditional_edges("critic", lambda state: "retry" if state["critic_result"]["status"] == "retry_required" else "brief")
+    graph.add_conditional_edges("critic", lambda state: "retry" if state["critic_result"]["status"] == "retry_required" else "semantic")
     graph.add_edge("retry", "merge")
+    graph.add_edge("semantic", "brief")
     graph.add_edge("brief", END)
 
     return graph.compile()

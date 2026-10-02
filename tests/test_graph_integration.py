@@ -36,7 +36,7 @@ class GraphIntegrationTest(unittest.TestCase):
             events = list(build_graph().stream({"request": request}, stream_mode="updates"))
         nodes = [node for event in events for node in event]
         self.assertCountEqual(nodes[:2], ["quant", "local"])
-        self.assertEqual(nodes[2:], ["trend_context", "trend", "merge", "critic", "brief"])
+        self.assertEqual(nodes[2:], ["trend_context", "trend", "merge", "critic", "semantic", "brief"])
         bundle = events[4]["merge"]["research_bundle"]
         self.assertEqual(bundle["results"], results)
         self.assertEqual(events[-1]["brief"]["research_brief"]["status"], "failed")
