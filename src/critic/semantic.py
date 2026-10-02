@@ -17,8 +17,16 @@ For EVERY input claim return exactly one object with ONLY claim_id, verdict,
 source_ids, reason, suggested_action. verdict is supported/contradicted/insufficient;
 actions are respectively keep/qualify/manual_check. Cite only sources attached to
 that claim. Supported or contradicted needs at least one source. Explain in Korean.
-Review locality (Myeongji International New Town versus Eco Delta City), planned
-versus operating stage, statistical population and period, demographic inference,
+Review locality relative to THIS request's address, coordinates, radius and
+comparison_area, using supplied scout_scopes and claim locality fields. Never use
+a fixed city, neighborhood or default catchment. Administrative district names,
+development-project names and store-radius catchments are different scopes.
+Matching a broad district name does not prove an event is inside the radius.
+Coordinates without source/event coordinates do not prove distance. If a street
+address or source locality is ambiguous, mark insufficient rather than guessing.
+Separate direct local evidence, adjacent-area context and outside-area evidence;
+do not infer proximity, population composition or impact from model knowledge.
+Review planned versus operating stage, statistical population and period, demographic inference,
 independent events versus repeated coverage, comparison evidence and campaign fit.
 Adjacent-area context can be useful when qualified. Do not infer buying intent
 from gender/age shares, infer joint distributions, or invent comparison areas.
@@ -59,11 +67,17 @@ def build_input(bundle, critic, *, quant_evidence=None):
         'campaign': {k: request.get('campaign', {}).get(k) for k in ('purpose', 'product', 'target_hint')},
         'research': {k: request.get('research', {}).get(k) for k in ('reference_date', 'radius_m', 'lookback_days', 'comparison_area')}},
         'rule_status': critic['checks']['rules']['rule_status'], 'excluded_modules': excluded,
-        'claims': [], 'quant_facts': None, 'trend_coverage_groups': []}
+        'claims': [], 'quant_facts': None, 'trend_coverage_groups': [], 'scout_scopes': {}}
     for module in ('quant', 'local', 'trend'):
         result = bundle['results'].get(module, {})
         if module in excluded or result.get('status') == 'failed':
             continue
+        context = result.get('query_context', {})
+        # Resolved coordinates and declared collection scopes are evidence metadata,
+        # not proof that every source is inside the requested store catchment.
+        payload['scout_scopes'][module] = {k: context.get(k) for k in
+            ('area_anchor', 'lat', 'lng', 'radius_m', 'resolved_location', 'resolved_address',
+             'coordinate_source', 'scope', 'reference_date', 'lookback_start', 'analysis_date')}
         sources = {s['source_id']: s for s in result.get('sources', [])}
         # Patterns are claims too; counts cannot prove semantic independence.
         items = [('insight', i) for i in result.get('insights', [])]
@@ -77,7 +91,8 @@ def build_input(bundle, critic, *, quant_evidence=None):
             sid_list = item.get('source_ids', item.get('example_source_ids', []))
             refs = [s for s in sid_list if s in sources]
             fields = ('statement', 'title', 'evidence', 'event_name', 'observation', 'description', 'name',
-                      'change_state', 'evidence_role', 'context_note', 'locality_tags', 'why_relevant',
+                      'change_state', 'evidence_role', 'context_note', 'locality_tags', 'classification_basis',
+                      'location', 'brand', 'why_relevant',
                       'limitations', 'evidence_count', 'example_case_ids', 'metric_refs', 'published_at')
             claim = {'claim_id': f'{module}:{kind}:{index}',
                      'content': {k: item[k] for k in fields if k in item}, 'evidence': []}
