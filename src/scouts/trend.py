@@ -11,8 +11,12 @@ PATTERNS = {
     "mission_journey": ("미션 기반 참여 동선", ("미션", "스탬프", "단서")),
     "direct_product_trial": ("직접 제품·기능 체험", ("체험", "시연", "hands-on")),
     "worldbuilding_exploration": ("세계관·테마 공간 탐색", ("세계관", "테마 공간", "테마존")),
+    "game_interaction": ("게임·도전 참여", ("미니게임", "미니 게임", "게임 체험", "챌린지", "대결")),
+    "photo_sharing": ("촬영·결과물 공유", ("포토존", "촬영", "인증샷", "사진", "공유")),
+    "food_discovery": ("시식·취향 탐색", ("시식", "테이스팅", "맛보기")),
+    "collectible_reward": ("참여·수집 보상", ("굿즈", "수집", "한정판", "리워드")),
 }
-OFFLINE_CUES = ("팝업", "체험존", "체험 공간", "체험공간", "오프라인 행사", "전시회", "전시관", "행사장", "체험관")
+OFFLINE_CUES = ("팝업", "체험존", "체험 공간", "체험공간", "오프라인 행사", "전시회", "전시관", "행사장", "체험관", "축제", "페스티벌", "지역 행사", "지역행사")
 AGE_LABELS = {"under_10":"10세 미만", "teens":"10대", "20s":"20대", "30s":"30대", "40s":"40대", "50s":"50대", "60_plus":"60대"}
 MAX_QUERIES = 3
 
@@ -25,20 +29,68 @@ def product_alias(product):
 
 
 def build_queries(request, context):
-    product = request['campaign']['product']
-    alias = product_alias(product)
-    queries = [alias + ' 팝업 체험']
-    if any(w in product.lower() for w in ('galaxy','iphone','갤럭시','아이폰','스마트폰')):
-        queries.append('스마트폰 팝업 체험')
-    # An age query is exploratory, never proof of the audience of an event.
+    # Category breadth is independent of gender. One broad query remains ungated
+    # by cohort words; demographics guide discovery, never establish preference.
+    queries = ['게임 팝업 체험', '음식 팝업 체험', '지역 축제 참여 체험']
     age = next((s.get('dominant_age') for s in context.get('population_signals',[]) if s.get('population_kind')=='floating_population'),None)
     if age in AGE_LABELS:
-        queries.append(alias + ' 체험 ' + AGE_LABELS[age])
-    else:
-        precision = relevance.build_search_queries(request)
-        if precision:
-            queries.append(precision[0])
+        queries[-1] += ' ' + AGE_LABELS[age]
+    sales_age = next((s.get('dominant_age') for s in context.get('population_signals',[]) if s.get('population_kind')=='sales'),None)
+    if sales_age in AGE_LABELS:
+        queries[1] += ' ' + AGE_LABELS[sales_age]
     return list(dict.fromkeys(queries))[:MAX_QUERIES]
+
+
+def event_category(text):
+    lowered = text.lower()
+    if any(w in lowered for w in ('게임', '게이밍', 'game', '챌린지')):
+        return 'game'
+    if any(w in lowered for w in ('음식', '푸드', '디저트', '시식', '라면', '커피', '맛보기')):
+        return 'food'
+    if any(w in lowered for w in ('축제', '페스티벌', '지역 행사', '지역행사')):
+        return 'festival'
+    return 'other'
+
+
+def diversified_references(cases, limit=5):
+    selected, seen = [], set()
+    for case in cases:
+        category = case['event_category']
+        if category not in seen:
+            selected.append(case)
+            seen.add(category)
+        if len(selected) >= limit:
+            return deepcopy(selected)
+    selected.extend(c for c in cases if c not in selected)
+    return deepcopy(selected[:limit])
+
+
+def adaptation_hypotheses(tags, product):
+    # Applications are questions, not demonstrated appeal or device specs.
+    applications = {
+        'mission_journey': '미션·스탬프 동선을 여러 기능을 직접 비교하는 매장 체험에 응용할 수 있을까?',
+        'game_interaction': '짧은 게임·도전 구조를 기기 조작과 사용 경험을 비교하는 체험에 응용할 수 있을까?',
+        'photo_sharing': '촬영·결과물 공유 구조를 카메라 체험과 결과물 비교에 응용할 수 있을까?',
+        'food_discovery': '시식의 취향 비교 방식을 기기 사용 경험 비교나 음식 촬영 체험에 응용할 수 있을까?',
+        'collectible_reward': '수집·참여 보상 구조를 기능 탐색의 참여 동기로 응용할 수 있을까?',
+        'worldbuilding_exploration': '테마 공간의 탐색 구조를 일상 사용 장면별 매장 체험에 응용할 수 있을까?',
+        'direct_product_trial': '직접 사용·비교 구조를 매장 제품 체험에 응용할 수 있을까?',
+    }
+    return [{'kind': 'research_question', 'mechanism': tag,
+             'statement': f'{product}: {applications[tag]} 실제 지원 기능과 고객 반응은 추가 조사.'}
+            for tag in tags if tag in applications][:3]
+
+
+def audience_hypothesis(context):
+    labels = []
+    for profile in context.get('population_signals', []):
+        cohort = [AGE_LABELS.get(profile.get('dominant_age')),
+                  {'male': '남성', 'female': '여성'}.get(profile.get('dominant_gender'))]
+        if any(cohort):
+            labels.append(profile['population_kind'] + ': ' + '/'.join(c for c in cohort if c))
+    return (('Quant가 전달한 인구·매출 구성 (' + '; '.join(labels) + ')을 바탕으로 이 참여 방식에 호응할지 조사. '
+             '인구 구성은 관측값이며 관심·선호는 탐색 가설입니다.') if labels else
+            '고객층 자료가 없어 특정 성별·연령의 선호를 정하지 않고 참여 방식의 응용 가능성을 조사합니다.')
 
 
 def context_fit(text, context):
@@ -104,8 +156,8 @@ def run_trend_scout(request, *, context=None):
     output['reference_library']=library_references(request,start,end)
     output['query_context'].update(reference_date=end.isoformat(),lookback_start=start.isoformat(),lookback_days=days,
         product=product,search_queries=queries,max_queries_per_provider=MAX_QUERIES,
-        scope='제품·인접 카테고리 후보; 요청 조사 맥락을 보조적으로 대조',
-        upstream_context=context, relevance_mode='PR14_heuristics_with_bounded_context_signals')
+        scope='전국·다업종 오프라인 체험; 고객층 맥락과 매장 응용 가능성 탐색',
+        upstream_context=context, relevance_mode='nationwide_experience_transfer_with_audience_context')
     output['warnings']=['SEARCH_METADATA_ONLY_EVENTS_UNVERIFIED','YOUTUBE_CONTENT_NOT_WATCHED',
         '후보자료 수는 독립 행사 수가 아닙니다. 실제 체험 구조·참여자·효과를 확인해야 합니다.',
         'NAVER_DATE_IS_PROVIDED_AT','DISTINCT_SOURCES_NOT_DISTINCT_EVENTS','BOUNDED_SEARCH_NOT_EXHAUSTIVE',
@@ -128,22 +180,21 @@ def run_trend_scout(request, *, context=None):
     phone=any(w in product.lower() for w in ('galaxy','iphone','갤럭시','아이폰','스마트폰'))
     for item in by_url.values():
         text=item['title']+' '+item['description']
-        scored=relevance.score_candidate_relevance(dict(item,channel_title=item.get('source_name','')),request)
         title_match,_=relevance.find_product_match(item['title'].lower(),item['title'].lower().replace(' ',''),product)
         category=phone and any(w in item['title'].lower() for w in ('스마트폰','갤럭시','아이폰','galaxy','iphone'))
         cue_text=item['title'] if item['source_type']=='news' else text
         if not any(w in cue_text.lower() for w in OFFLINE_CUES):
             continue
-        if item['source_type']=='news' and title_match=='none' and not category:
+        if any(w in item['title'].lower() for w in ('최저가', '구매링크', '구매 링크', '언박싱', 'unboxing')):
             continue
-        adjacent=category and not scored['review_keyword_hits'] and not scored['commerce_keyword_hits']
-        if not scored['is_experiential_candidate'] and not adjacent:
-            continue
+        mechanisms = [key for key, (_, words) in PATTERNS.items()
+                      if any(relevance.contains_experience_keyword(w, text.lower(), text.lower().replace(' ', '')) for w in words)]
         score_delta,why,refs,limits=context_fit(text,context)
-        ranked.append(dict(item,score=scored['relevance_score']+score_delta,
-            product_match_level=scored['product_match_level'],relevance_reasons=scored['relevance_reasons'],
+        # Product/geographic match never determines inclusion or priority.
+        ranked.append(dict(item,score=3+min(len(mechanisms),3)+score_delta,
+            product_match_level=title_match,relevance_reasons=['전국 오프라인 체험 후보', '체험 방식 표현: ' + ', '.join(mechanisms)],
             context_fit_reasons=why,context_source_refs=refs,context_limitations=limits,
-            request_relevance='same_product' if scored['exact_product_match'] else 'adjacent_category'))
+            request_relevance='same_product' if title_match=='exact' else 'adjacent_category' if category else 'cross_industry_transfer'))
     ranked.sort(key=lambda i:(-i['score'],i['source_url']))
     provider_counts={}
     for item in ranked:
@@ -154,20 +205,25 @@ def run_trend_scout(request, *, context=None):
         n=len(output['insights'])+1;sid,cid=f'S-T-{n:03}',f'T-{n:03}'
         text=item['title']+' '+item['description']
         tags=[key for key,(_,words) in PATTERNS.items() if any(relevance.contains_experience_keyword(w,text.lower(),text.lower().replace(' ','')) for w in words)]
-        output['sources'].append({k:item[k] for k in ('source_url','source_name','source_type','published_at','collected_at','date_basis') if k in item} | {'source_id':sid,'verification':{'method':'search_metadata','event_verified':False}})
-        why=['요청 제품이 직접 언급된 체험 후보입니다.' if item['request_relevance']=='same_product' else '요청 제품과 인접한 카테고리의 체험 구조를 비교할 후보입니다.']+item['context_fit_reasons']
+        output['sources'].append({k:item[k] for k in ('source_url','source_name','source_type','published_at','collected_at','date_basis') if k in item} | {'source_id':sid,'title':item['title'],'verification':{'method':'search_metadata','event_verified':False}})
+        why=['전국 체험 사례의 참여 방식을 매장에 응용할 가능성을 탐색하는 후보입니다.']+item['context_fit_reasons']
+        refs = item['context_source_refs'] + [{'module': 'quant', 'source_id': sid}
+            for profile in context.get('population_signals', []) for sid in profile.get('source_ids', [])]
+        refs = list({(ref['module'], ref['source_id']): ref for ref in refs}.values())
         output['insights'].append({'case_id':cid,'type':'experiential_marketing_candidate','event_name':item['title'],
             'observation':item['description'],'published_at':item['published_at'],'brand':None,'location':None,
             'source_ids':[sid],'taxonomy_tags':tags,'verification_status':'candidate',
             'request_relevance':item['request_relevance'],'product_match_level':item['product_match_level'],
             'reference_priority_score':item['score'],'fit_signals':item['relevance_reasons'],
-            'context_source_refs':item['context_source_refs'],'why_relevant':why,
+            'context_source_refs':refs,'why_relevant':why,
+            'event_category':event_category(text), 'audience_hypothesis':audience_hypothesis(context),
+            'adaptation_hypotheses':adaptation_hypotheses(tags,product),
             'limitations':['원문·영상·실제 행사 여부와 대상 고객은 확인하지 않았습니다.','인구 구성과 단어 겹침은 효과·취향·수요를 증명하지 않습니다.']+item['context_limitations'],
             'origin':'live_search_candidate'})
-    output['reference_cases']=deepcopy(output['insights'][:5])
+    output['reference_cases']=diversified_references(output['insights'])
     output['patterns']=build_patterns(output['insights'])
     output['reference_patterns']=build_patterns(output['reference_cases'])
     output['status']='partial' if output['insights'] else 'failed'
-    output['summary']=f"실제 검색 후보 {len(output['insights'])}건 중 요청 맥락을 대조한 참고 후보 {len(output['reference_cases'])}건. 실제 행사·고객 적합성 검토 필요."
+    output['summary']=f"전국·다업종 검색 후보 {len(output['insights'])}건 중 참고 후보 {len(output['reference_cases'])}건. 고객층 연결·매장 응용은 조사 가설이며 실제 호응은 미확인."
     output['finished_at']=search.now()
     return output

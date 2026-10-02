@@ -83,6 +83,9 @@ May add:
 - `metrics`
 - category/store/competition counts
 - metric references inside insights
+- `claim_kind=public_api_observation` on API-derived observation insights; inferred
+  preferences/intent must not use this marker. With SBIZ365 provenance, observations
+  are supplied as the quantitative baseline instead of LLM re-approval claims.
 
 ### Local
 
@@ -100,6 +103,13 @@ May add:
 - evidence counts
 - example source IDs
 - pattern taxonomy tags
+- Optional case-level `event_category`, `audience_hypothesis` and
+  `adaptation_hypotheses` (`kind=research_question`, `mechanism`, `statement`). These
+  are Trend-specific extensions; existing common v0.1 fields stay unchanged.
+- Collection scope is nationwide and cross-industry. A case need not match the
+  store's area, device or product category. Audience response is a hypothesis unless
+  separately evidenced; adaptation questions identify how the mechanism could be
+  used in a phone store.
 
 ## ResearchBundle v0.1
 

@@ -22,12 +22,14 @@ def render_markdown(brief):
     lines = ["# SPOT Research Brief", "", f"- 요청: {brief['request_id']}",
              f"- 상태: {status} — 조사 초안",
              f"- 인용한 고유 출처 URL: {brief['source_count']}개", "",
-             brief["overview"]["area_summary"], "", "## 상권·인구 지표", "",
-             "| 항목 | 값 | 자료 기준 | 지역 범위 | 근거 |",
-             "|---|---:|---|---|---|"]
+             brief["overview"]["area_summary"], "", "## 상권·인구 지표", ""]
+    if any(c.get('evidence_basis') == 'public_agency_api' for c in brief['unique_local_signals']):
+        lines.extend(['소상공인365 제공 관측값을 정량 기준으로 사용합니다. 성향·수요·효과에 관한 해석은 별도로 검토합니다.', ''])
+    lines.extend(["| 항목 | 값 | 자료 기준 | 지역 범위 | 근거 |", "|---|---:|---|---|---|"])
     for card in brief["unique_local_signals"]:
         if "value" in card:
-            value = f"{card['value']:,}{card['unit']}"
+            raw = card['value']
+            value = (format(raw, ',') if isinstance(raw, (int, float)) else str(raw)) + card['unit']
             lines.append("| " + " | ".join(map(_cell, (card["title"], value,
                          card.get("reference_period"), card.get("scope"), _refs(card)))) + " |")
     if not any("value" in card for card in brief["unique_local_signals"]):
@@ -100,6 +102,10 @@ def render_markdown(brief):
                           f"- 선정 점수: {card.get('reference_priority_score')} (규칙 기반 비교값; 효과·품질 점수 아님)",
                           f"- 범위: {card['scope']}", f"- 근거: {_refs(card)}"])
             lines.extend("- 선정 이유: " + text for text in card.get("why_relevant", []))
+            if card.get("audience_hypothesis"):
+                lines.append("- 고객층 조사 가설: " + card["audience_hypothesis"])
+            for hypothesis in card.get("adaptation_hypotheses", []):
+                lines.append("- 매장 응용 가설: " + hypothesis["statement"])
             lines.extend("- 한계: " + text for text in card.get("limitations", []))
             if card.get("article_count", 1) > 1:
                 lines.append(f"- 관련 보도: {card['article_count']}건을 후보 묶음 1개로 표시")

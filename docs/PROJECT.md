@@ -6,6 +6,15 @@ SPOT is a **지역 맥락 탐색형 AI Research Agent** for the pre-planning sta
 
 Its job is not to generate a finished event plan immediately. It researches the local area, commercial context, recent local changes, and experience trends, then validates the evidence and produces a **Research Brief**.
 
+User clarification (2026-10-02): SBIZ365 agency API observations, including gender,
+age and peak day/time, are the quantitative baseline and do not require LLM
+re-approval. Preference, attendance and purchase-intent inferences are separate.
+Trend researches nationwide, cross-industry offline experiences (for example game
+and food popups and regional festivals), guided by the observed population/sales
+profiles. Neither store-area nor device/category match is an inclusion condition.
+Its key output is the experience mechanism and a research hypothesis for adapting
+it to a phone store, rather than a finished promotion plan or a claim of proven appeal.
+
 ## Problem
 
 KT Plaza staff may need to manually check multiple sources such as small-business data, maps, local news, and public web content before planning a promotion.

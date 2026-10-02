@@ -87,10 +87,17 @@ Use code for deterministic checks:
 
 ### LLM semantic checks
 Use an LLM for meaning-dependent checks:
-- is this generic or genuinely local?
-- does this differentiate the area?
+- Local: is the claimed change specific to the declared area?
+- Local: does this differentiate the area?
 - are the three Scout outputs meaningfully connected?
-- is the rationale specific enough to this location?
+- Trend: is the nationwide experience mechanism connected to this store's audience
+  through an explicit adaptation hypothesis, without inventing preference or impact?
+
+Official SBIZ365 observations are an accepted quantitative baseline, not LLM
+approval targets. Coordinates, source links, parser consistency and unknown
+reference periods remain deterministic data-handling concerns. Trend cases may be
+outside the store area and product category; locality restrictions apply to Local
+claims, not to nationwide Trend references.
 
 ## Target retry flow
 

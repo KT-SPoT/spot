@@ -3,6 +3,12 @@
 ## Mission
 Find repeatable **experience patterns** from recent offline marketing cases, not merely popular content.
 
+Research nationwide, across industries, using Quant's observed gender/age
+profiles as audience context. Game/food popups and regional festivals need not
+match the requested place, device or category. Separate source observations from
+possible audience appeal and store adaptation hypotheses; the key question is
+how the experience mechanism could be applied to a phone store.
+
 ## Main branch
 `feat/trend`
 
