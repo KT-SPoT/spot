@@ -1,5 +1,28 @@
 # 의미 Critic — 선택적 shadow 평가
 
+## 현재 기본 연구 검토 경로
+
+`SPOT_CRITIC_PROFILE=research`가 기본 프로필이다. GPT는 선정 참고 사례 최대 5개에 대해
+지역·고객 연결, 휴대폰 체험 응용 논리, 일반적인 제안 대비 구체성·차별성, 과장 여부를
+검토한다. 출처 수집은 Scout, 출처 연결·날짜·계약·중복 검사는 코드가 맡는다.
+GPT는 출처 ID를 생성하지 않고 사례 ID로만 검토하며 코드는 실제 등록 출처를 붙인다.
+기본 호출 스위치 `SPOT_SEMANTIC_MODE=off`는 유지한다. shadow를 켰을 때만 최대 1회 호출한다.
+자료 입력은 최대 60KB, 원문 HTML·provider archive·키는 전달하지 않는다.
+
+사례별 `useful`·`generic`·`needs_context`·`overstated` 판정과 네 항목의 판단,
+이유·보완 방향을 `checks.semantic_review.case_reviews`에 기록한다. Brief의 선택적
+`research_review`와 Markdown에도 표시한다. useful은 응용 가설의 활용 가능성이지
+실제 선호·효과·경쟁 상권 대비 독보성을 입증한다는 뜻이 아니다. generic 판정도
+참고 사례를 삭제하지 않는다. 응답 형식·사례 ID·누락·모순 검사는 유지한다.
+모델 제안에 미확인 성별×연령 교차 고객군·구매층 표현이 있으면 그 제안만 관측값을
+구분하는 질문으로 대체하고 `review_warning`·`suggestion_basis=policy_fallback`을 기록한다.
+사례·판정은 유지하며 Markdown에 보정 사실을 표시한다. 이 최소 정책 검사는
+출처 재인증이나 실제 고객 선호의 승인이 아니다.
+
+검증 실패·timeout·provider 오류는 안정된 코드로 남기고 브리프를 보존한다.
+Critic 때문에 Scout를 다시 호출하지 않는다. `SPOT_CRITIC_PROFILE=evidence`는
+아래의 이전 주장·출처 중심 경로를 보존한다. 이전 검증 기록은 이 프로필에 관한 것이다.
+
 규칙 Critic 및 제한된 Scout 재조사 이후, Brief 전에 의미 평가를 최대 한 번 실행한다.
 기본값은 off다. 평가가 실패하거나 판정이 contradicted여도 현재 Brief·출처·최종 상태를
 바꾸거나 Scout를 재호출하지 않는다. 결과는 `critic_result.checks.semantic_review`에 기록한다.

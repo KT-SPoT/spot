@@ -153,7 +153,26 @@ def render_markdown(brief):
         lines.append("- " + item["statement"])
     if not brief["research_implications"]:
         lines.append("근거를 먼저 보완해야 합니다.")
-    lines.extend(["", "## 검토 필요 사항", ""])
+    review = brief.get('research_review', {})
+    if review.get('performed'):
+        lines.extend(['', '## Critic: 고객 연결·차별성 검토', '',
+                      '조사 가설의 구체성과 응용 논리 검토입니다. 사실·성과의 인증이 아닙니다.'])
+        labels = {'useful': '활용 가능한 응용 가설', 'generic': '응용 가설 구체화 필요',
+                  'needs_context': '연결 맥락 보완 필요', 'overstated': '과장 표현 수정 필요'}
+        dimensions = {'local_customer_fit': '지역·고객 연결', 'transfer_logic': '응용 논리',
+                      'differentiation': '차별성', 'overclaim': '과장 여부'}
+        ratings = {'clear': '적절', 'weak': '약함', 'missing': '미확보', 'distinctive': '구체적 차별 요소',
+                   'contextual': '맥락 반영', 'generic': '일반적', 'risk': '수정 필요'}
+        for row in review.get('case_reviews', []):
+            lines.extend(['', f"### {row.get('event_name', row['case_id'])} — {labels[row['verdict']]}", '',
+                          row['reason'], '', '- 보완 방향: ' + row['suggestion'],
+                          '- 검토: ' + ' / '.join(dimensions[k] + ': ' + ratings[v] for k, v in row['dimensions'].items()),
+                          '- 근거: ' + ', '.join('trend:' + s for s in row['source_ids'])])
+            if row.get('review_warning'):
+                lines.append('- 제안 보정: 모델의 미확인 교차 고객군·구매층 표현을 제외하고 관측값을 구분하는 검토 질문으로 대체했습니다.')
+    elif review:
+        lines.extend(['', 'Critic 차별성 검토가 완료되지 않았습니다. 조사 자료는 유지하며 확인 코드: ' + review.get('code', '미확인')])
+    lines.extend(['', '## 검토 필요 사항', ''])
     lines.extend("- " + str(item) for item in brief["needs_manual_check"])
     lines.extend(["", "## 출처", ""])
     sources = {}

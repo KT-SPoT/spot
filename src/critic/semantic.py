@@ -258,15 +258,16 @@ def validate_response(raw, payload, *, action_normalizations=None):
 
 class ChatCaller:
     """Single Chat Completions JSON call; transport never retries or redirects."""
-    def __init__(self, endpoint, model, key, *, transport=None):
+    def __init__(self, endpoint, model, key, *, transport=None, prompt=None):
         parts = urlsplit(endpoint)
         if not model or not key or parts.scheme != 'https' or not parts.hostname or parts.username or parts.query or parts.fragment:
             raise SemanticError('INVALID_CONFIGURATION')
         self.endpoint, self.model, self.key, self.transport = endpoint, model, key, transport
+        self.prompt = prompt or PROMPT
 
     def __call__(self, payload):
         body = {'model': self.model, 'messages': [
-            {'role': 'system', 'content': PROMPT},
+            {'role': 'system', 'content': self.prompt},
             {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}],
             'response_format': {'type': 'json_object'}, 'max_completion_tokens': 4000}
         started = time.monotonic()
@@ -293,6 +294,12 @@ def run_semantic(bundle, critic, *, caller=None, mode=None, quant_evidence=None)
     selected = mode if mode is not None else os.environ.get('SPOT_SEMANTIC_MODE', 'off')
     if selected != 'shadow' or os.environ.get('SPOT_SCOUT_MODE') == 'offline':
         return {**review, 'code': 'DISABLED' if selected in ('off', 'shadow') else 'INVALID_CONFIGURATION'}
+    profile = os.getenv('SPOT_CRITIC_PROFILE', 'research')
+    if profile == 'research':
+        from src.critic.research_review import run_research_review
+        return run_research_review(bundle, critic, caller=caller, quant_evidence=quant_evidence)
+    if profile != 'evidence':
+        return {**review, 'code': 'INVALID_CONFIGURATION'}
     try:
         if caller is None:
             caller = ChatCaller(os.environ.get('SPOT_LLM_ENDPOINT', ''), os.environ.get('SPOT_LLM_MODEL', ''),

@@ -174,7 +174,12 @@ def run_trend_scout(request, *, context=None, detail_reader=None):
     if not context.get('local_signals'):
         output['warnings'].append('LOCAL_CONTEXT_UNAVAILABLE')
     by_url={}
-    for provider in (search.news,search.videos):
+    video_mode = os.getenv('SPOT_TREND_VIDEO_MODE', 'on')
+    output['query_context']['video_mode'] = video_mode
+    providers = (search.news, search.videos) if video_mode == 'on' else (search.news,)
+    if video_mode != 'on':
+        output['warnings'].append('YOUTUBE_LOOKUP_DISABLED' if video_mode == 'off' else 'INVALID_TREND_VIDEO_MODE')
+    for provider in providers:
         for query in queries:
             for item in search.collect(output,provider,query,start,end):
                 url=item['source_url']

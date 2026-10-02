@@ -8,6 +8,14 @@ REQUEST = {"request_id": "trend-test", "campaign": {"product": "Galaxy Z Fold8"}
            "research": {"reference_date": "2026-10-01", "lookback_days": 0}}
 
 class TrendTests(unittest.TestCase):
+    def test_video_lookup_can_pause_without_removing_key(self):
+        with patch.dict('os.environ', {'SPOT_TREND_VIDEO_MODE': 'off', 'YOUTUBE_API_KEY': 'synthetic-preserved-key'}), \
+             patch('src.scouts.search_runtime.news', return_value=[article('게임 팝업 체험')]), \
+             patch('src.scouts.search_runtime.videos') as videos:
+            result = run_trend_scout(REQUEST)
+        videos.assert_not_called()
+        self.assertIn('YOUTUBE_LOOKUP_DISABLED', result['warnings'])
+        self.assertEqual(result['query_context']['video_mode'], 'off')
     def test_relevance_and_pattern_candidates(self):
         rows = [article("갤럭시 Z 폴드8 팝업 체험", "https://example.org/1"),
                 article("스마트폰 팝업 체험", "https://example.org/2"),

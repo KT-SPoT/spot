@@ -1,5 +1,8 @@
 # SPOT API / n8n 연결
 
+현재 연구 Critic·웹 구현 전 검증 결과는 [PRE_WEB_READINESS.md](PRE_WEB_READINESS.md),
+웹 서버 경유 입력·조회·오류 경계는 [WEB_INTEGRATION.md](WEB_INTEGRATION.md)를 참고한다.
+
 ## 1. Linux에서 API 실행
 
 저장소 루트에서 실행합니다. 기존 provider 키는 `.env`에 그대로 둡니다.

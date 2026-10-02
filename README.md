@@ -7,6 +7,7 @@ SPOT은 KT Plaza 홍보기획 전 단계에서 상권·지역 변화·트렌드�
 ## Architecture
 
 HTTP API와 n8n 가져오기 파일: [연결 안내](docs/N8N_API_SETUP.md).
+웹 구현 시 사용할 요청·조회·오류 처리 경계: [웹 연결 계약](docs/WEB_INTEGRATION.md).
 
 ```text
 n8n Main Entry
@@ -28,6 +29,8 @@ n8n Main Entry
 Trend는 전국의 게임·음식 팝업, 지역 축제 등 다양한 업종의 체험을 조사하고,
 관측된 인구·매출 구성과 연결해 핸드폰 매장에 응용할 조사 가설을 제시합니다.
 사례가 대상 지역·기기와 같아야 한다는 조건은 없습니다.
+GPT Critic은 Scout 근거를 다시 인증하기보다 지역·고객 연결, 응용 논리,
+제안의 구체성·차별성과 과장 여부를 검토합니다. 호응 자료는 선택적 보조 근거입니다.
 
 ## Collaboration model
 
