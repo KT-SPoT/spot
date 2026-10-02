@@ -3,7 +3,7 @@ import re
 from datetime import date
 
 GENERIC = {"팝업", "팝업스토어", "체험", "체험형", "스마트폰", "갤럭시", "아이폰",
-           "삼성전자", "폴드", "플립", "시리즈", "제품", "신제품"}
+           "삼성전자", "폴드", "플립", "시리즈", "제품", "신제품", "테마파크", "챌린지", "미니게임", "포토존"}
 
 
 def _words(text):
@@ -26,10 +26,11 @@ def group_coverage(cases, product=""):
     """
     quoted = set()
     for case in cases:
-        for phrase in re.findall(r"['‘’\"“”]([^'‘’\"“”]+)['‘’\"“”]", case.get("event_name") or ""):
+        for phrase in re.findall(r"['‘’\"“”]([^'‘’\"“”]+)['‘’\"“”]", (case.get("event_name") or "") + ' ' + (case.get('observation') or case.get('description') or '')):
             quoted.update(_words(phrase))
     anchors = {word for word in quoted - GENERIC - _words(product)
-               if len(word) >= 3 and not any(char.isdigit() for char in word)}
+               if (len(word) >= 3 and not any(char.isdigit() for char in word))
+               or re.fullmatch(r'\d+색', word)}
 
     def matches(left, right):
         day = _day(left)
@@ -43,7 +44,9 @@ def group_coverage(cases, product=""):
         lead_a, lead_b = re.match(r"[a-zA-Z0-9가-힣]+", a), re.match(r"[a-zA-Z0-9가-힣]+", b)
         if not lead_a or not lead_b or lead_a[0].lower() != lead_b[0].lower():
             return False
-        return bool(anchors & _words(a) & _words(b))
+        details_a = a + ' ' + (left.get('observation') or left.get('description') or '')
+        details_b = b + ' ' + (right.get('observation') or right.get('description') or '')
+        return bool(anchors & _words(details_a) & _words(details_b))
 
     groups = []
     for case in cases:

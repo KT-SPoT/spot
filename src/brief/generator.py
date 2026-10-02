@@ -270,8 +270,16 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         if not sources or len(sources) != len(set(ids)):
             checks.append("Trend 참고 후보의 출처 연결을 확인하세요.")
             continue
-        if case not in references:
-            references.append(case)
+        related_ids = reference.get('related_case_ids', [case.get('case_id')])
+        if not isinstance(related_ids, list):
+            related_ids = [case.get('case_id')]
+        for cid in [case.get('case_id')] + related_ids:
+            member = cases.get(cid)
+            member_sources = sources_for('trend', member.get('source_ids', [])) if member else []
+            if (member and member not in references and member.get('origin') == 'live_search_candidate'
+                    and member_sources and len(member_sources) == len(set(member.get('source_ids', [])))
+                    and member in group_coverage([case, member], product)[0]):
+                references.append(member)
     for group in group_coverage(references, product):
         case = deepcopy(group[0])
         ids = list(dict.fromkeys(sid for member in group for sid in member.get("source_ids", [])))
@@ -308,6 +316,18 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
                     context_sources={m: list(entries.values()) for m, entries in context_sources.items()},
                     evidence_count=1, scope="검색 후보; 실제 행사·체험 구조·고객 적합성 미확인")
         trend_patterns.append(card)
+
+    for item in trend.get('audience_contexts', []):
+        if not isinstance(item, dict) or item.get('evidence_role') != 'audience_context':
+            continue
+        case = cases.get(item.get('case_id'), {})
+        ids = case.get('source_ids', [])
+        sources = sources_for('trend', ids)
+        if sources and len(sources) == len(set(ids)):
+            card = deepcopy(case)
+            card.update(module='trend', type='audience_context', sources=sources,
+                        scope='전국 고객층 조사 보도; 행사 사례·실제 방문 반응과 구분')
+            trend_patterns.append(card)
 
     preview = evaluate_rules(bundle)
     checks.extend(preview["pending_checks"])
@@ -364,7 +384,10 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
     store = request.get("store", {})
     address = store.get("address") or context.get("area_name") or "조사 지역 미확인"
     reference_count = sum(card.get("type") == "reference_case" for card in trend_patterns)
-    area_summary = f"{address}: 정량 지표 {len(facts)}개, 직접 지역 변화 {len(local_changes)}건, 보조 맥락·배경 {len(local_context)}건, 체험 패턴 {len(trend_patterns)-reference_count}개·참고 후보 {reference_count}건을 근거와 함께 요약했습니다. 자료 수는 독립 사건 수의 확정값이 아닙니다."
+    audience_context_count = sum(card.get('type') == 'audience_context' for card in trend_patterns)
+    area_summary = f"{address}: 정량 지표 {len(facts)}개, 직접 지역 변화 {len(local_changes)}건, 보조 맥락·배경 {len(local_context)}건, 체험 패턴 {len(trend_patterns)-reference_count-audience_context_count}개·참고 후보 {reference_count}건을 근거와 함께 요약했습니다. 자료 수는 독립 사건 수의 확정값이 아닙니다."
+    if audience_context_count:
+        area_summary += f' 전국 고객층 조사 맥락 {audience_context_count}건을 별도로 제공합니다.'
     if not cards:
         area_summary = f"{address}: 요약할 출처 연결 근거가 없습니다. 재수집 또는 자료 보완이 필요합니다."
     return {"schema_version": "0.1", "request_id": request_id,

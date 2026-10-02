@@ -31,14 +31,18 @@ signals. The context carries provenance metadata, not credential-bearing URLs or
 raw provider archives. Missing context is recorded in warnings.
 
 Trend uses at most three unique queries per provider: game popups, food popups
-and regional festivals. Available sales/floating ages refine two queries; one
-query stays broad. Gender never assigns an industry or a stereotyped preference.
+and regional festivals. All three queries stay broad: age/gender are context for
+candidate selection and interpretation, not mandatory query terms. Gender never
+assigns an industry or a stereotyped preference.
 Search has no store-area or device/category gate. Offline-event wording in news
 headlines still prevents related-story snippets from admitting unrelated news.
 Product matching remains descriptive metadata, not an inclusion/ranking bonus.
 Experience mechanism expressions and at most two literal population/local
 overlaps guide ranking. Reference selection keeps available category diversity
-within the five-case cap. Event reviews can be useful; unboxing/purchase-link/
+before the provider cap and within the five coverage-group reference slots.
+Headline industry and participation mechanics are separate: a beauty popup with
+a minigame stays beauty. Named industries get diversity slots before unclassified
+cases; the remaining ranked candidates remain usable. Event reviews can be useful; unboxing/purchase-link/
 lowest-price headlines do not qualify. These are bounded discovery heuristics,
 not a claim of exhaustive nationwide coverage or audience demand.
 
@@ -75,6 +79,11 @@ remain failed even when library entries exist.
 - `reference_cases`: up to five ranked live search candidates, each with
   `why_relevant`, `limitations`, `context_source_refs`, `event_category`,
   `audience_hypothesis`, `adaptation_hypotheses` and a heuristic score.
+- Each reference slot represents one conservative coverage group, with
+  `related_case_ids` pointing only to selected same-group cases. Brief retains
+  all source-connected group members; this does not prove an independent event.
+- `audience_contexts`: source-connected survey/participation-intent reports,
+  displayed separately from experience cases and excluded from pattern counts.
 - `reference_patterns`: metadata patterns within the selected candidates.
 - `reference_library`: past cases, explicitly marked `rechecked_during_run=false`.
 - `query_context.upstream_context`: the actual bounded context used.
