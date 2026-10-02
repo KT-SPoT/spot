@@ -1,0 +1,30 @@
+# 지도에서 시작하는 SPoT 리서치
+
+## 사용 흐름
+
+1. `http://127.0.0.1:8768/`에서 지역 리서치를 시작한다.
+2. 상품·목적을 입력하고 매장명 또는 주소를 검색한다. 검색 결과를 선택하면 주소와 좌표가 함께 입력된다.
+3. 신규 매장은 지도에서 후보지를 클릭한다. 카카오 역지오코딩으로 주소가 확인된 지점을 사용하며, 후보지 이름은 변경할 수 있다.
+4. Quant·Local 병렬 조사 → Trend → 통합 → Critic → Brief 순서의 실제 작업 상태를 확인한다.
+5. 결과의 AREA SUMMARY, KEY INSIGHTS와 Scout 상세 화면을 읽고, 근거 버튼이나 출처 분류 탭에서 원문을 연다.
+
+## 구현 경계
+
+- `KAKAO_REST_API_KEY`는 웹 서버에서만 사용한다. 지도는 로컬에 포함한 Leaflet 1.9.4와 OpenStreetMap 타일을 사용하므로 별도 카카오 JavaScript 키는 필요 없다. 검색/주소 공급자와 지도 저작자 표시를 유지한다.
+- Kakao 호출은 고정된 HTTPS 목적지로만 전송하며 세션당 분당 30회로 제한한다. n8n 인증 헤더를 카카오에 전달하지 않는다. 기존 SpotRequest / ScoutResult v0.1 필수 필드는 변경하지 않는다.
+- 작업 조회 응답에는 선택적 `progress: {stages, updated_at}`가 추가된다. stages는 실제 graph node의 `running`, `success`, `partial`, `failed`, `completed` 상태만 전달한다. 토큰·원문·예상 퍼센트는 포함하지 않는다. 기존 커스텀 runner도 계속 사용할 수 있다.
+- AREA SUMMARY와 KEY INSIGHTS는 기존 Brief의 관측값·직접 지역 변화·전국 참고 사례에서 추출한다. 추가 GPT 호출 없이 표시하며, 배경 자료를 직접 변화로 승격하지 않는다. 숫자나 성과를 생성하지 않는다.
+- Local 기사 이미지는 기존 원문 수집에서 확인한 `og:image`만 사용한다. URL은 공개 목적지 검사 후 사용하며 없거나 로드되지 않으면 텍스트 목록을 표시한다. 과거 결과에는 이미지가 없을 수 있다. 사진과 타일은 외부 네트워크가 필요하다.
+- 출처는 메타데이터/URL에 따라 뉴스·공공데이터·보고서·기타로 분류한다. 자동 분류는 발행 기관의 공식 분류를 뜻하지 않는다.
+- 명륜동처럼 같은 이름이 여러 도시에 있는 경우 검색에 요청 도시를 포함하며, 다른 광역시 제목과 요청 도시 부재가 함께 확인된 원문은 제외한다. 완전한 지리 경계 검증을 대신하지는 않는다.
+- 작업/브라우저 소유권은 여전히 메모리 기반이며 서버 재시작 시 이전 작업 조회는 만료된다.
+
+## 디자인 자산
+
+- 서울 한강 사진: [Inkwon hwang / Unsplash](https://unsplash.com/photos/a-city-skyline-with-a-river-E3vnaw9q3Pg), Unsplash License. 메인 화면의 분위기 사진이며 조사 대상지의 사진으로 사용하지 않는다.
+- 지도: [OpenStreetMap](https://www.openstreetmap.org/copyright), [타일 사용 정책](https://operations.osmfoundation.org/policies/tiles/). 지도 타일에 origin Referer를 전달하고 사전 다운로드하지 않는다.
+- Leaflet: `src/web/static/LEAFLET-LICENSE.txt`에 BSD-2-Clause 라이선스를 포함한다.
+
+## 검증
+
+Python unittest 전체, `tests/test_web_brief.js`, `tests/test_web_workspace.js`, `tests/test_web_experience.js`와 n8n workflow 테스트를 실행한다. 지도 검색·주소 변환은 mock transport로 인증 경계/입력/오류를 검사하고, 실제 동래점 검색 및 한 차례 실조사로 주소 자동 입력과 Quant 자료 확보를 확인했다.

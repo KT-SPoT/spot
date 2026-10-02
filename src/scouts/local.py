@@ -43,7 +43,11 @@ def run_local_scout(request):
         return output
     seen = set()
     checked = 0
-    for query in (anchor, anchor + " 개관 개통 입주"):
+    # Neighborhood names repeat across cities (e.g. 부산/서울 명륜동).
+    address = (request.get("store") or {}).get("address") or ""
+    city = address.split()[0] if address.split() else ""
+    query_anchor = " ".join(dict.fromkeys([city, anchor])).strip()
+    for query in (query_anchor, query_anchor + " 개관 개통 입주"):
         for item in search.collect(output, search.news, query, start, end):
             text = item["title"] + " " + item["description"]
             if search.normalized(anchor) not in search.normalized(text) or not any(w in text for w in CHANGE_WORDS):

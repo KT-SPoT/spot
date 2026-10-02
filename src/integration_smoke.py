@@ -17,7 +17,7 @@ from src.graph.graph import build_graph
 from src.validation import validate_scout_result
 
 
-def run_smoke(request, *, mode="offline"):
+def run_smoke(request, *, mode="offline", progress=None):
     if mode not in ("offline", "live"):
         raise ValueError("mode must be offline or live")
     store = request.get("store") or {}
@@ -33,7 +33,7 @@ def run_smoke(request, *, mode="offline"):
                 "SPOT_SCOUT_MODE": "offline",
             }))
             stack.enter_context(patch("src.scouts.quant.load_dotenv"))
-        state = build_graph().invoke({"request": request})
+        state = build_graph(progress=progress).invoke({"request": request})
     bundle = state["research_bundle"]
     validation = {
         module: validate_scout_result(result, expected_module=module,

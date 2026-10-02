@@ -119,25 +119,41 @@ def brief_node(state: SpotState) -> dict:
                                             quant_evidence=None if "quant" in excluded else state.get("quant_evidence"))}
 
 
-def build_graph(*, max_retry_rounds=1, semantic_caller=None, semantic_mode=None):
+def build_graph(*, max_retry_rounds=1, semantic_caller=None, semantic_mode=None, progress=None):
     if type(max_retry_rounds) is not int or max_retry_rounds not in (0, 1):
         raise ValueError("max_retry_rounds must be 0 or 1")
     graph = StateGraph(SpotState)
 
-    graph.add_node("quant", quant_node)
-    graph.add_node("local", local_node)
-    graph.add_node("trend", trend_node)
+    def observed(name, fn):
+        def run(state):
+            if progress:
+                progress(name, "running")
+            try:
+                result = fn(state)
+            except Exception:
+                if progress:
+                    progress(name, "failed")
+                raise
+            scout = result.get(f"{name}_result", {})
+            if progress:
+                progress(name, scout.get("status", "completed"))
+            return result
+        return run
+
+    graph.add_node("quant", observed("quant", quant_node))
+    graph.add_node("local", observed("local", local_node))
+    graph.add_node("trend", observed("trend", trend_node))
     graph.add_node("trend_context", trend_context_node)
-    graph.add_node("merge", merge_node)
-    graph.add_node("critic", lambda state: critic_node(state, max_retry_rounds=max_retry_rounds))
-    graph.add_node("retry", retry_node)
+    graph.add_node("merge", observed("merge", merge_node))
+    graph.add_node("critic", observed("critic", lambda state: critic_node(state, max_retry_rounds=max_retry_rounds)))
+    graph.add_node("retry", observed("retry", retry_node))
     def semantic_node(state):
         critic = deepcopy(state['critic_result'])
         critic['checks']['semantic_review'] = run_semantic(state['research_bundle'], critic,
             caller=semantic_caller, mode=semantic_mode, quant_evidence=state.get('quant_evidence'))
         return {'critic_result': critic}
-    graph.add_node("semantic", semantic_node)
-    graph.add_node("brief", brief_node)
+    graph.add_node("semantic", observed("semantic", semantic_node))
+    graph.add_node("brief", observed("brief", brief_node))
 
     # Gather independent measurements before context-dependent discovery.
     graph.add_edge(START, "quant")

@@ -20,12 +20,13 @@ from pydantic import ValidationError
 
 from src.api.app import redact
 from src.api.models import ResearchRequest
+from src.web import places
 
 STATIC = Path(__file__).parent / 'static'
 COOKIE = 'spot_session'
 
 
-def create_app(*, token=None, n8n_base=None, transport=None):
+def create_app(*, token=None, n8n_base=None, transport=None, place_transport=None):
     if token is None:
         load_dotenv(Path(__file__).resolve().parents[2] / '.env', encoding='utf-8-sig')
         token = os.getenv('SPOT_N8N_TOKEN') or os.getenv('SPOT_API_TOKEN', '')
@@ -59,7 +60,7 @@ def create_app(*, token=None, n8n_base=None, transport=None):
         response = await call_next(request)
         response.headers['Cache-Control'] = 'no-store'
         response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' https: data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
         response.headers['Referrer-Policy'] = 'no-referrer'
         return response
 
@@ -87,13 +88,40 @@ def create_app(*, token=None, n8n_base=None, transport=None):
 
     @app.get('/assets/{name}')
     async def asset(name: str):
-        if name not in ('app.js','style.css'):
+        if name not in ('app.js','style.css','experience.js','leaflet.js','leaflet.css'):
             return failure('NOT_FOUND',404)
         return FileResponse(STATIC/name)
 
     @app.get('/api/config')
     async def config():
         return {'reference_date':datetime.now(ZoneInfo('Asia/Seoul')).date().isoformat(), 'local_only':True}
+
+    async def place_request(request, operation, **kwargs):
+        record = session(request)
+        if not record:
+            return failure('SESSION_EXPIRED',401)
+        now = time.monotonic()
+        recent = [at for at in record.get('place_calls',[]) if now-at < 60]
+        if len(recent) >= 30:
+            return failure('PLACE_RATE_LIMIT',429)
+        record['place_calls'] = recent + [now]
+        try:
+            value = await operation(os.getenv('KAKAO_REST_API_KEY',''), transport=place_transport, **kwargs)
+            return JSONResponse(redact({'results':value},sensitive))
+        except places.PlaceError as exc:
+            return failure(str(exc),503 if str(exc) != 'ADDRESS_NOT_FOUND' else 404)
+
+    @app.get('/api/places/search')
+    async def place_search(request: Request, q: str = ''):
+        if not 2 <= len(q.strip()) <= 100:
+            return failure('INVALID_PLACE_QUERY',422)
+        return await place_request(request, places.search, query=q.strip())
+
+    @app.get('/api/places/reverse')
+    async def place_reverse(request: Request, lat: float, lng: float):
+        if not (32 <= lat <= 39.5 and 124 <= lng <= 132):
+            return failure('INVALID_COORDINATES',422)
+        return await place_request(request, places.reverse, lat=lat, lng=lng)
 
     async def upstream(method, path, **kwargs):
         try:

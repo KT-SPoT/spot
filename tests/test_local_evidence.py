@@ -16,6 +16,21 @@ def page(body=SENTENCE, pub="2026-09-20"):
 
 
 class LocalEvidenceTests(unittest.TestCase):
+    def test_same_neighborhood_in_other_city_is_rejected(self):
+        item = dict(ITEM, title='서울관광재단 명륜동 야간 노선 신설')
+        html = page('서울 명륜동 상권과 연결되도록 야간 관광 코스 종착지를 새로 신설할 예정이라고 서울관광재단은 밝혔다.')
+        with patch.object(evidence, 'fetch_article', return_value=(html, ITEM['source_url'])):
+            result = evidence.verify_source(item,'명륜동',START,END,{'address':'부산 동래구 명륜동 386'})
+        self.assertEqual(result['status'],'rejected')
+        self.assertEqual(result['reason'],'OTHER_CITY_SAME_NEIGHBORHOOD')
+
+    def test_thumbnail_comes_from_article_and_is_url_checked(self):
+        html = page() + '<meta property="og:image" content="/photo.jpg">'
+        with patch.object(evidence,'fetch_article',return_value=(html,ITEM['source_url'])), patch.object(evidence,'validate_url') as check:
+            result = evidence.verify_source(ITEM,'명지국제신도시',START,END)
+        check.assert_called_once_with('https://example.org/photo.jpg')
+        self.assertEqual(result['thumbnail_url'],'https://example.org/photo.jpg')
+
     def test_cross_paragraph_project_context_is_retained_with_scope(self):
         html = page("명지지구 개발사업 실시계획 25차 변경 승인을 완료하고 23일 고시할 예정이라고 관계 기관은 밝혔다.")
         html += '<article><p>명지 중앙공원은 명지국제신도시의 핵심 공원으로 특화 계획에 따라 조성될 예정이다.</p></article>'

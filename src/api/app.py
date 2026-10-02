@@ -38,10 +38,10 @@ def redact(value, secrets):
     return value
 
 
-def research_result(request, *, mode):
+def research_result(request, *, mode, progress=None):
     from src.integration_smoke import run_smoke
     from src.brief.renderer import render_markdown
-    run = run_smoke(request, mode=mode)
+    run = run_smoke(request, mode=mode, progress=progress)
     if not run["all_contracts_valid"]:
         raise ValueError("invalid Scout contract")
     state = run["state"]
@@ -64,7 +64,8 @@ def create_app(*, token=None, mode=None, runner=None):
         raise RuntimeError("SPOT_API_TOKEN must be configured (at least 24 characters)")
     if mode not in ("offline", "live"):
         raise RuntimeError("SPOT_API_MODE must be offline or live")
-    registry = JobRegistry(runner or (lambda request: research_result(request, mode=mode)))
+    registry = JobRegistry(runner or (lambda request, progress: research_result(request, mode=mode, progress=progress)),
+                           reports_progress=runner is None)
 
     @asynccontextmanager
     async def lifespan(app):
