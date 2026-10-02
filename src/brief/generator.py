@@ -384,6 +384,7 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         implications.append({"statement": "주변 행정구역 변화와 지역 배경 자료를 조사 질문으로 활용하세요. 점포 생활권 연결과 영향 여부를 추가 확인하고 최근 지역 변화·고객 증가와 구분하세요.",
                              "basis": deepcopy(local_context), "kind": "research_question"})
     if trend_patterns:
+        checks.append('Trend는 참여 방식과 응용 가능성의 조사 참고입니다. 고객 호응 자료는 선택적 보조 근거이며, 미확보만으로 사례를 제외하지 않습니다. 반복 등장하는 방식도 인기·성과를 입증하지 않습니다.')
         pattern_names = ", ".join(str(card.get("name") or card.get("event_name") or "체험 후보") for card in trend_patterns)
         campaign = request.get("campaign", {})
         product = campaign.get("product") or "요청 제품"

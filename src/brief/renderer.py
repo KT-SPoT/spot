@@ -121,7 +121,7 @@ def render_markdown(brief):
                 for signal in detail.get('response_signals', []):
                     lines.append('- 본문 반응 표현: ' + _cell(signal.get('reported_value', '정성·홍보 표현')) + '; ' + signal['limitation'])
                 if not detail.get('response_signals'):
-                    lines.append('- 호응 근거: 방문·참여 실적이나 연령별 반응을 확인할 자료 미확보')
+                    lines.append('- 호응 근거: 미확보. 참여 방식의 참고·응용 가설 활용을 막는 조건은 아닙니다.')
             population_labels = {'floating_population': '유동인구', 'sales': '매출 비중',
                                  'resident_population': '주거인구', 'worker_population': '직장인구'}
             if card.get('audience_fit'):
