@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 import httpx
 
 from src.critic.critic import run_critic
-from src.critic.semantic import build_input, validate_response, run_semantic, ChatCaller, SemanticError
+from src.critic.semantic import build_input, validate_response, run_semantic, ChatCaller, SemanticError, PROMPT
 from src.graph.graph import build_graph
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -194,6 +194,68 @@ class SemanticCriticTests(unittest.TestCase):
         self.assertEqual(off['research_brief'], on['research_brief'])
         failed = execute(Mock(side_effect=RuntimeError('PRIVATE')), 'shadow')
         self.assertEqual(off['research_brief'], failed['research_brief'])
+
+    def test_three_area_requests_pass_their_own_scope_through_graph(self):
+        # End-to-end wiring with synthetic Scouts/evaluator, not real model accuracy.
+        profiles = json.loads((ROOT / 'samples/critic/area_profiles.synthetic.json').read_text())['profiles']
+        self.assertEqual(len(profiles), 3)
+        for profile in profiles:
+            with self.subTest(profile=profile['profile_id']):
+                bundle = copy.deepcopy(BASE)
+                request = bundle['request']
+                request['store'] = profile['store']
+                request['research'].update(radius_m=profile['radius_m'], comparison_area=profile['comparison_area'])
+                local = bundle['results']['local']
+                local['query_context'].update(area_anchor=profile['area_anchor'], scope='SYNTHETIC: 점포 반경 미검증')
+                local['insights'][0].update(title='SYNTHETIC 가상 시설 계획',
+                    evidence='SYNTHETIC: 인접생활권 A의 가상 시설 도입 계획. 요청 점포와의 거리는 미확보.',
+                    evidence_role='surrounding_context', locality_tags=['SYNTHETIC 인접생활권 A'],
+                    context_note='요청 지역 내부 사업인지 미확인', evidence_basis='article_text')
+                quant = bundle['results']['quant']
+                quant['query_context'].update(lat=None, lng=None, radius_m=profile['radius_m'])
+                trend = bundle['results']['trend']
+                trend['query_context']['scope'] = 'SYNTHETIC: 타 지역 체험 참고 후보'
+                captured = []
+                def evaluate(payload):
+                    captured.append(copy.deepcopy(payload))
+                    return answer(payload)
+                with patch('src.graph.graph.run_quant_scout', return_value=quant), \
+                     patch('src.graph.graph.run_local_scout', return_value=local), \
+                     patch('src.graph.graph.run_trend_scout', return_value=trend):
+                    state = build_graph(semantic_caller=evaluate, semantic_mode='shadow').invoke({'request': request})
+                self.assertEqual(len(captured), 1)
+                payload = captured[0]
+                self.assertEqual(payload['request']['store'], profile['store'])
+                self.assertEqual(payload['request']['research']['radius_m'], profile['radius_m'])
+                self.assertEqual(payload['request']['research']['comparison_area'], profile['comparison_area'])
+                self.assertEqual(payload['scout_scopes']['local']['area_anchor'], profile['area_anchor'])
+                self.assertIsNone(payload['scout_scopes']['quant']['lat'])
+                local_claim = next(c for c in payload['claims'] if c['claim_id'].startswith('local:'))
+                self.assertEqual(local_claim['content']['evidence_role'], 'surrounding_context')
+                self.assertEqual(state['critic_result']['status'], 'manual_review')
+                self.assertEqual(state['research_bundle']['request']['store'], profile['store'])
+                self.assertFalse(state['critic_result']['checks']['semantic_review']['truth_verified'])
+
+    def test_prompt_has_no_fixed_neighborhood_and_missing_scope_stays_unknown(self):
+        self.assertNotIn('Myeongji', PROMPT)
+        self.assertNotIn('Eco Delta', PROMPT)
+        self.bundle['request']['store'] = {'name': 'SYNTHETIC 미확정 점포', 'address': None}
+        payload = build_input(self.bundle, self.critic)
+        self.assertIsNone(payload['request']['store']['address'])
+        self.assertIsNone(payload['request']['store']['lat'])
+        self.assertIsNone(payload['scout_scopes']['local']['area_anchor'])
+
+    def test_source_location_and_resolution_metadata_are_preserved_without_private_fields(self):
+        quant = self.bundle['results']['quant']
+        quant['query_context'].update(lat=35.1, lng=129.1, resolved_address='SYNTHETIC 확정 주소',
+            coordinate_source='synthetic_geocoder', verification_log=[{'private': 'DO_NOT_SEND'}])
+        self.bundle['results']['trend']['insights'][0].update(location='SYNTHETIC 다른 생활권', brand='SYNTHETIC 브랜드')
+        payload = build_input(self.bundle, self.critic)
+        self.assertEqual(payload['scout_scopes']['quant']['lat'], 35.1)
+        self.assertEqual(payload['scout_scopes']['quant']['resolved_address'], 'SYNTHETIC 확정 주소')
+        self.assertNotIn('DO_NOT_SEND', json.dumps(payload))
+        trend = next(c for c in payload['claims'] if c['claim_id'].startswith('trend:insight:'))
+        self.assertEqual(trend['content']['location'], 'SYNTHETIC 다른 생활권')
 
 
 if __name__ == '__main__':
