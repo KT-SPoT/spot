@@ -24,6 +24,9 @@ def answer(payload):
 
 class SemanticCriticTests(unittest.TestCase):
     def setUp(self):
+        profile = patch.dict(os.environ, {'SPOT_CRITIC_PROFILE': 'evidence'})
+        profile.start()
+        self.addCleanup(profile.stop)
         self.env = patch.dict(os.environ, {'SPOT_SEMANTIC_MODE': 'off', 'SPOT_SCOUT_MODE': 'live',
                                            'SPOT_LLM_MODEL': '', 'SPOT_LLM_ENDPOINT': '', 'LLM_API_KEY': ''})
         self.env.start()

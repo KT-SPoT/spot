@@ -403,7 +403,7 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         area_summary += f' 전국 고객층 조사 맥락 {audience_context_count}건을 별도로 제공합니다.'
     if not cards:
         area_summary = f"{address}: 요약할 출처 연결 근거가 없습니다. 재수집 또는 자료 보완이 필요합니다."
-    return {"schema_version": "0.1", "request_id": request_id,
+    result = {"schema_version": "0.1", "request_id": request_id,
             "status": "manual_review" if cards else "failed",
             "overview": {"area_summary": area_summary, "primary_customer_signal": primary},
             "local_changes": local_changes, "unique_local_signals": facts + demographics + local_context,
@@ -412,6 +412,17 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
                              "지금 실행해야 할 이유나 다른 상권 대비 차별성은 근거의 시점·지역 관련성을 확인하기 전까지 확정하지 않습니다.") if cards else "근거 부족으로 why here / why now를 판단할 수 없습니다.",
             "research_implications": implications,
             "needs_manual_check": list(dict.fromkeys(checks)), "source_count": len(urls)}
+    review = (critic_result or {}).get('checks', {}).get('semantic_review', {})
+    if review.get('profile') == 'research':
+        result['research_review'] = deepcopy(review)
+        case_cards = {c['case_id']: c for c in trend_patterns if c.get('type') == 'reference_case'}
+        result['research_review']['case_reviews'] = []
+        for row in review.get('case_reviews', []):
+            if row.get('case_id') in case_cards:
+                card = case_cards[row['case_id']]
+                result['research_review']['case_reviews'].append({**deepcopy(row), 'event_name': card.get('event_name'),
+                    'source_ids': [s['source_id'] for s in card['sources']]})
+    return result
 
 
 def mock_brief(request_id: str) -> dict[str, Any]:
