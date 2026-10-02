@@ -203,8 +203,7 @@ def build_input(bundle, critic, *, quant_evidence=None):
                                    if s.get('source_id') == ref.get('source_id')), None)
                     if source and not any(e['source_id'] == source['source_id'] for e in claim['evidence']):
                         claim['evidence'].append({'source_id': source['source_id'], 'module': upstream,
-                            'kind': 'upstream_context', 'source_name': source.get('source_name'),
-                            'limitation': 'Context provenance only; Quant observations are in quant_facts. Not evidence of event response.'})
+                            'kind': 'upstream_context'})
             claim['allowed_source_ids'] = [e['source_id'] for e in claim['evidence']]
             payload['claims'].append(claim)
     payload = _clean(payload)
