@@ -8,6 +8,7 @@ SPOT은 KT Plaza 홍보기획 전 단계에서 상권·지역 변화·트렌드�
 
 HTTP API와 n8n 가져오기 파일: [연결 안내](docs/N8N_API_SETUP.md).
 웹 구현 시 사용할 요청·조회·오류 처리 경계: [웹 연결 계약](docs/WEB_INTEGRATION.md).
+매장 입력·진행 상태·브리프 조회 웹: [로컬 웹 실행 안내](docs/WEB_SETUP.md).
 
 ```text
 n8n Main Entry
