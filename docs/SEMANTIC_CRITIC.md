@@ -49,6 +49,8 @@ GPT API 비용은 [공식 요금 안내](https://developers.openai.com/api/docs/
 - Local 본문 발췌와 Trend 검색 요약의 확보 방식을 구분한다. 미확보 정보는 null이다.
 - 여러 출처를 병합했으면 첫 발췌를 모든 출처에 복사하지 않는다. 확보한 supporting facet만 사용한다.
 - 검증된 Quant 수치·모집단·기간과 선택적 보조자료에서 읽은 성별·연령 구성.
+- Quant 주장의 metric_refs는 검증된 정량 카드와 같은 모듈의 source_id로 연결한다.
+  확보한 지표만 주장별 metric_facts에 넣고 미확보 지표는 unverified_metric_refs로 남긴다.
 - Trend 후보 보도 그룹. 그룹은 보수적인 중복 후보이며 독립 사건 검증 완료가 아니다.
 
 HTML 원본·전체 Scout 객체·URL·인증 헤더·환경 변수는 전달하지 않는다.

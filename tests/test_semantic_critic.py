@@ -125,6 +125,40 @@ class SemanticCriticTests(unittest.TestCase):
         self.assertNotIn('RAW_ARCHIVE', json.dumps(payload))
         self.assertNotIn('PRIVATE', json.dumps(payload))
 
+    def test_quant_metric_refs_resolve_only_through_matching_verified_cards(self):
+        quant = self.bundle['results']['quant']
+        quant['insights'][0]['metric_refs'] = ['resident_population', 'unknown_metric']
+        quant['insights'][0].pop('source_ids', None)
+        card = {'module': 'quant', 'metric_refs': ['resident_population'], 'reference_period': None,
+                'statement': 'SYNTHETIC 주거인구 100명', 'sources': [{'source_id': 'S-Q-001'}]}
+        other = {'module': 'quant', 'metric_refs': ['unrelated_metric'],
+                 'statement': 'UNRELATED', 'sources': [{'source_id': 'S-Q-001'}]}
+        foreign = {'module': 'quant', 'metric_refs': ['resident_population'],
+                   'statement': 'FOREIGN', 'sources': [{'source_id': 'not_in_quant_registry'}]}
+        with patch('src.critic.semantic.generate_brief', return_value={'unique_local_signals': [card, other, foreign]}):
+            payload = build_input(self.bundle, self.critic)
+        claim = next(c for c in payload['claims'] if c['claim_id'].startswith('quant:'))
+        self.assertEqual([e['source_id'] for e in claim['evidence']], ['S-Q-001'])
+        self.assertEqual(claim['evidence'][0]['kind'], 'verified_metric')
+        self.assertEqual(claim['evidence'][0]['text'], card['statement'])
+        self.assertIsNone(claim['evidence'][0]['metric_facts'][0]['reference_period'])
+        self.assertEqual(claim['unverified_metric_refs'], ['unknown_metric'])
+        raw = answer(payload)
+        raw['findings'][0].update(verdict='supported', suggested_action='keep', source_ids=['S-Q-001'])
+        self.assertEqual(validate_response(raw, payload)[0]['verdict'], 'supported')
+
+    def test_quant_unmatched_metric_does_not_borrow_other_card_source(self):
+        quant = self.bundle['results']['quant']
+        quant['insights'][0]['metric_refs'] = ['missing_metric']
+        quant['insights'][0].pop('source_ids', None)
+        card = {'module': 'quant', 'metric_refs': ['other_metric'], 'statement': 'SYNTHETIC 다른 수치',
+                'sources': [{'source_id': 'S-Q-001'}]}
+        with patch('src.critic.semantic.generate_brief', return_value={'unique_local_signals': [card]}):
+            payload = build_input(self.bundle, self.critic)
+        claim = next(c for c in payload['claims'] if c['claim_id'].startswith('quant:'))
+        self.assertEqual(claim['evidence'], [])
+        self.assertEqual(claim['unverified_metric_refs'], ['missing_metric'])
+
     def test_provider_exception_text_is_never_returned(self):
         for error, code in [(httpx.ReadTimeout('PRIVATE'), 'PROVIDER_TIMEOUT'),
                             (RuntimeError('PRIVATE'), 'EVALUATION_FAILED')]:
