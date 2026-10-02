@@ -114,6 +114,13 @@ May add:
   within the same conservative group; one group occupies one reference slot.
 - `audience_contexts` may carry survey/participation-intent evidence separately
   from event cases. Such context is not counted as a repeated experience pattern.
+- Optional `case_detail` records bounded original-article wording checks, source
+  IDs, publication date (nullable), mechanisms and reported response expressions.
+  `status=text_corroborated` does not verify an event or audience preference.
+- Optional `audience_fit` carries `kind=research_hypothesis`, population kind,
+  observed profile, Quant context source refs, Trend mechanism source IDs,
+  mechanism basis, rationale and next check. `fit_status=hypothesis_not_proven_preference`
+  explicitly separates cohort composition from appeal. See `TREND_EVIDENCE_FIT.md`.
 
 ## ResearchBundle v0.1
 

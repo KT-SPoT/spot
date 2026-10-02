@@ -111,6 +111,27 @@ def render_markdown(brief):
                 lines.append("- 고객층 조사 가설: " + card["audience_hypothesis"])
             for hypothesis in card.get("adaptation_hypotheses", []):
                 lines.append("- 매장 응용 가설: " + hypothesis["statement"])
+            detail = card.get('case_detail', {})
+            if detail:
+                label = {'text_corroborated': '제목·본문 표현 대조', 'unavailable': '원문 접근 불가',
+                         'unconfirmed': '원문 연결 미확인', 'rejected': '원문 날짜·정체성 확인 필요'}.get(detail['status'], '미확인')
+                lines.append('- 원문 확인: ' + label + '; 실제 호응 검증 아님')
+                for mechanism in detail.get('reported_mechanisms', []):
+                    lines.append('- 본문 참여 방식 표현: ' + ', '.join(mechanism['matched_terms']) + '; 근거: ' + ', '.join(mechanism['source_ids']))
+                for signal in detail.get('response_signals', []):
+                    lines.append('- 본문 반응 표현: ' + _cell(signal.get('reported_value', '정성·홍보 표현')) + '; ' + signal['limitation'])
+                if not detail.get('response_signals'):
+                    lines.append('- 호응 근거: 방문·참여 실적이나 연령별 반응을 확인할 자료 미확보')
+            population_labels = {'floating_population': '유동인구', 'sales': '매출 비중',
+                                 'resident_population': '주거인구', 'worker_population': '직장인구'}
+            if card.get('audience_fit'):
+                lines.append('- 구성 해석: 주요 성별과 주요 연령은 각각의 분포입니다. 두 조건의 교차 비율이나 행사 선호를 뜻하지 않습니다.')
+            for fit in card.get('audience_fit', []):
+                profile = fit['observed_profile']
+                age = AGE_LABELS.get(profile.get('dominant_age'), '연령 미확인')
+                gender = {'male': '남성', 'female': '여성'}.get(profile.get('dominant_gender'), '성별 미확인')
+                label = population_labels.get(fit['population_kind'], fit['population_kind'])
+                lines.append(f"- 고객층 연결 가설 ({label}, 주요 연령 {age}·주요 성별 {gender}): {fit['rationale']} {fit['next_check']}")
             lines.extend("- 한계: " + text for text in card.get("limitations", []))
             if card.get("article_count", 1) > 1:
                 lines.append(f"- 관련 보도: {card['article_count']}건을 후보 묶음 1개로 표시")
