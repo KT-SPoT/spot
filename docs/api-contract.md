@@ -185,3 +185,14 @@ It should contain:
 
 Never commit API keys or credentials.
 Use local environment variables and n8n Credentials where applicable.
+
+## Optional research job progress (web transport)
+
+Tracked in [Issue #32](https://github.com/KT-SPoT/spot/issues/32). The job polling
+response may include `progress: {stages, updated_at}`. This is transport metadata,
+not a new required field in SpotRequest, ScoutResult, or ResearchBrief.
+`stages` maps graph nodes (`quant`, `local`, `trend`, `merge`, `critic`, `retry`,
+`semantic`, `brief`) to actual execution states (`running`, `success`, `partial`,
+`failed`, `completed`). Consumers must tolerate missing stages/metadata. A completed
+node means execution ended, not that facts or recommendations were certified.
+See [web experience](web-experience.md) for display and compatibility rules.

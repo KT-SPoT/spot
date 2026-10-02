@@ -12,7 +12,7 @@ from datetime import date, datetime
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qsl, urlsplit
+from urllib.parse import parse_qsl, urlsplit, urljoin
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from src.scouts import search_runtime as search
@@ -87,6 +87,7 @@ class ArticleParser(HTMLParser):
         self.dates = []
         self.json_scripts = []
         self.script = None
+        self.image = None
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
@@ -95,6 +96,8 @@ class ArticleParser(HTMLParser):
         skip = tag in ("nav", "aside", "header", "footer", "style", "script", "noscript", "form", "title", "h1", "h2", "h3", "h4", "h5", "h6")
         parent_skip = any(s[2] for s in self.stack)
         if tag == "meta":
+            if attrs.get("property") == "og:image" and not self.image:
+                self.image = attrs.get("content")
             if attrs.get("property") in ("article:published_time", "og:article:published_time") or attrs.get("itemprop") == "datePublished":
                 self.dates.append(attrs.get("content"))
             return
@@ -291,6 +294,22 @@ def verify_source(item, anchor, start, end, store=None):
     parser.feed(html)
     blocks, extraction = parser.document()
     verification.update(resolved_url=resolved, extraction_method=extraction, status="unconfirmed")
+    # Do not identify a same-named neighborhood in another metropolitan city.
+    address = (store or {}).get('address') or ''
+    cities = ('서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종')
+    requested_city = next((city for city in cities if address.startswith(city)), None)
+    article_text = ' '.join(blocks) + ' ' + item.get('title', '')
+    if requested_city and requested_city not in article_text and any(city in item.get('title','') for city in cities if city != requested_city):
+        verification.update(status='rejected', reason='OTHER_CITY_SAME_NEIGHBORHOOD')
+        return verification
+    if parser.image:
+        image_url = urljoin(resolved, parser.image)
+        try:
+            validate_url(image_url)
+            if image_url.startswith('https://'):
+                verification['thumbnail_url'] = image_url
+        except search.SearchError:
+            pass
     dates = publication_dates(parser.dates)
     if len(dates) > 1:
         verification["reason"] = "CONFLICTING_ARTICLE_DATES"
