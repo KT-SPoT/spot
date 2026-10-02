@@ -128,7 +128,7 @@ def audience_fit_questions(case, context):
             'mechanisms': mechanisms[:4], 'mechanism_source_ids': detail.get('source_ids', []) if detail.get('status') == 'text_corroborated' else case.get('source_ids', []),
             'mechanism_basis': 'article_keyword_check' if detail.get('status') == 'text_corroborated' else 'search_metadata',
             'rationale': f'{transfer} 가설입니다. {purpose[kind]}을 조사합니다. 성별·연령 구성만으로 선호를 확정하지 않습니다.',
-            'next_check': f'다음 확인: 해당 모집단의 고객 인터뷰에서 {next_check} 확인합니다. 행사별 성별·연령 반응 자료가 확보되면 대조합니다.',
+            'next_check': f'응용 검토 질문: {next_check} 검토합니다. 고객 인터뷰·행사별 반응 자료는 확보 가능할 때 보조 근거로 활용합니다.',
             'fit_status': 'hypothesis_not_proven_preference'})
     return result
 

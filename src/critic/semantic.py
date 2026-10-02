@@ -18,6 +18,9 @@ For EVERY input claim return exactly one object with ONLY claim_id, verdict,
 source_ids, reason, suggested_action. verdict is supported/contradicted/insufficient;
 actions are respectively keep/qualify/manual_check. Cite only sources attached to
 that claim. Supported or contradicted needs at least one source. Explain in Korean.
+Keep each reason to one concise sentence focused on the decisive evidence or limitation.
+source_ids must use exact strings from that claim's allowed_source_ids (or evidence
+source_id if absent). Never add module prefixes, case IDs or a source from another claim.
 Use contradicted ONLY for an explicit conflict with the supplied evidence, such
 as changing planned into operating or relabeling resident population as floating
 population. A wrong population label is a conflict even when the period is unknown.
@@ -55,6 +58,21 @@ Review the sourced experience mechanism and clearly labeled adaptation hypothese
 for this store/product and audience. An exploratory research hypothesis need not
 already prove demand, but never turn it into demonstrated demographic preference,
 positive response, sales impact or a confirmed device capability without evidence.
+Trend acceptance is about documented experience design and reasonable transfer,
+not demonstrated customer response. Do NOT mark a sourced mechanism or a clearly
+labeled, logically connected adaptation hypothesis insufficient ONLY because
+attendance, satisfaction, age/gender response or purchase-intent data is absent.
+Keep the missing response as a limitation, not a rejection or mandatory task.
+For example, a report describing missions plus a hypothesis to compare phone
+functions through missions can be supported as a research reference with no
+attendance data. '40s customers prefer missions' still needs preference evidence.
+An official announcement supports scheduled design, not completed operation.
+News supports reported design within its wording; community posts support only
+that author's reported experience, never representative audience satisfaction.
+Repeated mechanisms across separately sourced cases are signals of recurring
+design, not proof of popularity or effectiveness. Repeated coverage of one event
+does not establish a nationwide trend. Missing mechanism provenance, unjustified
+transfer or unsupported demographic/causal claims still require review.
 """
 
 
@@ -171,6 +189,23 @@ def build_input(bundle, critic, *, quant_evidence=None):
                     'limitation': 'Stored Scout excerpt; full original not supplied.'})
                 if module == 'quant':
                     claim['evidence'][-1]['metric_facts'] = linked_facts
+            # Audience transfer uses attached upstream observations too. Resolve
+            # those refs against actual usable registries, never model knowledge.
+            if module == 'trend':
+                for ref in item.get('context_source_refs', []):
+                    if not isinstance(ref, dict) or ref.get('module') not in ('quant', 'local'):
+                        continue
+                    upstream = ref['module']
+                    upstream_result = bundle['results'].get(upstream, {})
+                    if upstream in excluded or upstream_result.get('status') == 'failed':
+                        continue
+                    source = next((s for s in upstream_result.get('sources', [])
+                                   if s.get('source_id') == ref.get('source_id')), None)
+                    if source and not any(e['source_id'] == source['source_id'] for e in claim['evidence']):
+                        claim['evidence'].append({'source_id': source['source_id'], 'module': upstream,
+                            'kind': 'upstream_context', 'source_name': source.get('source_name'),
+                            'limitation': 'Context provenance only; Quant observations are in quant_facts. Not evidence of event response.'})
+            claim['allowed_source_ids'] = [e['source_id'] for e in claim['evidence']]
             payload['claims'].append(claim)
     payload = _clean(payload)
     if len(json.dumps(payload, ensure_ascii=False, allow_nan=False).encode()) > MAX_INPUT_BYTES:
