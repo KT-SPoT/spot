@@ -155,6 +155,11 @@ const SPOTExperience = (() => {
   }
   function display(brief,request,sourceRow,evidence) {
     const signals=brief.unique_local_signals||[],quant=signals.filter(c=>c.module==='quant'),local=brief.local_changes||[],context=signals.filter(c=>c.module!=='quant'),trend=brief.trend_patterns||[];
+    const quantFailure=(brief.needs_manual_check||[]).find(text=>typeof text==='string'&&text.startsWith('quant: '));
+    if(!quant.length&&quantFailure){
+      $('quant-cards').replaceChildren();
+      make('p',quantFailure.slice(7),'empty',$('quant-cards'));
+    }
     const population=quant.filter(c=>c.population_kind||c.shares||/성별|연령|시간대/.test(c.title||''));
     const highlights=[...population.slice(0,3).map(c=>[c,'quant']),...local.slice(0,1).map(c=>[c,'local']),...trend.filter(c=>c.type==='reference_case').slice(0,1).map(c=>[c,'trend'])];
     if(!highlights.length)highlights.push(...quant.slice(0,2).map(c=>[c,'quant']));

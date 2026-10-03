@@ -18,4 +18,10 @@ const library=get('source-list'),tabs=library.children[0];assert.equal(tabs.chil
 rows=[];tabs.children.find(button=>button.dataset.category==='공공데이터').events.click();assert.deepEqual(rows,[source]);
 context.experience.progress('running',{quant:'success',local:'running'});assert.equal(get('research-steps').children[1].attributes['aria-current'],'step');
 context.experience.display({},null,()=>{},()=>{});assert(get('area-summary').textContent.includes('충분하지'));
+const failure='소상공인365 서버가 일시적으로 응답하지 않습니다(HTTP 503). 잠시 후 새 조사를 시작해주세요.';
+context.experience.display({needs_manual_check:['quant: '+failure]},null,()=>{},()=>{});
+assert.equal(get('quant-cards').children[0].textContent,failure);
+const metric=new Element();metric.textContent='공공 관측 지표';get('quant-cards').replaceChildren();get('quant-cards').append(metric);
+context.experience.display({unique_local_signals:brief.unique_local_signals,needs_manual_check:['quant: 일부 자료 없음']},null,()=>{},()=>{});
+assert.equal(get('quant-cards').children[0],metric); // Existing metric cards must not be replaced.
 console.log('Grounded summary, insight evidence, source filters, progress and empty results passed.');
