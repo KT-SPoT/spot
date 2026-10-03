@@ -6,6 +6,7 @@ from copy import deepcopy
 from src.scouts import search_runtime as search
 from src.scouts.local_evidence import ArticleParser, fetch_article, publication_dates
 from src.scouts.trend_relevance import contains_experience_keyword
+from src.scouts.trend_transfer import audience_lenses, POPULATIONS
 
 MAX_DETAIL_CASES = 5
 MECHANISM_QUESTIONS = {
@@ -121,14 +122,20 @@ def audience_fit_questions(case, context):
         kind = profile.get('population_kind')
         if kind not in purpose or not profile.get('source_ids'):
             continue
+        lenses = audience_lenses(profile, context)
+        context_refs = list({(r['module'], r['source_id']): r for lens in lenses
+                            for r in lens['context_source_refs']}.values())
+        observations = ' '.join(lens['observation'] for lens in lenses)
+        checks = ' '.join(lens['question'] for lens in lenses)
         result.append({'kind': 'research_hypothesis', 'population_kind': kind,
             'observed_profile': {k: deepcopy(profile.get(k)) for k in
                 ('dominant_age', 'dominant_gender', 'age_share_pct', 'gender_share_pct', 'reference_period')},
-            'context_source_refs': [{'module': 'quant', 'source_id': sid} for sid in profile['source_ids']],
+            'context_source_refs': context_refs,
             'mechanisms': mechanisms[:4], 'mechanism_source_ids': detail.get('source_ids', []) if detail.get('status') == 'text_corroborated' else case.get('source_ids', []),
             'mechanism_basis': 'article_keyword_check' if detail.get('status') == 'text_corroborated' else 'search_metadata',
-            'rationale': f'{transfer} 가설입니다. {purpose[kind]}을 조사합니다. 성별·연령 구성만으로 선호를 확정하지 않습니다.',
-            'next_check': f'응용 검토 질문: {next_check} 검토합니다. 고객 인터뷰·행사별 반응 자료는 확보 가능할 때 보조 근거로 활용합니다.',
+            'rationale': f'{transfer} 가설입니다. {purpose[kind]}을 조사합니다. {observations} 성별·연령 구성만으로 선호를 확정하지 않습니다.',
+            'next_check': f'응용 검토 질문: {next_check} 검토합니다. {checks} 고객 인터뷰·행사별 반응 자료는 확보 가능할 때 보조 근거로 활용합니다.',
+            'question_basis': lenses,
             'fit_status': 'hypothesis_not_proven_preference'})
     return result
 
@@ -147,7 +154,32 @@ def enrich_references(output, context, patterns, start, end, *, reader=None):
                 case['limitations'] = ['기사 제목·본문 표현을 대조했습니다. 실제 행사 여부·참여 고객은 확인하지 않았습니다.'] + case.get('limitations', [])[1:]
             log.append({'case_id': case['case_id'], 'status': detail['status'], 'reason': detail.get('reason')})
         case['audience_fit'] = audience_fit_questions(case, context)
-        reference.update(deepcopy({k: case[k] for k in ('case_detail', 'audience_fit', 'limitations') if k in case}))
+        if case['audience_fit']:
+            fits = case['audience_fit']
+            context_refs = case.get('context_source_refs', []) + [r for fit in fits for r in fit['context_source_refs']]
+            case['context_source_refs'] = list({(r['module'], r['source_id']): r for r in context_refs}.values())
+            case['why_relevant'] = case.get('why_relevant', []) + [
+                '선정 후 매장 응용 검토에 연결한 근거: ' + ' '.join(
+                    lens['observation'] for fit in fits for lens in fit['question_basis']),
+                '전국 공통 사례는 참여 방식 때문에 함께 참고할 수 있습니다. 성별·연령별 취향 근거가 없어 업종을 다르게 배정하지 않습니다.'
+            ]
+            product = output['query_context'].get('product', '대상 제품')
+            hypotheses = []
+            for index, mechanism in enumerate(fits[0]['mechanisms'][:3]):
+                if mechanism not in MECHANISM_QUESTIONS:
+                    continue
+                transfer, check = MECHANISM_QUESTIONS[mechanism]
+                # One focused lens per population in the card; the full grounded
+                # comparison questions and provenance remain in audience_fit.
+                preferred = ('age_distribution', 'timing', 'gender_distribution')[index]
+                questions = ' '.join(f"{POPULATIONS[fit['population_kind']]}: " + next(
+                    (lens['question'] for lens in fit['question_basis'] if lens['axis'] == preferred),
+                    fit['question_basis'][-1]['question']) for fit in fits)
+                hypotheses.append({'kind': 'research_question', 'mechanism': mechanism,
+                    'statement': f'{product}: {transfer} 방식에서 {check} 검토합니다. {questions} 실제 지원 기능과 고객 반응은 추가 조사.'})
+            case['adaptation_hypotheses'] = hypotheses
+        reference.update(deepcopy({k: case[k] for k in ('case_detail', 'audience_fit', 'limitations',
+            'context_source_refs', 'why_relevant', 'adaptation_hypotheses') if k in case}))
     output['query_context']['detail_checks'] = log
     if log:
         output['warnings'] = [w for w in output['warnings'] if w != 'SEARCH_METADATA_ONLY_EVENTS_UNVERIFIED']

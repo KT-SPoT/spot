@@ -119,9 +119,11 @@ Local은 [원문 대조·문맥 분류](docs/LOCAL_SOURCE_VERIFICATION.md)를 �
 현재 통합 입력은 조사 중심점이 미확정인 지역명이며, 반경 분석 결과로 사용하지 않습니다.
 
 Trend가 연령·성별 입력을 얼마나 반영하는지 같은 뉴스 자료로 비교한 결과:
-[고객층 비교 검증](docs/TREND_AUDIENCE_VALIDATION.md). 현재는 고객층 표기가
-전달되지만 실제 참고 사례와 매장 응용 문장의 차이는 약합니다. 평가기는
-저장된 자료만 재생하며 새 API 호출 없이 이 한계를 재현합니다.
+[개선 전 고객층 비교](docs/TREND_AUDIENCE_VALIDATION.md),
+[근거 기반 응용 질문 구현·재검증](docs/TREND_AUDIENCE_ADAPTATION.md).
+전체 분포·유동/매출 시간대·모집단·Local 맥락을 응용 질문에 연결합니다.
+성별·연령 이름만으로 업종이나 선호를 배정하지 않습니다. 평가기는 저장된
+자료만 재생하며 새 API 호출 없이 반영 정도를 비교합니다.
 
 ```bash
 python -m src.integration_smoke samples/input/myeongji_international.provisional.json --mode offline --output samples/integration/myeongji-20260930-offline

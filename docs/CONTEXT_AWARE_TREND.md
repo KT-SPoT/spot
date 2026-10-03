@@ -52,6 +52,13 @@ can suggest investigating a feature-comparison journey; food sampling can sugges
 investigating preference comparison or food photography. These are questions,
 not proven device capabilities, event success or a final campaign plan.
 
+Selected cases additionally use available full distributions, population kind,
+peak timing and corroborated Local context for adaptation questions. Original
+article mechanism wording takes precedence over search snippets. Question rules
+and provenance remain in `audience_fit.question_basis`; these do not change the
+discovery score or assert demographic preference. See
+[audience-conditioned adaptation](TREND_AUDIENCE_ADAPTATION.md).
+
 SBIZ365 official observations are the quantitative baseline. The semantic input
 keeps their fact cards but excludes explicitly marked API observations from LLM
 re-approval; inferred preference/intent remains reviewable. Semantic locality

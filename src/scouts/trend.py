@@ -20,7 +20,7 @@ PATTERNS = {
     "collectible_reward": ("참여·수집 보상", ("굿즈", "수집", "한정판", "리워드")),
 }
 OFFLINE_CUES = ("팝업", "체험존", "체험 공간", "체험공간", "오프라인 행사", "전시회", "전시관", "행사장", "체험관", "축제", "페스티벌", "지역 행사", "지역행사")
-AGE_LABELS = {"under_10":"10세 미만", "teens":"10대", "20s":"20대", "30s":"30대", "40s":"40대", "50s":"50대", "60_plus":"60대"}
+AGE_LABELS = {"under_10":"10세 미만", "teens":"10대", "20s":"20대", "30s":"30대", "40s":"40대", "50s":"50대", "60_plus":"60대 이상"}
 MAX_QUERIES = 3
 
 
@@ -90,12 +90,12 @@ def adaptation_hypotheses(tags, product):
 def audience_hypothesis(context):
     labels = []
     for profile in context.get('population_signals', []):
-        cohort = [AGE_LABELS.get(profile.get('dominant_age')),
-                  {'male': '남성', 'female': '여성'}.get(profile.get('dominant_gender'))]
+        cohort = [f"주요 연령 {AGE_LABELS[profile['dominant_age']]}" if profile.get('dominant_age') in AGE_LABELS else None,
+                  f"주요 성별 { {'male': '남성', 'female': '여성'}[profile['dominant_gender']]}" if profile.get('dominant_gender') in ('male', 'female') else None]
         if any(cohort):
             labels.append(profile['population_kind'] + ': ' + '/'.join(c for c in cohort if c))
     return (('Quant가 전달한 인구·매출 구성 (' + '; '.join(labels) + ')을 바탕으로 이 참여 방식에 호응할지 조사. '
-             '인구 구성은 관측값이며 관심·선호는 탐색 가설입니다.') if labels else
+             '연령·성별은 각각의 분포이며 교차 고객층은 미확인. 인구 구성은 관측값이며 관심·선호는 탐색 가설입니다.') if labels else
             '고객층 자료가 없어 특정 성별·연령의 선호를 정하지 않고 참여 방식의 응용 가능성을 조사합니다.')
 
 
