@@ -53,6 +53,7 @@ main{max-width:1660px;padding:30px 30px 40px}.page-heading{margin-bottom:22px}.p
 .key-insight-detail{grid-column:2/-1;font-size:11px;color:#7b8da4;line-height:1.8;font-weight:400;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-align:left}.key-insight{padding:17px 0;row-gap:5px}.overview-reading .card-grid{gap:12px}.overview-reading .signal-card{padding:18px}
 @media(max-width:720px){.key-insight-detail{font-size:10px}.quant-kpi{padding:17px 14px}.quant-kpi-value strong{font-size:25px}.quant-plot,.overview-population .quant-plot{height:180px}.quant-chart{padding:21px 18px}.quant-gender{gap:20px}.quant-donut{width:130px;height:130px}.quant-column-value{font-size:9px}.trend-previews{gap:10px}.preview-cover>strong{word-break:normal;font-size:13px}.preview-cover>span{font-size:7px}.overview-metric strong{font-size:20px}}
 /* Editorial research workspace: paper, ink and one restrained brand accent. */
+.input-help{display:block;margin-top:7px;font-size:10px;line-height:1.7;color:#70786b;font-weight:400}
 body:not(.landing){--chart-primary:#315a50;--chart-secondary:#b69278;background:#f4f3ef;color:#262824}
 body:not(.landing) .sidebar{background:#242923;box-shadow:none}body:not(.landing) .nav-item[aria-current=page]{background:#41483f;box-shadow:none;color:#fff;border-left:3px solid #cf4939;border-radius:0}
 body:not(.landing) .topbar{background:#f4f3ef;border-color:#dcded7}body:not(.landing) .button.dark{background:#b53c2d;box-shadow:none;border-radius:3px}

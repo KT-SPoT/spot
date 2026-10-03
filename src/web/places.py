@@ -43,12 +43,3 @@ async def search(key, query, transport=None):
         result.append({'name':identity[0], 'address':address, 'lat':lat, 'lng':lng,
                        'kind':'store' if item.get('place_name') else 'address'})
     return result
-
-
-async def reverse(key, lat, lng, transport=None):
-    documents = await lookup(key, 'geo/coord2address.json', {'x':lng,'y':lat}, transport)
-    for item in documents:
-        address = item.get('road_address') or item.get('address') or {}
-        if address.get('address_name'):
-            return {'name':'신규 매장 후보지', 'address':address['address_name'], 'lat':lat, 'lng':lng, 'kind':'site'}
-    raise PlaceError('ADDRESS_NOT_FOUND')

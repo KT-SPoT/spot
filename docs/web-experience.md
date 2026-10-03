@@ -1,10 +1,10 @@
-# 지도에서 시작하는 SPoT 리서치
+# 매장 홍보 근거를 찾는 SPoT 리서치
 
 ## 사용 흐름
 
 1. `http://127.0.0.1:8768/`에서 지역 리서치를 시작한다.
-2. 상품·목적을 입력하고 매장명 또는 주소를 검색한다. 검색 결과를 선택하면 주소와 좌표가 함께 입력된다.
-3. 신규 매장은 지도에서 후보지를 클릭한다. 카카오 역지오코딩으로 주소가 확인된 지점을 사용하며, 후보지 이름은 변경할 수 있다.
+2. 홍보할 제품·서비스 또는 제품군을 입력하고, 특히 알아보고 싶은 점은 선택적으로 적는다. 비워두면 기본 홍보 근거 탐색으로 접수하며 API의 기존 purpose 필드는 유지한다.
+3. 매장명 또는 매장 주소를 검색한다. 검색 결과를 선택하면 주소와 좌표가 함께 입력되고 지도는 위치를 보여준다. 후보지 생성·추천·비교는 제공하지 않는다.
 4. Quant·Local 병렬 조사 → Trend → 통합 → Critic → Brief 순서의 실제 작업 상태를 확인한다.
 5. 결과의 AREA SUMMARY, KEY INSIGHTS와 Scout 상세 화면을 읽고, 근거 버튼이나 출처 분류 탭에서 원문을 연다.
 
@@ -43,4 +43,4 @@
 
 ## 검증
 
-Python unittest 전체, `tests/test_web_brief.js`, `tests/test_web_workspace.js`, `tests/test_web_experience.js`와 n8n workflow 테스트를 실행한다. 지도 검색·주소 변환은 mock transport로 인증 경계/입력/오류를 검사하고, 실제 동래점 검색 및 한 차례 실조사로 주소 자동 입력과 Quant 자료 확보를 확인했다.
+Python unittest 전체, `tests/test_web_brief.js`, `tests/test_web_workspace.js`, `tests/test_web_experience.js`와 n8n workflow 테스트를 실행한다. 매장·주소 검색은 mock transport로 인증 경계/입력/오류를 검사하고, 실제 동래점 검색 및 한 차례 실조사로 주소 자동 입력과 Quant 자료 확보를 확인했다. 삭제한 후보지 역지오코딩 경로는 404이며 공급자를 호출하지 않는다.

@@ -117,12 +117,6 @@ def create_app(*, token=None, n8n_base=None, transport=None, place_transport=Non
             return failure('INVALID_PLACE_QUERY',422)
         return await place_request(request, places.search, query=q.strip())
 
-    @app.get('/api/places/reverse')
-    async def place_reverse(request: Request, lat: float, lng: float):
-        if not (32 <= lat <= 39.5 and 124 <= lng <= 132):
-            return failure('INVALID_COORDINATES',422)
-        return await place_request(request, places.reverse, lat=lat, lng=lng)
-
     async def upstream(method, path, **kwargs):
         try:
             response = await client.request(method, path, **kwargs)

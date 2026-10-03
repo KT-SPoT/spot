@@ -9,7 +9,7 @@ const SPOTExperience = (() => {
     if (parent) parent.append(el);
     return el;
   };
-  let map, marker, areaMap, selection = null, revision = 0, searchRevision = 0;
+  let map, marker, areaMap, selection = null, searchRevision = 0;
   const field = name => document.querySelector(`[name=${name}]`);
   const message = text => { $('place-message').textContent = text; };
   const errors = {MAP_NOT_CONFIGURED:'카카오 장소 검색 설정을 확인해주세요.', PLACE_RATE_LIMIT:'검색이 많아요. 잠시 후 다시 시도해주세요.', ADDRESS_NOT_FOUND:'이 지점의 주소를 찾지 못했어요. 인근 도로나 건물을 선택해주세요.', SESSION_EXPIRED:'접속이 만료됐어요. 화면을 새로고침해주세요.'};
@@ -18,11 +18,6 @@ const SPOTExperience = (() => {
     const data = await response.json();
     if (!response.ok) throw new Error(errors[data.error?.code] || '장소를 조회하지 못했어요. 잠시 후 다시 시도해주세요.');
     return data.results;
-  }
-  function clearSelection() {
-    selection = null;
-    for (const name of ['address','lat','lng']) field(name).value = '';
-    $('selected-place').textContent = '검색 결과 또는 지도를 눌러 조사 위치를 선택해주세요.';
   }
   function choose(place) {
     selection = place;
@@ -43,15 +38,6 @@ const SPOTExperience = (() => {
         maxZoom:19,referrerPolicy:'strict-origin-when-cross-origin',
         attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'
       }).on('tileerror',()=>message('지도 배경을 불러오지 못했어요. 장소 검색으로도 위치를 선택할 수 있어요.')).addTo(map);
-      map.on('click',async event => {
-        const version = ++revision; clearSelection();
-        if (marker) { marker.remove(); marker=null; }
-        message('선택한 지점의 주소를 확인하고 있어요…');
-        try {
-          const place = await request(`/api/places/reverse?lat=${event.latlng.lat}&lng=${event.latlng.lng}`);
-          if (version === revision) choose(place);
-        } catch(error) { if(version===revision) message(error.message); }
-      });
     }
     if (map) setTimeout(()=>map.invalidateSize(),50);
   }
@@ -64,11 +50,11 @@ const SPOTExperience = (() => {
     try {
       const results=await request(`/api/places/search?q=${encodeURIComponent(query)}`);
       if(version!==searchRevision)return;
-      message(results.length?`${results.length}개 결과 · 조사할 위치를 선택해주세요.`:'검색 결과가 없어요. 지역·도로명을 바꾸거나 지도를 눌러주세요.');
+      message(results.length?`${results.length}개 결과 · 조사할 매장을 선택해주세요.`:'검색 결과가 없어요. 매장명에 지역명을 붙이거나 매장 주소로 검색해주세요.');
       for(const place of results) {
         const button=make('button',undefined,'place-option',$('place-results'));button.type='button';
         make('strong',place.name,'',button);make('span',place.address,'',button);
-        button.addEventListener('click',()=>{++revision;choose(place);$('place-results').replaceChildren();});
+        button.addEventListener('click',()=>{choose(place);$('place-results').replaceChildren();});
       }
     } catch(error) {if(version===searchRevision)message(error.message);}
   }
@@ -78,7 +64,7 @@ const SPOTExperience = (() => {
   $('research-form').addEventListener('submit',event=>{
     if(!selection || field('address').value!==selection.address || Number(field('lat').value)!==selection.lat || Number(field('lng').value)!==selection.lng){
       event.preventDefault();event.stopImmediatePropagation();
-      $('form-error').hidden=false;$('form-error').textContent='검색 결과나 지도에서 조사할 위치를 먼저 선택해주세요.';
+      $('form-error').hidden=false;$('form-error').textContent='검색 결과에서 조사할 매장 또는 매장 주소를 먼저 선택해주세요.';
     }
   });
   function workspace(active) {

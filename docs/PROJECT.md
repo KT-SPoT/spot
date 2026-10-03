@@ -6,6 +6,14 @@ SPOT is a **지역 맥락 탐색형 AI Research Agent** for the pre-planning sta
 
 Its job is not to generate a finished event plan immediately. It researches the local area, commercial context, recent local changes, and experience trends, then validates the evidence and produces a **Research Brief**.
 
+User decision (2026-10-03): focus on pre-promotion research for a specified store
+and product/service. Remove candidate-site creation and recommendation from the
+web flow; keep one research path. Products identify the research subject and an
+optional question identifies the focus. The planned product-value/customer-signal
+research and question-conditioned discovery are described in
+[promotion research design](PROMOTION_RESEARCH_DESIGN.md); they are not yet
+implemented by changing form labels alone.
+
 User clarification (2026-10-02): SBIZ365 agency API observations, including gender,
 age and peak day/time, are the quantitative baseline and do not require LLM
 re-approval. Preference, attendance and purchase-intent inferences are separate.
