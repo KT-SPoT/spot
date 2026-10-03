@@ -118,6 +118,11 @@ Local은 [원문 대조·문맥 분류](docs/LOCAL_SOURCE_VERIFICATION.md)를 �
 키 설정·조회 범위·실패 정책: [실제 검색 가이드](docs/LIVE_SCOUT_RESEARCH.md).
 현재 통합 입력은 조사 중심점이 미확정인 지역명이며, 반경 분석 결과로 사용하지 않습니다.
 
+Trend가 연령·성별 입력을 얼마나 반영하는지 같은 뉴스 자료로 비교한 결과:
+[고객층 비교 검증](docs/TREND_AUDIENCE_VALIDATION.md). 현재는 고객층 표기가
+전달되지만 실제 참고 사례와 매장 응용 문장의 차이는 약합니다. 평가기는
+저장된 자료만 재생하며 새 API 호출 없이 이 한계를 재현합니다.
+
 ```bash
 python -m src.integration_smoke samples/input/myeongji_international.provisional.json --mode offline --output samples/integration/myeongji-20260930-offline
 ```
