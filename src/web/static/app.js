@@ -1,4 +1,104 @@
 'use strict';
+// Local presentation only: percentages come from evidence cards, never from peak labels.
+const SPOTQuantCharts = (() => {
+  const kinds = {floating_population:'유동인구',resident_population:'주거인구',worker_population:'직장인구',sales:'매출액'};
+  const dimensions = {
+    gender:{title:'성별 구성',keys:['male','female'],labels:['남성','여성']},
+    age:{title:'연령 구성',keys:['under_10','teens','20s','30s','40s','50s','60_plus'],labels:['10세 미만','10대','20대','30대','40대','50대','60대 이상']},
+    day:{title:'요일별 비중',keys:['mon','tue','wed','thu','fri','sat','sun'],labels:['월요일','화요일','수요일','목요일','금요일','토요일','일요일']},
+    time:{title:'시간대별 비중',keys:['05_09','09_12','12_14','14_18','18_23','23_05'],labels:['05~09시','09~12시','12~14시','14~18시','18~23시','23~05시']}
+  };
+  const percent = value => typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=100;
+  const number = value => typeof value==='number'&&Number.isFinite(value);
+  const format = value => value.toLocaleString('ko-KR',{maximumFractionDigits:2});
+  function rows(card,dimension,kind){
+    const def=dimensions[dimension];
+    return def.keys.flatMap((key,i)=>(dimension==='age'&&(
+      (kind!=='resident_population'&&key==='under_10')||(kind==='worker_population'&&key==='teens')))?[]:[{
+      key,label:def.labels[i],value:percent(card?.shares?.[key]?.share_pct)?card.shares[key].share_pct:null,
+      count:number(card?.shares?.[key]?.count)&&card.shares[key].count>=0?card.shares[key].count:null
+    }]);
+  }
+  function chartCard(cards,kind,dimension){
+    return cards.find(c=>c.population_kind===kind&&c.distribution_kind===dimension&&Array.isArray(c.sources)&&c.sources.length)
+      ||(['gender','age'].includes(dimension)?cards.find(c=>c.population_kind===kind&&!c.distribution_kind&&c.shares&&Array.isArray(c.sources)&&c.sources.length):null);
+  }
+  function render(doc,target,cards,evidence){
+    target.replaceChildren();target.className='quant-dashboard';
+    if(!cards.length){
+      const message=doc.createElement('p');message.className='empty';
+      message.textContent='이번 조사에서 상권 자료를 확보하지 못했어요.';target.append(message);return;
+    }
+    const make=(tag,text,cls,parent)=>{const el=doc.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;if(parent)parent.append(el);return el;};
+    const summary=make('div',undefined,'quant-kpis',target);
+    for(const [metric,label,unit] of [['daily_avg_floating_population','일평균 유동인구','명'],['resident_population','주거인구','명'],['worker_population','직장인구','명'],['monthly_avg_sales_10k_krw','업소당 월평균 매출','만원']]){
+      const card=cards.find(c=>c.metric_refs?.includes(metric)&&number(c.value)&&c.value>=0&&c.sources?.length);
+      const kpi=make('article',undefined,'quant-kpi',summary);make('p',label,'',kpi);
+      const line=make('div',undefined,'quant-kpi-value',kpi);make('strong',card?format(card.value):'—','',line);if(card)make('span',unit,'',line);
+      make('small',card?`자료 기준 · ${card.reference_period||'미확인'}`:'자료 미확보','',kpi);
+      if(card){const button=make('button','근거 보기 ↗','text-button',kpi);button.type='button';button.addEventListener('click',()=>evidence(card,'quant'));}
+    }
+    const section=make('section',undefined,'quant-analysis',target);
+    const header=make('div',undefined,'quant-section-head',section);make('div','고객 구성과 방문 맥락','quant-heading',header);make('span','제공 표의 원래 비율 · 0~100% 축','quant-scale',header);
+    const tabs=make('div',undefined,'quant-tabs',section);tabs.setAttribute('aria-label','분석 모집단 선택');
+    const content=make('div',undefined,'quant-tab-content',section);
+    let selected=Object.keys(kinds).find(kind=>Object.keys(dimensions).some(d=>rows(chartCard(cards,kind,d),d,kind).some(r=>r.value!==null)))||'floating_population';
+    function select(kind){
+      selected=kind;for(const button of tabs.children)button.setAttribute('aria-pressed',String(button.dataset.kind===kind));
+      content.replaceChildren();
+      make('p',kind==='sales'?'매출액의 구성비입니다. 방문자 수·매출건수 비율과 구분해 읽어주세요.':'선택 영역의 '+kinds[kind]+' 구성입니다. 성별·연령은 각각의 분포이며 교차 고객 비율이나 행사 선호를 뜻하지 않습니다.','quant-context',content);
+      const grid=make('div',undefined,'quant-chart-grid',content);
+      for(const [dimension,def] of Object.entries(dimensions)){
+        if(['resident_population','worker_population'].includes(kind)&&['day','time'].includes(dimension))continue;
+        const card=chartCard(cards,kind,dimension),data=rows(card,dimension,kind),known=data.filter(r=>r.value!==null);
+        const panel=make('article',undefined,'quant-chart',grid);panel.setAttribute('aria-label',kinds[kind]+' '+def.title);
+        make('p',kinds[kind]+' · '+(kind==='sales'?'매출액 비율':'인구 비율'),'eyebrow',panel);make('h3',def.title,'',panel);
+        if(!known.length){
+          const peakMetric=dimension==='day'?'peak_'+(kind==='sales'?'sales':'floating')+'_day':dimension==='time'?'peak_'+(kind==='sales'?'sales':'floating')+'_time_band':null;
+          const peak=cards.find(c=>peakMetric&&c.metric_refs?.includes(peakMetric)&&c.sources?.length);
+          make('p',peak?`${peak.title}: ${peak.value}`:'제공 비율 미확보','quant-unavailable',panel);
+          make('p','전체 분포를 확인할 비율이 없어 그래프를 표시하지 않습니다.','quant-chart-note',panel);
+          if(peak){const button=make('button','확보한 관측값 근거 ↗','text-button',panel);button.type='button';button.addEventListener('click',()=>evidence(peak,'quant'));}
+          continue;
+        }
+        const max=Math.max(...known.map(r=>r.value)),top=known.filter(r=>r.value===max);
+        make('p',`${known.length===data.length?'가장 높은 비중':'확보 항목 중 가장 높은 비중'} · ${top.map(r=>r.label).join(' · ')} ${format(max)}%`,'quant-chart-lead',panel);
+        const bars=make('div',undefined,'quant-bars',panel);
+        for(const row of data){
+          const line=make('div',undefined,'quant-bar-row'+(row.value===max?' is-top':''),bars);
+          make('span',row.label,'quant-bar-label',line);
+          const track=make('div',undefined,'quant-bar-track',line);track.setAttribute('aria-hidden','true');
+          if(row.value!==null){const fill=make('span',undefined,'quant-bar-fill',track);fill.style.width=row.value+'%';}
+          else track.className+=' is-missing';
+          make('strong',row.value===null?'미확보':format(row.value)+'%','quant-bar-number',line);
+        }
+        make('p',`자료 기준 · ${card.reference_period||'미확인'} / ${card.scope||'지역 범위 미확인'}`,'quant-chart-note',panel);
+        const total=known.reduce((sum,r)=>sum+r.value,0);
+        if(known.length<data.length)make('p','일부 항목이 미확보입니다. 미확보를 0%로 처리하거나 합계를 100%로 환산하지 않습니다.','quant-chart-note',panel);
+        else if(Math.abs(total-100)>1)make('p',`제공 비율 합계 ${format(total)}% · 원문 비율을 그대로 표시합니다.`,'quant-chart-note',panel);
+        const footer=make('div',undefined,'quant-chart-footer',panel);
+        const button=make('button','출처 · 근거 보기 ↗','text-button',footer);button.type='button';button.addEventListener('click',()=>evidence(card,'quant'));
+        const details=make('details',undefined,'quant-data-table',panel);make('summary','수치 표 보기','',details);
+        const table=make('table',undefined,'',details);make('caption',kinds[kind]+' '+def.title+' 원래 관측값','',table);
+        const head=make('thead',undefined,'',table),headrow=make('tr',undefined,'',head);
+        for(const label of ['구분','비율','인구(확보 시)']){const th=make('th',label,'',headrow);th.setAttribute('scope','col');}
+        const body=make('tbody',undefined,'',table);
+        for(const row of data){const tr=make('tr',undefined,'',body);const th=make('th',row.label,'',tr);th.setAttribute('scope','row');make('td',row.value===null?'미확보':format(row.value)+'%','',tr);make('td',row.count===null?'미확보':format(row.count)+'명','',tr);}
+      }
+    }
+    for(const [kind,label] of Object.entries(kinds)){
+      const button=make('button',label,'',tabs);button.type='button';button.dataset.kind=kind;button.addEventListener('click',()=>select(kind));
+    }
+    select(selected);
+    const extra=cards.filter(c=>!c.shares&&c.metric_refs?.length);
+    if(extra.length){const details=make('details',undefined,'quant-other',target);make('summary','전체 상권 관측값 · '+extra.length+'개','',details);
+      for(const card of extra){const row=make('div',undefined,'quant-observation',details);make('span',card.title,'',row);make('strong',number(card.value)?format(card.value)+(card.unit||''):String(card.value??'미확보'),'',row);const button=make('button','근거 ↗','text-button',row);button.type='button';button.addEventListener('click',()=>evidence(card,'quant'));}}
+  }
+  return {render,rows,chartCard};
+})();
+
+
+'use strict';
 // A bounded subset of Markdown rendered only through DOM text nodes.
 function renderBrief(doc, target, markdown) {
   target.replaceChildren();
@@ -56,7 +156,7 @@ function renderBrief(doc, target, markdown) {
     }
   }
 }
-if (typeof module !== 'undefined') module.exports = {renderBrief};
+if (typeof module !== 'undefined') module.exports = {renderBrief, SPOTQuantCharts};
 
 if (typeof document !== 'undefined') {
 const $ = id => document.getElementById(id);
@@ -81,7 +181,7 @@ function evidence(card,module){$('evidence-title').textContent=card.title||card.
 function cards(target,items,module){target.replaceChildren();if(!items.length){empty(target,'이번 조사에서 이 항목에 사용할 수 있는 근거를 확보하지 못했어요.');return;}for(const card of items){const box=node('article',undefined,'signal-card',target);node('p',module.toUpperCase()+' SIGNAL','eyebrow',box);node('h3',card.title||card.event_name||card.name||'조사 신호','',box);if(card.value!==undefined)node('p',`${typeof card.value==='number'?card.value.toLocaleString('ko-KR'):card.value}${card.unit||''}`,'value-line',box);node('p',card.statement||card.evidence||card.observation||card.description||card.summary||'근거와 해석 범위를 함께 확인하세요.','',box);const adaptation=card.adaptation_hypotheses;if(Array.isArray(adaptation)&&adaptation[0])node('p',typeof adaptation[0]==='string'?adaptation[0]:adaptation[0].statement||'','',box);const footer=node('div',undefined,'card-footer',box);node('span',`${(card.sources||[]).length}개 연결 근거`,'',footer);const button=node('button','근거 보기 ↗','evidence-button',footer);button.type='button';button.addEventListener('click',()=>evidence(card,module));}}
 function progress(status,moduleStatus={},stages={}){$('welcome').hidden=true;$('research-workspace').hidden=false;$('overview-content').hidden=status!=='completed';$('progress-title').textContent=status==='completed'?'Research complete':'Researching this SPoT';$('job-state').textContent=({queued:'접수 · 대기',running:'조사 진행 중',completed:'브리프 생성 완료',failed:'실행 실패',connecting:'연결 중'})[status]||'상태 확인 중';$('scout-cards').replaceChildren();for(const [key,info] of Object.entries(modules)){const state=moduleStatus[key];const card=node('article',undefined,'scout-card',$('scout-cards'));node('div',info.icon,'scout-icon',card);node('span',state?({success:'✓ 자료 확보',partial:'일부 자료 확보',failed:'자료 미확보'}[state]||'상태 미확인'):(status==='failed'?'상태 미확인':'완료 결과 대기'),'scout-state '+(state||''),card);node('div',key.toUpperCase()+' SCOUT','scout-label',card);node('h3',info.name,'',card);node('p',info.description,'',card);}$('progress-note').textContent=status==='completed'?'확보한 자료와 조사 가설을 구분해 확인하세요. 일부 자료 미확보가 있어도 브리프는 보존됩니다.':'상권·지역 조사 → 체험 트렌드 탐색 → 연결·차별성 검토 순서로 조사합니다. 항목별 자료와 발견한 신호는 조사가 완료되면 표시합니다.';if(typeof SPOTExperience!=='undefined')SPOTExperience.progress(status,stages);}
 function display(data){cached=data;const result=data.result||{},brief=result.research_brief||{},review=brief.research_review||{};markdown=result.research_brief_markdown||'조사 결과 본문이 없습니다.';progress('completed',result.module_status);$('area-title').textContent=lastRequest?.store?.name||'조사 지역의 근거 요약';$('area-summary').textContent=brief.overview?.area_summary||'지역 요약이 없습니다.';$('customer-signal').textContent=brief.overview?.primary_customer_signal||'인구 신호를 요약할 자료가 미확보됐어요.';$('source-count').textContent=`${brief.source_count||0}개 고유 출처`;$('why-now').textContent=brief.why_here_now||'판단할 근거가 미확보됐어요.';$('quality').textContent=(result.mode==='offline'?'외부 호출 없는 연결 확인 결과 · ':'')+(review.performed?'고객 연결·차별성 검토 포함':'고객 연결·차별성 검토 미완료 / 꺼짐')+` · ${brief.source_count||0}개 출처 연결. 확보한 조사 자료를 보존하며 사실·고객 호응·행사 효과의 최종 인증을 뜻하지 않습니다.`;
-const signals=brief.unique_local_signals||[],quant=signals.filter(card=>card.module==='quant'),local=brief.local_changes||[],context=signals.filter(card=>card.module!=='quant'),trend=brief.trend_patterns||[];cards($('quant-cards'),quant,'quant');cards($('local-cards'),local,'local');cards($('context-cards'),context,'local');cards($('trend-cards'),trend,'trend');$('signal-cards').replaceChildren();const featured=[...quant.slice(0,2).map(card=>[card,'quant']),...local.slice(0,2).map(card=>[card,'local']),...trend.filter(card=>card.type==='reference_case').slice(0,2).map(card=>[card,'trend'])];if(!featured.length)empty($('signal-cards'));for(const [card,module] of featured){const staging=document.createElement('div');cards(staging,[card],module);$('signal-cards').append(...staging.children);}renderBrief(document,$('brief'),markdown);for(const title of $('brief').querySelectorAll('summary'))if(title.textContent.startsWith('Critic:'))title.textContent='고객 연결·차별성 검토';$('download').disabled=false;$('source-list').replaceChildren();const seen=new Set();for(const [items,module] of [[quant,'quant'],[local.concat(context),'local'],[trend,'trend']])for(const card of items){for(const source of card.sources||[]){const id=`${module}:${source.source_id}:${source.source_url}`;if(!seen.has(id)){seen.add(id);sourceRow(source,$('source-list'),module);}}for(const [key,items] of Object.entries(card.context_sources||{}))for(const source of items){const id=`${key}:${source.source_id}:${source.source_url}`;if(!seen.has(id)){seen.add(id);sourceRow(source,$('source-list'),key);}}}if(!seen.size)empty($('source-list'),'이용 가능한 출처가 없습니다.');if(typeof SPOTExperience!=='undefined')SPOTExperience.display(brief,lastRequest,sourceRow,evidence);heading();}
+const signals=brief.unique_local_signals||[],quant=signals.filter(card=>card.module==='quant'),local=brief.local_changes||[],context=signals.filter(card=>card.module!=='quant'),trend=brief.trend_patterns||[];if(typeof SPOTQuantCharts!=='undefined')SPOTQuantCharts.render(document,$('quant-cards'),quant,evidence);else cards($('quant-cards'),quant,'quant');cards($('local-cards'),local,'local');cards($('context-cards'),context,'local');cards($('trend-cards'),trend,'trend');$('signal-cards').replaceChildren();const featured=[...quant.slice(0,2).map(card=>[card,'quant']),...local.slice(0,2).map(card=>[card,'local']),...trend.filter(card=>card.type==='reference_case').slice(0,2).map(card=>[card,'trend'])];if(!featured.length)empty($('signal-cards'));for(const [card,module] of featured){const staging=document.createElement('div');cards(staging,[card],module);$('signal-cards').append(...staging.children);}renderBrief(document,$('brief'),markdown);for(const title of $('brief').querySelectorAll('summary'))if(title.textContent.startsWith('Critic:'))title.textContent='고객 연결·차별성 검토';$('download').disabled=false;$('source-list').replaceChildren();const seen=new Set();for(const [items,module] of [[quant,'quant'],[local.concat(context),'local'],[trend,'trend']])for(const card of items){for(const source of card.sources||[]){const id=`${module}:${source.source_id}:${source.source_url}`;if(!seen.has(id)){seen.add(id);sourceRow(source,$('source-list'),module);}}for(const [key,items] of Object.entries(card.context_sources||{}))for(const source of items){const id=`${key}:${source.source_id}:${source.source_url}`;if(!seen.has(id)){seen.add(id);sourceRow(source,$('source-list'),key);}}}if(!seen.size)empty($('source-list'),'이용 가능한 출처가 없습니다.');if(typeof SPOTExperience!=='undefined')SPOTExperience.display(brief,lastRequest,sourceRow,evidence);heading();}
 function remember(status){const entry=history.find(item=>item.job_id===activeJob);if(entry)entry.status=status;else history.unshift({job_id:activeJob,status,request:lastRequest,created_at:new Date().toISOString()});history=history.slice(0,4);save();}
 function renderHistory(){$('history-list').replaceChildren();if(!history.length){empty($('history-list'),'이 탭에서 접수한 리서치가 아직 없습니다.');return;}for(const item of history){const row=node('article',undefined,'history-row',$('history-list'));const info=node('div',undefined,'',row);node('h3',item.request?.store?.name||'지역 리서치','',info);node('p',`${item.request?.campaign?.product||'접수한 조사'} · ${new Date(item.created_at).toLocaleString('ko-KR')} · ${({queued:'대기',running:'진행',completed:'완료',failed:'실패'})[item.status]||'상태 확인 중'}`,'',info);const button=node('button','열기 ↗','text-button',row);button.addEventListener('click',()=>{clearTimeout(timer);activeJob=item.job_id;lastRequest=item.request;pending=null;polls=0;clearResult();save();show('overview');poll();});}}
 function clearResult(){cached=null;markdown='';$('download').disabled=true;$('overview-content').hidden=true;for(const id of ['quant-cards','local-cards','context-cards','trend-cards','source-list','brief'])empty($(id));$('quality').textContent='완료된 결과에서 자료·검토 상태를 확인할 수 있어요.';}

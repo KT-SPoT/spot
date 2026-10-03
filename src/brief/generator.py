@@ -10,6 +10,7 @@ from src.validation import validate_scout_result
 from src.brief.trend_groups import group_coverage
 from src.brief.quant_policy import quant_basis
 from src.brief.failures import failure_summary
+from src.brief.quant_distributions import distribution_cards, valid_share
 
 
 METRICS = {
@@ -186,19 +187,25 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         if not selected or not quant_sources:
             continue
         shares = {key: deepcopy(value) for key, value in selected.items()
-                  if isinstance(value, dict) and _number(value.get("share_pct"))}
+                  if isinstance(value, dict) and valid_share(value.get("share_pct"))}
         male = shares.get("male", {}).get("share_pct")
         female = shares.get("female", {}).get("share_pct")
-        if male is not None and female is not None:
+        if shares:
+            gender_statement = ', '.join(f'{name} {value:g}%' for name, value in
+                                         (("남성", male), ("여성", female)) if value is not None)
             demographics.append({"module": "quant", "title": f"{label} 성별·연령 구성",
-                                 "statement": f"{label}: 남성 {male:g}%, 여성 {female:g}%",
+                                 "statement": f"{label}: {gender_statement or '성별 비율 미확보; 연령 표 확인'}",
                                  "population_kind": field, "shares": shares,
                                  "reference_period": sections.get("population", {}).get(field, {}).get("demographics", {}).get("reference_period"),
                                  "scope": "선택 영역", "sources": deepcopy(quant_sources)})
 
     local_changes = []
-    for card in facts + demographics:
+    distributions = distribution_cards(sections, quant_sources,
+                                        f"선택 영역 / 요청 반경 {context.get('radius_m', '미확인')}m")
+    for card in facts + demographics + distributions:
         card["evidence_basis"] = quant_basis(card["sources"])
+    if any(card['reference_period'] is None for card in distributions):
+        checks.append("요일·시간대·매출 구성비의 표 기준 시점이 일부 미확보입니다. 다른 표의 최신 월로 대체하지 않습니다.")
     if demographics and any(card["reference_period"] is None for card in demographics):
         checks.append("성별·연령 표의 기준 시점이 미확보입니다. 다른 인구 추이 표의 최신 월이나 분석 생성일을 비율의 기준일로 사용하지 마세요.")
     local_context = []
@@ -395,7 +402,7 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         implications.append({"statement": f"{pattern_names} 자료를 {product} 체험 목적과 대조해 적합성을 검토하세요. 방문 증가나 매출 효과는 이번 근거로 확정할 수 없습니다.",
                              "basis": deepcopy(trend_patterns), "kind": "research_question"})
 
-    cards = facts + demographics + local_context + local_changes + trend_patterns
+    cards = facts + demographics + distributions + local_context + local_changes + trend_patterns
     urls = {source["source_url"] for card in cards for source in card.get("sources", [])}
     urls.update(source["source_url"] for card in cards for entries in card.get("context_sources", {}).values() for source in entries)
     store = request.get("store", {})
@@ -410,7 +417,7 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
     result = {"schema_version": "0.1", "request_id": request_id,
             "status": "manual_review" if cards else "failed",
             "overview": {"area_summary": area_summary, "primary_customer_signal": primary},
-            "local_changes": local_changes, "unique_local_signals": facts + demographics + local_context,
+            "local_changes": local_changes, "unique_local_signals": facts + demographics + distributions + local_context,
             "trend_patterns": trend_patterns,
             "why_here_now": ("위 주소의 상권·인구 자료와 조회 기간의 생활권 변화, 체험 사례를 함께 검토할 수 있습니다. "
                              "지금 실행해야 할 이유나 다른 상권 대비 차별성은 근거의 시점·지역 관련성을 확인하기 전까지 확정하지 않습니다.") if cards else "근거 부족으로 why here / why now를 판단할 수 없습니다.",
