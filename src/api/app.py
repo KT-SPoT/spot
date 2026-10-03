@@ -49,6 +49,8 @@ def research_result(request, *, mode, progress=None):
                any(word in k.upper() for word in ("KEY", "SECRET", "TOKEN", "CLIENT_ID", "PASSWORD"))]
     brief = redact(state["research_brief"], secrets)
     return {"mode": mode, "module_status": run["module_status"], "critic_is_mock": False,
+            "trend_discovery": redact({k: state.get('trend_result', {}).get('query_context', {}).get(k)
+                for k in ('search_plan', 'reference_date', 'lookback_start')}, secrets),
             "critic_result": redact(state["critic_result"], secrets),
             "retry_history": state.get("retry_history", []),
             "research_brief": brief, "research_brief_markdown": redact(render_markdown(brief), secrets)}

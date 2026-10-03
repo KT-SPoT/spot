@@ -219,3 +219,10 @@ not a new required field in SpotRequest, ScoutResult, or ResearchBrief.
 `failed`, `completed`). Consumers must tolerate missing stages/metadata. A completed
 node means execution ended, not that facts or recommendations were certified.
 See [web experience](web-experience.md) for display and compatibility rules.
+# 선택적인 탐색 메타데이터 (2026-10-03, Issue #42)
+
+Trend Scout v0.1의 기존 자유 형식 `query_context`에 `search_plan` 배열을 추가한다.
+각 항목은 `role`(broad/request/timing), `query`, `reason`이다. 기존 필수 필드·상태는 바뀌지 않는다.
+연구 HTTP 완료 결과에는 선택 필드 `trend_discovery`로 `search_plan`, `reference_date`,
+`lookback_start`를 전달한다. 과거/오프라인 결과에서는 없거나 null일 수 있다.
+Research Brief v0.1 필수 스키마에는 추가하지 않는다. 후속 공통 Notion 문서 동기화는 Integrator가 담당한다.

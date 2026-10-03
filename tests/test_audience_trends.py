@@ -27,21 +27,28 @@ def agency(bundle):
 
 
 class AudienceTrendTests(unittest.TestCase):
-    def test_nationwide_cross_industry_queries_do_not_use_site_or_device(self):
+    def test_discovery_combines_broad_input_and_date_without_demographic_stereotypes(self):
         bundle = evidence()
         ctx = build_trend_context(bundle['request'], bundle['results']['quant'])
         queries = build_queries(bundle['request'], ctx)
         self.assertEqual(len(queries), 3)
-        self.assertTrue(all(any(c in q for q in queries) for c in ('게임', '음식', '축제')))
+        self.assertEqual(queries[0], '팝업')
+        self.assertIn('Galaxy Z Fold8', queries[1])
+        self.assertIn('월 축제', queries[2])
         self.assertNotIn('부산', ' '.join(queries))
-        self.assertNotIn('폴드', ' '.join(queries))
-        self.assertNotIn('Galaxy', ' '.join(queries))
         self.assertNotIn('30대', ' '.join(queries))
         self.assertNotIn('40대', ' '.join(queries))
         swapped = copy.deepcopy(ctx)
         for p in swapped['population_signals']:
             p['dominant_gender'] = 'female' if p['dominant_gender'] == 'male' else 'male'
         self.assertEqual(queries, build_queries(bundle['request'], swapped))
+        changed = copy.deepcopy(bundle['request'])
+        changed['campaign'].update(product='홈 인터넷', purpose='가족의 사용 상황')
+        changed['research']['reference_date'] = '2026-11-12'
+        updated = build_queries(changed, ctx)
+        self.assertEqual(updated[0], queries[0])
+        self.assertIn('홈 인터넷 가족의 사용 상황', updated[1])
+        self.assertEqual(updated[2], '2026 11월 축제')
 
     def test_game_food_festival_in_other_regions_survive_with_transfer_questions(self):
         bundle = evidence(); agency(bundle)
