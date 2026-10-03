@@ -36,6 +36,12 @@ class Sbiz365Error(RuntimeError):
     """SBIZ365 수집 과정에서 발생한 오류."""
 
 
+def _request_failure(stage: str, exc: Exception) -> Sbiz365Error:
+    # Provider URLs, response bodies and network exception text may contain keys.
+    detail = f"HTTP {exc.code}" if isinstance(exc, HTTPError) else "네트워크 연결 실패"
+    return Sbiz365Error(f"{stage}: {detail}")
+
+
 def _make_opener():
     return build_opener(HTTPCookieProcessor(CookieJar()))
 
@@ -140,8 +146,8 @@ def collect_sbiz365_reports(
             detail_url,
             common_headers,
         )
-    except (HTTPError, URLError) as exc:
-        raise Sbiz365Error(f"상세분석 페이지 진입 실패: {exc}") from exc
+    except (HTTPError, URLError, TimeoutError) as exc:
+        raise _request_failure("상세분석 페이지 진입 실패", exc) from None
 
     capture_payload = {
         "type": "circleRadius",
@@ -183,15 +189,11 @@ def collect_sbiz365_reports(
         )
         capture_data = json.loads(capture_text)
     except HTTPError as exc:
-        try:
-            body = exc.read().decode("utf-8", errors="replace")
-        except Exception:
-            body = ""
-        raise Sbiz365Error(
-            f"capture.json HTTP {exc.code}: {body[:500]}"
-        ) from exc
-    except (URLError, json.JSONDecodeError) as exc:
-        raise Sbiz365Error(f"capture.json 요청 실패: {exc}") from exc
+        raise _request_failure("capture.json 요청 실패", exc) from None
+    except (URLError, TimeoutError) as exc:
+        raise _request_failure("capture.json 요청 실패", exc) from None
+    except json.JSONDecodeError:
+        raise Sbiz365Error("capture.json 응답 형식 오류") from None
 
     analy_no = capture_data.get("analyNo")
     analy_date = capture_data.get("analyDate")
@@ -238,8 +240,8 @@ def collect_sbiz365_reports(
             sg1_url,
             report_headers,
         )
-    except (HTTPError, URLError) as exc:
-        raise Sbiz365Error(f"sang_gwon1.sg 요청 실패: {exc}") from exc
+    except (HTTPError, URLError, TimeoutError) as exc:
+        raise _request_failure("sang_gwon1.sg 요청 실패", exc) from None
 
     admi_cd = _extract_js_var(sg1_html, "aACd")
     admi_nm = _extract_js_var(sg1_html, "aANm")
@@ -274,18 +276,8 @@ def collect_sbiz365_reports(
                 report_url,
                 report_headers,
             )
-        except HTTPError as exc:
-            try:
-                body = exc.read().decode("utf-8", errors="replace")
-            except Exception:
-                body = ""
-            raise Sbiz365Error(
-                f"{report_name} HTTP {exc.code}: {body[:500]}"
-            ) from exc
-        except URLError as exc:
-            raise Sbiz365Error(
-                f"{report_name} 네트워크 오류: {exc.reason}"
-            ) from exc
+        except (HTTPError, URLError, TimeoutError) as exc:
+            raise _request_failure(f"{report_name} 요청 실패", exc) from None
 
         reports[report_no] = {
             "report": report_name,

@@ -9,6 +9,7 @@ from src.critic.rules import evaluate_rules
 from src.validation import validate_scout_result
 from src.brief.trend_groups import group_coverage
 from src.brief.quant_policy import quant_basis
+from src.brief.failures import failure_summary
 
 
 METRICS = {
@@ -113,7 +114,10 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         if errors:
             checks.append(f"{module}: 공통 계약 오류로 요약에서 제외했습니다: {', '.join(errors)}")
             continue
-        if result["status"] == "failed" or "MOCK_ONLY_NOT_REAL_DATA" in result["warnings"]:
+        if result["status"] == "failed":
+            checks.append(f"{module}: {failure_summary(module, result['errors'])}")
+            continue
+        if "MOCK_ONLY_NOT_REAL_DATA" in result["warnings"]:
             checks.append(f"{module}: 실패 또는 Mock 결과로 근거 요약에서 제외했습니다.")
             continue
         valid[module] = result
