@@ -20,7 +20,22 @@
 - 명륜동처럼 같은 이름이 여러 도시에 있는 경우 검색에 요청 도시를 포함하며, 다른 광역시 제목과 요청 도시 부재가 함께 확인된 원문은 제외한다. 완전한 지리 경계 검증을 대신하지는 않는다.
 - 작업/브라우저 소유권은 여전히 메모리 기반이며 서버 재시작 시 이전 작업 조회는 만료된다.
 
-## 디자인 자산
+## 인사이트 대시보드 — 2026-10-03
+
+- 승인한 시안의 네이비 탐색 메뉴와 블루·틸·앰버·바이올렛 팔레트를 적용했다.
+  결과 개요는 AREA SUMMARY + 요청 위치 지도 → 주요 관측값 → 고객 분포와
+  KEY INSIGHTS → Local·Trend 미리보기 순서로 구성한다.
+- 지도는 요청 좌표와 반경을 표시한다. 소상공인 자료의 집계 영역과 요청
+  원형 반경이 같다고 주장하지 않는다. 좌표가 없으면 주소와 안내만 표시한다.
+- Key Insight와 카드의 근거 버튼은 기존 출처 창으로 연결된다. 모집단 선택은
+  같은 브리프의 제공 비율만 바꾸며 추가 Scout/GPT 호출은 없다.
+- Local·Trend는 확인된 원문 `verification.thumbnail_url`이 있을 때 이미지를
+  표시하고, 없거나 로드가 실패하면 텍스트 또는 체험 패턴 표지로 표시한다.
+  시안의 예시 수치·사진·지도·행사 문구를 실제 조사 결과로 사용하지 않는다.
+- 완료 후 실행 단계의 큰 영역은 숨기고 결과를 먼저 보여준다. 진행 중 상태와
+  Quant 실패 원인·미확보 항목·각 표의 기준 시점·출처 확인은 유지한다.
+
+### 디자인 자산
 
 - 서울 한강 사진: [Inkwon hwang / Unsplash](https://unsplash.com/photos/a-city-skyline-with-a-river-E3vnaw9q3Pg), Unsplash License. 메인 화면의 분위기 사진이며 조사 대상지의 사진으로 사용하지 않는다.
 - 지도: [OpenStreetMap](https://www.openstreetmap.org/copyright), [타일 사용 정책](https://operations.osmfoundation.org/policies/tiles/). 지도 타일에 origin Referer를 전달하고 사전 다운로드하지 않는다.
