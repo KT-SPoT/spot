@@ -26,22 +26,18 @@ class PlaceTests(unittest.TestCase):
             self.assertNotIn('test-private-key',response.text)
             self.assertEqual(response.json()['results'][0]['lat'],35.20)
 
-    def test_reverse_keeps_selected_point_and_does_not_fallback(self):
+    def test_candidate_site_endpoint_is_removed_without_provider_call(self):
         def handler(request):
-            self.assertEqual(request.url.params['x'],'129.08')
-            return httpx.Response(200,json={'documents':[{'address':{'address_name':'부산 동래구 명륜동 386'},'road_address':None}]})
-        with patch.dict(os.environ,{'KAKAO_REST_API_KEY':'test-private-key'}),self.client(handler) as client:
+            self.fail('Removed candidate-site endpoint must not call Kakao')
+        with self.client(handler) as client:
             client.get('/')
-            value=client.get('/api/places/reverse?lat=35.2&lng=129.08').json()['results']
-            self.assertEqual(value['kind'],'site')
-            self.assertEqual(value['lng'],129.08)
-            self.assertEqual(client.get('/api/places/reverse?lat=NaN&lng=129').status_code,422)
+            self.assertEqual(client.get('/api/places/reverse?lat=35.2&lng=129.08').status_code,404)
 
     def test_provider_errors_and_empty_address_are_safe(self):
-        for code,documents,expected in [(401,[],503),(200,[],404)]:
+        for code,documents,expected in [(401,[],503),(200,[],200)]:
             with patch.dict(os.environ,{'KAKAO_REST_API_KEY':'test-private-key'}),self.client(lambda r:httpx.Response(code,json={'documents':documents,'private':'test-private-key'})) as client:
                 client.get('/')
-                response=client.get('/api/places/reverse?lat=35.2&lng=129.08')
+                response=client.get('/api/places/search?q=동래점')
                 self.assertEqual(response.status_code,expected)
                 self.assertNotIn('test-private-key',response.text)
 
