@@ -111,7 +111,7 @@ def build_input(bundle, critic, *, quant_evidence=None):
         # Brief parser verifies archive coordinates, periods and metric anchors.
         brief = generate_brief(bundle, critic, quant_evidence=quant_evidence)
         payload['quant_facts'] = [card for card in brief.get('unique_local_signals', [])
-                                  if card.get('module') == 'quant']
+                                  if card.get('module') == 'quant' and card.get('type') != 'quant_distribution']
     for module in ('quant', 'local', 'trend'):
         result = bundle['results'].get(module, {})
         if module in excluded or result.get('status') == 'failed':

@@ -183,6 +183,21 @@ It should contain:
 - manual-check items
 - source count
 
+### Optional Quant distribution cards
+
+Tracked for Integrator review in [Issue #38](https://github.com/KT-SPoT/spot/issues/38).
+The implementation may add `type=quant_distribution` cards to the existing
+`unique_local_signals` list. Each preserves `module=quant`, `population_kind`
+(`floating_population` or `sales`), `distribution_kind` (`gender`, `age`, `day`,
+`time`), `shares` of recognized keys with numeric `share_pct` (and optional
+observed `count`), nullable table-specific `reference_period`, `scope`, `sources`
+and `evidence_basis`. Sales cards contain amount shares, not transaction shares.
+The data is extracted from the validated same-run Quant archive; no fresh call is
+made to populate a graph. Population demographic cards without this `type` or
+`distribution_kind` remain supported. Required v0.1 fields are unchanged.
+See [Quant charts](QUANT_CHARTS.md). This repository proposal does not assert that
+the common Notion documentation has already been synchronized.
+
 ## Missing values
 
 - unknown value: `null`

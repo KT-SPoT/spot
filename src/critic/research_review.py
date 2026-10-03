@@ -70,7 +70,8 @@ def build_research_input(bundle, critic, *, quant_evidence=None):
     payload = {'request': {k: request.get(k) for k in ('store', 'campaign', 'research')},
                'quant_observations': [], 'local_context': [], 'cases': []}
     for card in brief['unique_local_signals']:
-        if card.get('module') == 'quant':
+        # Display-only distributions must not expand an existing GPT request.
+        if card.get('module') == 'quant' and card.get('type') != 'quant_distribution':
             row = {k: card[k] for k in ('title', 'value', 'unit', 'statement', 'reference_period', 'scope') if k in card}
             if 'shares' in card:
                 row['shares_pct'] = {k: v.get('share_pct') for k, v in card['shares'].items()}

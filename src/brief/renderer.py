@@ -35,15 +35,19 @@ def render_markdown(brief):
     if not any("value" in card for card in brief["unique_local_signals"]):
         lines.append("| 자료 미확보 | — | 확인 필요 | 확인 필요 | — |")
 
-    lines.extend(["", "## 성별·연령 구성", ""])
+    lines.extend(["", "## 성별·연령·요일·시간대 구성", ""])
     demographic_cards = [card for card in brief["unique_local_signals"] if "shares" in card]
     if not demographic_cards:
         lines.append("성별·연령 비율을 확인할 원문 보조자료가 없습니다. 주요 성별·연령이라는 문구로 비율을 추정하지 않습니다.")
     for card in demographic_cards:
         lines.extend(["", f"### {card['title']}", "",
                       f"자료 기준: {_cell(card.get('reference_period'))} / {_cell(card['scope'])} / 근거: {_refs(card)}", "",
-                      "| 구분 | 인구 | 비율 |", "|---|---:|---:|"])
-        labels = {"male": "남성", "female": "여성", **AGE_LABELS}
+                      "| 구분 | 관측 인구(확보 시) | 비율 |", "|---|---:|---:|"])
+        labels = {"male": "남성", "female": "여성", **AGE_LABELS,
+                  "mon": "월요일", "tue": "화요일", "wed": "수요일", "thu": "목요일",
+                  "fri": "금요일", "sat": "토요일", "sun": "일요일",
+                  **{key: key.replace('_', '~')+'시' for key in
+                     ('05_09','09_12','12_14','14_18','18_23','23_05')}}
         for key, label in labels.items():
             entry = card["shares"].get(key)
             if entry:
