@@ -28,6 +28,9 @@ const zero={module:'quant',title:'유동인구',metric_refs:['daily_avg_floating
 const age={module:'quant',title:'연령 구성',population_kind:'floating_population',distribution_kind:'age',shares:{'40s':{share_pct:0}},sources:[source]};
 context.experience.display({unique_local_signals:[zero,age],local_changes:[],trend_patterns:[{type:'reference_case',event_name:'연결 후보',sources:[source]}]},null,()=>{},()=>{});
 const descendants=root=>{const nodes=[root];for(const child of root.children)nodes.push(...descendants(child));return nodes};
+context.experience.display({local_changes:[{module:'local',title:'기사 이미지',sources:[{...source,verification:{thumbnail_url:'https://example.org/article.jpg'}}]}]},null,()=>{},()=>{});
+assert(descendants(get('overview-local')).some(node=>node.src==='https://example.org/article.jpg'));
+context.experience.display({unique_local_signals:[zero,age],local_changes:[],trend_patterns:[{type:'reference_case',event_name:'연결 후보',sources:[source]}]},null,()=>{},()=>{});
 assert(descendants(get('overview-metrics')).some(node=>node.textContent==='0명'));
 assert(descendants(get('overview-population')).some(node=>node.textContent.includes('40대 0%')));
 assert.equal(get('overview-trend').children.length,1);assert.equal(get('overview-local').children[0].textContent,'지역 변화 근거를 확보하지 못했어요.');

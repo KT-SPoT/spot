@@ -30,7 +30,7 @@ const SPOTQuantCharts = (() => {
     if(dimension==='gender'&&known.length===data.length&&Math.abs(known.reduce((s,r)=>s+r.value,0)-100)<0.01){
       const wrap=make('div',undefined,'quant-gender',parent);
       const ring=make('div',undefined,'quant-donut',wrap);ring.setAttribute('role','img');ring.setAttribute('aria-label',data.map(r=>`${r.label} ${format(r.value)}%`).join(', '));
-      ring.style.background=`conic-gradient(#20ad9a 0% ${data[0].value}%, #ec846e ${data[0].value}% 100%)`;
+      ring.style.background=`conic-gradient(var(--chart-primary,#315a50) 0% ${data[0].value}%, var(--chart-secondary,#b69278) ${data[0].value}% 100%)`;
       make('span',kinds[kind],'quant-donut-center',ring);
       const legend=make('div',undefined,'quant-gender-legend',wrap);
       data.forEach((row,i)=>{const item=make('div',undefined,'quant-gender-item tone-'+i,legend);make('span',row.label,'',item);make('strong',format(row.value)+'%','',item);if(row.count!==null)make('small',format(row.count)+'명','',item);});

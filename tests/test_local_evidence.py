@@ -16,6 +16,11 @@ def page(body=SENTENCE, pub="2026-09-20"):
 
 
 class LocalEvidenceTests(unittest.TestCase):
+    def test_article_image_metadata_fallback_and_og_priority(self):
+        parser = evidence.ArticleParser()
+        parser.feed('<meta name="twitter:image" content="/twitter.jpg"><meta name="og:image" content="/article.jpg">')
+        self.assertEqual(parser.image, '/article.jpg')
+
     def test_same_neighborhood_in_other_city_is_rejected(self):
         item = dict(ITEM, title='서울관광재단 명륜동 야간 노선 신설')
         html = page('서울 명륜동 상권과 연결되도록 야간 관광 코스 종착지를 새로 신설할 예정이라고 서울관광재단은 밝혔다.')
