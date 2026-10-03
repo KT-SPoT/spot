@@ -96,8 +96,9 @@ class ArticleParser(HTMLParser):
         skip = tag in ("nav", "aside", "header", "footer", "style", "script", "noscript", "form", "title", "h1", "h2", "h3", "h4", "h5", "h6")
         parent_skip = any(s[2] for s in self.stack)
         if tag == "meta":
-            if attrs.get("property") == "og:image" and not self.image:
-                self.image = attrs.get("content")
+            image_key = (attrs.get("property") or attrs.get("name") or "").lower()
+            if image_key == "og:image" or (image_key in ("twitter:image", "twitter:image:src") and not self.image):
+                self.image = attrs.get("content") or self.image
             if attrs.get("property") in ("article:published_time", "og:article:published_time") or attrs.get("itemprop") == "datePublished":
                 self.dates.append(attrs.get("content"))
             return

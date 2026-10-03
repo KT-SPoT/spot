@@ -19,8 +19,9 @@ function all(){const list=[];const walk=n=>{list.push(n);for(const child of n.ch
 function text(){return all().map(n=>n.textContent).join('\n')}
 assert(text().includes('52.7%'));assert(text().includes('0%'));assert(text().includes('자료 기준 · 미확인'));
 assert(text().includes('14~18시'));assert(!text().includes('70%'));
-assert(all().some(n=>n.className==='quant-bar-fill'&&n.style.width==='52.7%'));
-assert(all().some(n=>n.className==='quant-bar-fill'&&n.style.width==='0%'));
+const donut=all().find(n=>n.className==='quant-donut');
+assert(donut.style.background.includes('52.7%'));assert.equal(donut.attributes['aria-label'],'남성 52.7%, 여성 47.3%');
+assert(all().some(n=>n.className==='quant-column-fill'&&n.style.height==='0%'));
 assert(text().includes('미확보를 0%로 처리'));
 assert.equal(charts.rows(flow,'age','floating_population').length,6);
 assert.equal(charts.rows(flow,'age','worker_population').length,5);
@@ -30,6 +31,14 @@ all().find(n=>n.tag==='button'&&n.dataset.kind==='sales').events.click();
 assert(text().includes('매출액의 구성비'));assert(text().includes('60%'));assert(!text().includes('52.7%'));assert(text().includes('2026년 제공 표'));
 all().find(n=>n.tag==='button'&&n.dataset.kind==='resident_population').events.click();assert(!text().includes('시간대별 비중'));assert(text().includes('제공 비율 미확보'));
 assert.equal(JSON.stringify(input),before);
+// Incomplete and non-100% gender shares must not be converted into a full ring.
+for(const shares of [{male:{share_pct:52.7}},{male:{share_pct:60},female:{share_pct:60}}]){
+  charts.render(doc,root,[{...flow,shares}],()=>{});
+  assert(!all().some(n=>n.className==='quant-donut'));
+  assert(all().some(n=>n.className==='quant-bar-fill'&&n.style.width===String(shares.male.share_pct)+'%'));
+}
+charts.render(doc,root,[{...flow,type:'quant_distribution',distribution_kind:'time',shares:{'05_09':{share_pct:0},'18_23':{share_pct:26.2}}}],()=>{});
+assert(text().includes('26.2%'));assert(text().includes('0%'));assert(all().some(n=>n.className?.includes('quant-time-cell is-missing')));
 for(const invalid of [NaN,Infinity,-1,101,true,'40'])assert.equal(charts.rows({...flow,shares:{male:{share_pct:invalid}}},'gender','floating_population')[0].value,null);
 charts.render(doc,root,[{...flow,sources:[]}],()=>{});assert(!text().includes('52.7%'));
 charts.render(doc,root,[],()=>{});assert(text().includes('확보하지 못'));

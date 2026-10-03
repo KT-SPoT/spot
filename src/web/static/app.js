@@ -23,6 +23,62 @@ const SPOTQuantCharts = (() => {
     return cards.find(c=>c.population_kind===kind&&c.distribution_kind===dimension&&Array.isArray(c.sources)&&c.sources.length)
       ||(['gender','age'].includes(dimension)?cards.find(c=>c.population_kind===kind&&!c.distribution_kind&&c.shares&&Array.isArray(c.sources)&&c.sources.length):null);
   }
+  // All visual geometry uses the returned shares. Missing observations remain missing.
+  function draw(doc,parent,data,dimension,kind){
+    const make=(tag,text,cls,host)=>{const el=doc.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;if(host)host.append(el);return el;};
+    const known=data.filter(r=>r.value!==null),max=Math.max(0,...known.map(r=>r.value));
+    if(dimension==='gender'&&known.length===data.length&&Math.abs(known.reduce((s,r)=>s+r.value,0)-100)<0.01){
+      const wrap=make('div',undefined,'quant-gender',parent);
+      const ring=make('div',undefined,'quant-donut',wrap);ring.setAttribute('role','img');ring.setAttribute('aria-label',data.map(r=>`${r.label} ${format(r.value)}%`).join(', '));
+      ring.style.background=`conic-gradient(var(--chart-primary,#315a50) 0% ${data[0].value}%, var(--chart-secondary,#b69278) ${data[0].value}% 100%)`;
+      make('span',kinds[kind],'quant-donut-center',ring);
+      const legend=make('div',undefined,'quant-gender-legend',wrap);
+      data.forEach((row,i)=>{const item=make('div',undefined,'quant-gender-item tone-'+i,legend);make('span',row.label,'',item);make('strong',format(row.value)+'%','',item);if(row.count!==null)make('small',format(row.count)+'명','',item);});
+      return;
+    }
+    if(dimension==='age'||dimension==='day'){
+      // Labeled scale starts at zero; the upper bound rounds up to the next 10%.
+      const ceiling=Math.max(10,Math.ceil(max/10)*10);
+      const chart=make('div',undefined,'quant-plot '+(dimension==='day'?'is-lollipop':'is-column'),parent);
+      chart.setAttribute('role','img');chart.setAttribute('aria-label',data.map(r=>`${r.label} ${r.value===null?'미확보':format(r.value)+'%'}`).join(', '));
+      const axis=make('div',undefined,'quant-axis',chart);for(const value of [ceiling,ceiling/2,0])make('span',format(value)+'%','',axis);
+      const columns=make('div',undefined,'quant-columns',chart);
+      for(const row of data){
+        const item=make('div',undefined,'quant-column'+(row.value===max?' is-top':'')+(row.value===null?' is-missing':''),columns);
+        const track=make('div',undefined,'quant-column-track',item);track.setAttribute('aria-hidden','true');
+        if(row.value!==null){const fill=make('div',undefined,'quant-column-fill',track);fill.style.height=(row.value/ceiling*100)+'%';make('strong',format(row.value)+'%','quant-column-value',fill);}
+        else make('span','미확보','quant-column-missing',track);
+        make('span',row.label.replace('요일','').replace(' 이상','+'),'quant-column-label',item);
+      }
+      return;
+    }
+    if(dimension==='time'){
+      const band=make('div',undefined,'quant-time-band '+(kind==='sales'?'is-sales':'is-floating'),parent);
+      for(const row of data){const cell=make('div',undefined,'quant-time-cell'+(row.value===max?' is-top':'')+(row.value===null?' is-missing':''),band);
+        if(row.value!==null)cell.style.backgroundColor=kind==='sales'?`rgba(237,170,71,${0.12+row.value/100*0.88})`:`rgba(56,104,245,${0.12+row.value/100*0.88})`;
+        make('strong',row.value===null?'미확보':format(row.value)+'%','',cell);make('span',row.label,'',cell);
+      }
+      return;
+    }
+    // An incomplete or non-100% gender table cannot be represented as a full donut.
+    const bars=make('div',undefined,'quant-bars',parent);
+    for(const row of data){const line=make('div',undefined,'quant-bar-row'+(row.value===max?' is-top':''),bars);make('span',row.label,'quant-bar-label',line);const track=make('div',undefined,'quant-bar-track'+(row.value===null?' is-missing':''),line);track.setAttribute('aria-hidden','true');if(row.value!==null){const fill=make('span',undefined,'quant-bar-fill',track);fill.style.width=row.value+'%';}make('strong',row.value===null?'미확보':format(row.value)+'%','quant-bar-number',line);}
+  }
+  function preview(doc,target,cards,evidence){
+    target.replaceChildren();
+    const make=(tag,text,cls,parent)=>{const el=doc.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;if(parent)parent.append(el);return el;};
+    const head=make('div',undefined,'overview-panel-head',target);make('h3','누가 이 지역을 찾을까요?','',head);
+    const tabs=make('div',undefined,'quant-tabs compact',head),content=make('div',undefined,'overview-age-content',target);
+    function select(kind){for(const button of tabs.children)button.setAttribute('aria-pressed',String(button.dataset.kind===kind));content.replaceChildren();const card=chartCard(cards,kind,'age'),data=rows(card,'age',kind),known=data.filter(r=>r.value!==null);
+      if(!known.length){make('p','이 모집단의 연령 비율은 미확보됐어요.','empty',content);return;}
+      const max=Math.max(...known.map(r=>r.value)),top=known.filter(r=>r.value===max).map(r=>r.label).join(' · ');
+      make('p',`${kinds[kind]} · ${known.length<data.length?'확보 항목 중 ':''}${top} ${format(max)}%`,'quant-chart-lead',content);draw(doc,content,data,'age',kind);
+      make('p','자료 기준 · '+(card.reference_period||'미확인'),'quant-chart-note',content);
+      const button=make('button','분포의 출처 보기 ↗','text-button',content);button.type='button';button.addEventListener('click',()=>evidence(card,'quant'));
+    }
+    for(const kind of ['floating_population','resident_population','worker_population']){const button=make('button',kinds[kind].replace('인구',''),' ',tabs);button.type='button';button.dataset.kind=kind;button.addEventListener('click',()=>select(kind));}
+    select(['floating_population','resident_population','worker_population'].find(k=>rows(chartCard(cards,k,'age'),'age',k).some(r=>r.value!==null))||'floating_population');
+  }
   function render(doc,target,cards,evidence){
     target.replaceChildren();target.className='quant-dashboard';
     if(!cards.length){
@@ -39,7 +95,7 @@ const SPOTQuantCharts = (() => {
       if(card){const button=make('button','근거 보기 ↗','text-button',kpi);button.type='button';button.addEventListener('click',()=>evidence(card,'quant'));}
     }
     const section=make('section',undefined,'quant-analysis',target);
-    const header=make('div',undefined,'quant-section-head',section);make('div','고객 구성과 방문 맥락','quant-heading',header);make('span','제공 표의 원래 비율 · 0~100% 축','quant-scale',header);
+    const header=make('div',undefined,'quant-section-head',section);make('div','고객 구성과 방문 맥락','quant-heading',header);make('span','소상공인365 · 공공 관측값','quant-scale',header);
     const tabs=make('div',undefined,'quant-tabs',section);tabs.setAttribute('aria-label','분석 모집단 선택');
     const content=make('div',undefined,'quant-tab-content',section);
     let selected=Object.keys(kinds).find(kind=>Object.keys(dimensions).some(d=>rows(chartCard(cards,kind,d),d,kind).some(r=>r.value!==null)))||'floating_population';
@@ -48,10 +104,11 @@ const SPOTQuantCharts = (() => {
       content.replaceChildren();
       make('p',kind==='sales'?'매출액의 구성비입니다. 방문자 수·매출건수 비율과 구분해 읽어주세요.':'선택 영역의 '+kinds[kind]+' 구성입니다. 성별·연령은 각각의 분포이며 교차 고객 비율이나 행사 선호를 뜻하지 않습니다.','quant-context',content);
       const grid=make('div',undefined,'quant-chart-grid',content);
-      for(const [dimension,def] of Object.entries(dimensions)){
+      for(const dimension of ['age','gender','time','day']){
+        const def=dimensions[dimension];
         if(['resident_population','worker_population'].includes(kind)&&['day','time'].includes(dimension))continue;
         const card=chartCard(cards,kind,dimension),data=rows(card,dimension,kind),known=data.filter(r=>r.value!==null);
-        const panel=make('article',undefined,'quant-chart',grid);panel.setAttribute('aria-label',kinds[kind]+' '+def.title);
+        const panel=make('article',undefined,'quant-chart dimension-'+dimension,grid);panel.setAttribute('aria-label',kinds[kind]+' '+def.title);
         make('p',kinds[kind]+' · '+(kind==='sales'?'매출액 비율':'인구 비율'),'eyebrow',panel);make('h3',def.title,'',panel);
         if(!known.length){
           const peakMetric=dimension==='day'?'peak_'+(kind==='sales'?'sales':'floating')+'_day':dimension==='time'?'peak_'+(kind==='sales'?'sales':'floating')+'_time_band':null;
@@ -63,14 +120,14 @@ const SPOTQuantCharts = (() => {
         }
         const max=Math.max(...known.map(r=>r.value)),top=known.filter(r=>r.value===max);
         make('p',`${known.length===data.length?'가장 높은 비중':'확보 항목 중 가장 높은 비중'} · ${top.map(r=>r.label).join(' · ')} ${format(max)}%`,'quant-chart-lead',panel);
-        const bars=make('div',undefined,'quant-bars',panel);
-        for(const row of data){
-          const line=make('div',undefined,'quant-bar-row'+(row.value===max?' is-top':''),bars);
-          make('span',row.label,'quant-bar-label',line);
-          const track=make('div',undefined,'quant-bar-track',line);track.setAttribute('aria-hidden','true');
-          if(row.value!==null){const fill=make('span',undefined,'quant-bar-fill',track);fill.style.width=row.value+'%';}
-          else track.className+=' is-missing';
-          make('strong',row.value===null?'미확보':format(row.value)+'%','quant-bar-number',line);
+        draw(doc,panel,data,dimension,kind);
+        if(dimension==='time'){
+          const otherKind=kind==='sales'?'floating_population':'sales',other=chartCard(cards,otherKind,'time'),otherData=rows(other,'time',otherKind);
+          if(other&&otherData.some(r=>r.value!==null)){
+            make('p',kinds[otherKind]+' · 별도 제공 표의 비중','quant-comparison-label',panel);draw(doc,panel,otherData,dimension,otherKind);
+            make('p',`${kinds[otherKind]} 자료 기준 · ${other.reference_period||'미확인'} / ${other.scope||'지역 범위 미확인'} · 서로 다른 모집단의 분포입니다.`,'quant-chart-note',panel);
+            const otherButton=make('button',kinds[otherKind]+' 출처 보기 ↗','text-button',panel);otherButton.type='button';otherButton.addEventListener('click',()=>evidence(other,'quant'));
+          }
         }
         make('p',`자료 기준 · ${card.reference_period||'미확인'} / ${card.scope||'지역 범위 미확인'}`,'quant-chart-note',panel);
         const total=known.reduce((sum,r)=>sum+r.value,0);
@@ -94,7 +151,7 @@ const SPOTQuantCharts = (() => {
     if(extra.length){const details=make('details',undefined,'quant-other',target);make('summary','전체 상권 관측값 · '+extra.length+'개','',details);
       for(const card of extra){const row=make('div',undefined,'quant-observation',details);make('span',card.title,'',row);make('strong',number(card.value)?format(card.value)+(card.unit||''):String(card.value??'미확보'),'',row);const button=make('button','근거 ↗','text-button',row);button.type='button';button.addEventListener('click',()=>evidence(card,'quant'));}}
   }
-  return {render,rows,chartCard};
+  return {render,rows,chartCard,draw,preview};
 })();
 
 
