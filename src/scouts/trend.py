@@ -19,7 +19,7 @@ PATTERNS = {
     "food_discovery": ("시식·취향 탐색", ("시식", "테이스팅", "맛보기")),
     "collectible_reward": ("참여·수집 보상", ("굿즈", "수집", "한정판", "리워드")),
 }
-OFFLINE_CUES = ("팝업", "체험존", "체험 공간", "체험공간", "오프라인 행사", "전시회", "전시관", "행사장", "체험관", "축제", "페스티벌", "지역 행사", "지역행사")
+OFFLINE_CUES = ("팝업", "체험존", "체험 공간", "체험공간", "오프라인 행사", "전시", "공연", "박람회", "페어", "마라톤", "문화제", "행사장", "체험관", "축제", "페스티벌", "지역 행사", "지역행사")
 AGE_LABELS = {"under_10":"10세 미만", "teens":"10대", "20s":"20대", "30s":"30대", "40s":"40대", "50s":"50대", "60_plus":"60대 이상"}
 MAX_QUERIES = 3
 
@@ -31,10 +31,26 @@ def product_alias(product):
     return alias
 
 
+def discovery_plan(request, context):
+    """Three auditable searches, no inferred age/gender interests or device specs."""
+    campaign = request.get('campaign') or {}
+    clean = lambda value: ' '.join(re.findall(r'[가-힣A-Za-z0-9]+', str(value or '')))
+    product = clean(campaign.get('product'))[:60]
+    purpose = clean(campaign.get('purpose'))
+    defaults = ('제품 지역 맥락을 연결한 홍보 근거 탐색', '신제품 체험 행사 사전 리서치')
+    # A verbatim user question is a search focus, never an observed customer fact.
+    focus = '' if purpose in defaults else ' '.join(purpose.split()[:4])[:40]
+    _, end, _ = search.window(request)
+    targeted = ' '.join(part for part in (product, focus, '행사') if part)[:110]
+    return [
+        {'role':'broad', 'query':'팝업', 'reason':'업종을 미리 지정하지 않고 전국 행사 참고 사례 탐색'},
+        {'role':'request', 'query':targeted, 'reason':'입력한 제품·서비스와 조사 질문의 표현을 검색에 반영; 관심·선호를 추정한 검색어가 아님'},
+        {'role':'timing', 'query':f'{end.year} {end.month}월 축제', 'reason':'요청 자료 기준월의 전국 일정·행사 보도 탐색; 실제 행사 일정은 원문에서 확인'},
+    ]
+
+
 def build_queries(request, context):
-    # Demographics guide selection/interpretation, not mandatory search terms.
-    queries = ['게임 팝업 체험', '음식 팝업 체험', '지역 축제 체험']
-    return list(dict.fromkeys(queries))[:MAX_QUERIES]
+    return list(dict.fromkeys(row['query'] for row in discovery_plan(request, context)))[:MAX_QUERIES]
 
 
 def event_category(title):
@@ -138,7 +154,7 @@ def build_patterns(cases):
         examples=[i for i in cases if i.get('evidence_role') != 'audience_context' and key in i['taxonomy_tags']]
         if len(examples)>=2:
             patterns.append({'pattern_id':key,'name':name,
-                'description':'검색 메타데이터에서 관련 표현이 반복됨. 실제 경험 구조·독립 행사 여부·적합성은 확인 필요.',
+                'description':'검색 후보에서 반복된 참여 방식 표현을 분류했습니다. 시장 추세·인기도·독립 행사 수의 근거가 아닙니다.',
                 'evidence_basis':'search_metadata','verification_status':'candidate','evidence_count':len(examples),
                 'example_case_ids':[i['case_id'] for i in examples],
                 'example_source_ids':[sid for i in examples for sid in i['source_ids']]})
@@ -161,7 +177,7 @@ def run_trend_scout(request, *, context=None, detail_reader=None):
     queries=build_queries(request,context)
     output['reference_library']=library_references(request,start,end)
     output['query_context'].update(reference_date=end.isoformat(),lookback_start=start.isoformat(),lookback_days=days,
-        product=product,search_queries=queries,max_queries_per_provider=MAX_QUERIES,
+        product=product,search_queries=queries,search_plan=discovery_plan(request,context),max_queries_per_provider=MAX_QUERIES,
         scope='전국·다업종 오프라인 체험; 고객층 맥락과 매장 응용 가능성 탐색',
         upstream_context=context, relevance_mode='nationwide_experience_transfer_with_audience_context')
     output['warnings']=['SEARCH_METADATA_ONLY_EVENTS_UNVERIFIED','YOUTUBE_CONTENT_NOT_WATCHED',

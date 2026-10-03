@@ -1,0 +1,49 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    environment:
+      SPOT_SERVICE: api
+    secrets:
+      - source: api_env
+        target: service_env
+    expose: ["8765"]
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    environment:
+      SPOT_SERVICE: web
+      SPOT_WEB_PUBLIC_ORIGIN: https://${SPOT_WEB_DOMAIN:?Set SPOT_WEB_DOMAIN}
+    secrets:
+      - source: web_env
+        target: service_env
+    expose: ["8768"]
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      SPOT_WEB_DOMAIN: ${SPOT_WEB_DOMAIN:?Set SPOT_WEB_DOMAIN}
+      SPOT_API_DOMAIN: ${SPOT_API_DOMAIN:?Set SPOT_API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    secrets:
+      - source: web_login
+        target: web_login
+    depends_on: [api, web]
+secrets:
+  api_env:
+    file: ./secrets/api.env
+  web_env:
+    file: ./secrets/web.env
+  web_login:
+    file: ./secrets/web-login.caddy
+volumes:
+  caddy_data:
+  caddy_config:
