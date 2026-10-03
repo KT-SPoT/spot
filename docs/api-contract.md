@@ -121,6 +121,14 @@ May add:
   observed profile, Quant context source refs, Trend mechanism source IDs,
   mechanism basis, rationale and next check. `fit_status=hypothesis_not_proven_preference`
   explicitly separates cohort composition from appeal. See `TREND_EVIDENCE_FIT.md`.
+- [Issue #34](https://github.com/KT-SPoT/spot/issues/34): `audience_fit` may add
+  `question_basis` entries (`axis`, `rule`, `observation`, `question`,
+  `context_source_refs`). These describe evidence-conditioned comparison design
+  for complete distributions, population kind, peak timing and corroborated Local
+  context. They do not assert age/gender preference, joint cohorts or efficacy.
+  `why_relevant` distinguishes discovery selection from subsequent adaptation
+  reasoning; adaptation hypotheses use article mechanisms when available.
+  No required v0.1 field or status changes. See `TREND_AUDIENCE_ADAPTATION.md`.
 
 ## ResearchBundle v0.1
 

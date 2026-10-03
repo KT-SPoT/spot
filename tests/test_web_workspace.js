@@ -21,8 +21,9 @@ async function scenario(status){
   const document={getElementById:get,createElement:tag=>new Element(tag),createTextNode:text=>({tag:'#text',textContent:text}),querySelector:()=>date,querySelectorAll:selector=>selector==='.view'?views:selector==='[data-new]'?[newButton]:nav};
   const storage=new Map([['spot-work',JSON.stringify({activeJob:'a'.repeat(32),pending:null,lastRequest:{store:{name:'범용 테스트 매장',address:'서울의 테스트 주소'},campaign:{product:'테스트 제품'}}})]]);
   const source={source_id:'S-Q-1',source_name:'Official <img>',source_url:'https://example.org/data'};
+  const trendCard={type:'reference_case',event_name:'합성 축제 미션',observation:'미션 체험',sources:[source],why_relevant:['전체 분포를 읽은 응용 검토'],adaptation_hypotheses:[{statement:'같은 방문 흐름에서 기능 차이를 비교할 수 있을까?'}],audience_fit:[{population_kind:'floating_population',rationale:'유동·매출 최다 시간대는 각각의 관측입니다.',next_check:'도입 체험과 제품 가치 비교를 다른 상황에서 검토할 수 있을까? <script>'}]};
   const calls=[];
-  const context={document,URL,Blob,console,FormData:class{},AbortSignal,crypto:require('node:crypto').webcrypto,setTimeout:()=>1,clearTimeout:()=>{},sessionStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},fetch:async(path,options)=>{calls.push([path,options]);return {ok:true,json:async()=>path==='/api/config'?{reference_date:'2026-10-02'}:{job_id:'a'.repeat(32),status,result:{module_status:{quant:'success',local:'partial',trend:'partial'},research_brief_markdown:'## 상권·인구\n| 지표 | 값 |\n|---|---|\n| 합성 | 0 |',research_brief:{source_count:1,overview:{area_summary:'합성 검증 데이터',primary_customer_signal:'관측 구성'},unique_local_signals:[{module:'quant',title:'합성 관측값',statement:'테스트',value:0,sources:[source]}],local_changes:[],trend_patterns:[],research_review:{performed:true},why_here_now:'합성 판단'}}}};}};
+  const context={document,URL,Blob,console,FormData:class{},AbortSignal,crypto:require('node:crypto').webcrypto,setTimeout:()=>1,clearTimeout:()=>{},sessionStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},fetch:async(path,options)=>{calls.push([path,options]);return {ok:true,json:async()=>path==='/api/config'?{reference_date:'2026-10-02'}:{job_id:'a'.repeat(32),status,result:{module_status:{quant:'success',local:'partial',trend:'partial'},research_brief_markdown:'## 상권·인구\n| 지표 | 값 |\n|---|---|\n| 합성 | 0 |',research_brief:{source_count:1,overview:{area_summary:'합성 검증 데이터',primary_customer_signal:'관측 구성'},unique_local_signals:[{module:'quant',title:'합성 관측값',statement:'테스트',value:0,sources:[source]}],local_changes:[],trend_patterns:[trendCard],research_review:{performed:true},why_here_now:'합성 판단'}}}};}};
   vm.runInNewContext(fs.readFileSync('src/web/static/app.js','utf8'),context);
   for(let i=0;i<5;i++)await new Promise(resolve=>setImmediate(resolve));
   assert.equal(calls.length,2);assert(calls.every(([,options])=>!options?.method));
@@ -35,6 +36,11 @@ async function scenario(status){
     const card=get('quant-cards').children[0];assert(card.children.some(e=>e.className==='value-line'&&e.textContent==='0'));
     card.children.at(-1).children.at(-1).events.click();assert.equal(get('evidence-dialog').open,true);
     const links=get('evidence-sources').querySelectorAll('a');assert.equal(links[0].href,'https://example.org/data');assert.equal(links[0].textContent,'Official <img>');
+    const trend=get('trend-cards').children[0];assert(trend.children.some(e=>e.textContent===trendCard.adaptation_hypotheses[0].statement));
+    trend.children.at(-1).children.at(-1).events.click();
+    const fit=get('evidence-meta').querySelectorAll('details')[0];
+    assert.equal(fit.children[0].textContent,'유동인구 · 매장 응용 검토');
+    assert.equal(fit.children[2].textContent,trendCard.audience_fit[0].next_check);
     nav.find(e=>e.dataset.view==='sources').events.click();assert.equal(get('view-overview').hidden,true);assert.equal(get('view-sources').hidden,false);
     nav.find(e=>e.dataset.view==='history').events.click();assert.equal(get('history-list').children.length,1);
     assert.equal(JSON.parse(storage.get('spot-work')).history[0].status,'completed');

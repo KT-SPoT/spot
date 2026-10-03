@@ -82,9 +82,17 @@ def build_research_input(bundle, critic, *, quant_evidence=None):
     for card in brief['trend_patterns']:
         if card.get('type') != 'reference_case' or len(payload['cases']) >= 5:
             continue
-        payload['cases'].append({k: card[k] for k in
+        case = {k: card[k] for k in
             ('case_id', 'event_name', 'observation', 'taxonomy_tags', 'scope', 'audience_hypothesis',
-             'adaptation_hypotheses', 'audience_fit', 'limitations') if k in card})
+             'adaptation_hypotheses', 'audience_fit', 'limitations') if k in card}
+        # Full diagnostic lenses remain in the Brief. Quant/Local observations
+        # already appear above; do not send them three times per reference case.
+        for fit in case.get('audience_fit', []):
+            for lens in fit.pop('question_basis', []):
+                fit['rationale'] = fit['rationale'].replace(lens['observation'], '')
+            fit['next_check'] = fit['next_check'].replace(
+                ' 고객 인터뷰·행사별 반응 자료는 확보 가능할 때 보조 근거로 활용합니다.', '')
+        payload['cases'].append(case)
     payload = _clean(payload)
     if len(json.dumps(payload, ensure_ascii=False, allow_nan=False).encode()) > MAX_RESEARCH_INPUT_BYTES:
         raise SemanticError('INPUT_LIMIT_EXCEEDED')

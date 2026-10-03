@@ -33,7 +33,9 @@ def profile(context, age, gender, *, kind='floating_population'):
         'age_share_pct':None, 'gender_share_pct':None, 'reference_period':None,
         'source_ids':['EVAL-QUANT-PROFILE'], 'evidence_basis':'synthetic_evaluation_input',
     }]
-    result.setdefault('sources',{})['quant'] = [{'source_id':'EVAL-QUANT-PROFILE',
+    original = [s for s in result.setdefault('sources',{}).get('quant', [])
+                if s.get('source_id') != 'EVAL-QUANT-PROFILE']
+    result['sources']['quant'] = original + [{'source_id':'EVAL-QUANT-PROFILE',
         'source_name':'합성 고객층 비교 입력 (공공 관측값 아님)', 'source_type':'synthetic'}]
     result.setdefault('limitations',[]).append('고객층만 바꾼 합성 비교 입력입니다. 실제 점포의 관측값으로 사용하지 않습니다.')
     return result
@@ -82,6 +84,12 @@ def projection(result):
     def url(case):
         return sources[case['source_ids'][0]]
     references=result['reference_cases']
+    def reasoning(fit):
+        rationale = fit['rationale']
+        for lens in fit.get('question_basis', []):
+            rationale = rationale.replace(lens['observation'], '')
+        return {'population_kind': fit['population_kind'], 'rationale': rationale,
+                'next_check': fit['next_check']}
     # Strip profiles/boilerplate before comparing substance. Changing an age label
     # alone must not be counted as a different adaptation or validation question.
     return {
@@ -90,9 +98,7 @@ def projection(result):
         'scores':{url(c):c['reference_priority_score'] for c in result['insights']},
         'audience_labels':{url(c):c.get('audience_hypothesis') for c in references},
         'adaptations':{url(c):c.get('adaptation_hypotheses',[]) for c in references},
-        'fit_questions':{url(c):[{'population_kind':f['population_kind'],
-                                 'rationale':f['rationale'],'next_check':f['next_check']}
-                                for f in c.get('audience_fit',[])] for c in references},
+        'fit_questions':{url(c):[reasoning(f) for f in c.get('audience_fit',[])] for c in references},
         'profile_echoes':{url(c):[f.get('observed_profile') for f in c.get('audience_fit',[])] for c in references},
     }
 
@@ -163,6 +169,50 @@ def evaluate(request,context,cache,details=None):
     return summary,outputs
 
 
+def evaluate_context_contrasts(request, context, cache, details=None):
+    """Isolate richer evidence axes; all interventions are explicitly synthetic."""
+    base = profile(context, '40s', 'male')
+    base['population_signals'][0]['shares'] = {
+        '40s': {'share_pct': 30}, '20s': {'share_pct': 25},
+        '60_plus': {'share_pct': 25}, '30s': {'share_pct': 20},
+        'male': {'share_pct': 55}, 'female': {'share_pct': 45}}
+    base['population_signals'][0].update(age_share_pct=30, gender_share_pct=55)
+    base['timing_signals'] = []
+    base['local_signals'] = []
+    contrasts = []
+    pairs = {}
+    age = deepcopy(base)
+    age['population_signals'][0]['shares'].update({key: {'share_pct': value} for key, value in
+        [('40s', 60), ('20s', 15), ('60_plus', 15), ('30s', 10)]})
+    age['population_signals'][0]['age_share_pct'] = 60
+    pairs['age_distribution'] = (base, age)
+    gender = deepcopy(base)
+    gender['population_signals'][0]['shares'].update(male={'share_pct': 75}, female={'share_pct': 25})
+    gender['population_signals'][0]['gender_share_pct'] = 75
+    pairs['gender_distribution'] = (base, gender)
+    timing = deepcopy(base)
+    timing['population_signals'].append({**deepcopy(timing['population_signals'][0]), 'population_kind': 'sales'})
+    timing['timing_signals'] = [{'population_kind': kind, 'peak_day': 'sat', 'peak_time_band': '14_18',
+                                 'source_ids': ['EVAL-QUANT-PROFILE']} for kind in ('floating_population', 'sales')]
+    different = deepcopy(timing)
+    different['timing_signals'][1]['peak_time_band'] = '18_23'
+    pairs['flow_sales_timing'] = (timing, different)
+    resident = deepcopy(base)
+    resident['population_signals'][0]['population_kind'] = 'resident_population'
+    pairs['population_kind'] = (base, resident)
+    local = deepcopy(resident)
+    local['sources']['local'] = [{'source_id': 'EVAL-LOCAL', 'source_type': 'synthetic', 'source_name': '합성 주거 변화 맥락'}]
+    local['local_signals'] = [{'title': '새 아파트 입주 예정', 'evidence': '주거 변화 조사 맥락',
+        'source_ids': ['EVAL-LOCAL'], 'verification_status': 'context_corroborated',
+        'evidence_role': 'surrounding_context', 'change_state': 'scheduled'}]
+    pairs['local_context'] = (resident, local)
+    for axis, (left, right) in pairs.items():
+        a, _ = replay(request, left, cache, details)
+        b, _ = replay(request, right, cache, details)
+        contrasts.append({'axis': axis, 'input_kind': 'synthetic_evidence_axis_intervention', **compare(a, b)})
+    return contrasts
+
+
 def render_report(summary):
     lines=['# Trend 고객층 비교 검증','',
            '동일한 저장 뉴스 자료에 합성 고객층만 바꿔 비교했습니다. 실제 상권의 성별·연령 관측을 수정한 결과가 아닙니다.',
@@ -183,6 +233,12 @@ def render_report(summary):
                   '사례가 겹친다는 사실만으로 실패로 판정하지 않습니다. 전국 공통 사례도 고객층별 검토 대상이 될 수 있습니다.',
                   '성별·연령 표기만 바뀐 경우는 응용 내용 변화로 세지 않습니다. 기사에 고객층 단어가 없으면 점수도 같을 수 있습니다.',
                   '이 검증은 고객층 입력의 반영 정도를 확인하며 실제 선호·호응·매출 효과를 검증하지 않습니다.'])
+    if summary.get('context_contrasts'):
+        lines.extend(['', '## 분포·시간대·모집단·지역 맥락 대조', '',
+                      '추가 합성 입력에서 축 하나씩 바꿉니다. 성별·연령 이름의 차이가 아니라 질문 내용의 차이를 셉니다.',
+                      '| 변경 축 | 공통 사례 | 응용 문장 변경 | 조사 질문 변경 |', '|---|---:|---:|---:|'])
+        for row in summary['context_contrasts']:
+            lines.append(f"| {row['axis']} | {row['common_reference_count']} | {row['changed_adaptation_count']} | {row['changed_fit_question_count']} |")
     return '\n'.join(lines)+'\n'
 
 
@@ -201,13 +257,16 @@ def main():
         sources={s['source_id']:s['source_url'] for s in trend['sources']}
         details={sources[c['source_ids'][0]]:c['case_detail'] for c in trend['reference_cases'] if c.get('case_detail')}
         summary,outputs=evaluate(request,context,cache,details)
+        summary['context_contrasts'] = evaluate_context_contrasts(request,context,cache,details)
     except (OSError,KeyError,ValueError,TypeError):
         parser.error('Cannot evaluate supplied snapshots; no live provider fallback was attempted')
     args.output.mkdir(parents=True,exist_ok=True)
     (args.output/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     (args.output/'COMPARISON.md').write_text(render_report(summary),encoding='utf-8')
     (args.output/'outputs.json').write_text(json.dumps(outputs,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-    print(json.dumps({key:summary[key] for key in ('verdict','profile_count','reference_date','search_snapshot_rows','selection_changes','adaptation_changes','fit_question_changes','repeatable','missing_profile_has_no_fit','mixed_population_kept_separate','network_calls')},ensure_ascii=False,indent=2))
+    printed = {key:summary[key] for key in ('verdict','profile_count','reference_date','search_snapshot_rows','selection_changes','adaptation_changes','fit_question_changes','repeatable','missing_profile_has_no_fit','mixed_population_kept_separate','network_calls')}
+    printed['context_contrasts'] = [{key:row[key] for key in ('axis','common_reference_count','changed_adaptation_count','changed_fit_question_count')} for row in summary['context_contrasts']]
+    print(json.dumps(printed,ensure_ascii=False,indent=2))
     return 1 if summary['verdict']=='evaluation_invariant_failed' else 0
 
 
