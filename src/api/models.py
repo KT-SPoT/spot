@@ -24,8 +24,8 @@ class Store(IntakeModel):
 
 
 class Campaign(IntakeModel):
-    purpose: str = Field(min_length=1, max_length=500)
-    product: str = Field(min_length=1, max_length=300)
+    purpose: str = Field(default="매장 지역·고객 맥락 리서치", min_length=1, max_length=500)
+    product: str | None = Field(default=None, min_length=1, max_length=300)
     target_hint: str | None = Field(default=None, max_length=500)
 
 
@@ -48,7 +48,7 @@ class ResearchRequest(IntakeModel):
     request_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
     requested_at: str | None = None
     store: Store
-    campaign: Campaign
+    campaign: Campaign = Field(default_factory=Campaign)
     research: Research = Field(default_factory=Research)
 
     @field_validator("requested_at")

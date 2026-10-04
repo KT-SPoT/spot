@@ -1,10 +1,10 @@
 """Request-scoped Local discovery; search passages require human verification."""
 import re
 from src.scouts import search_runtime as search
-from src.scouts.local_evidence import verify_source
+from src.scouts.local_evidence import verify_source, local_event_key
 from datetime import date
 
-CHANGE_WORDS = ("개관", "개통", "입주", "착공", "준공", "신설", "오픈", "건립", "확충", "공사", "계획", "승인")
+CHANGE_WORDS = ("개관", "개통", "입주", "착공", "준공", "신설", "오픈", "건립", "확충", "공사", "계획", "승인", "정비", "보수", "통행 재개")
 
 
 def area_anchor(store):
@@ -57,6 +57,8 @@ def run_local_scout(request):
             seen.add(item["source_url"])
             checked += 1
             verification = verify_source(item, anchor, start, end, request.get("store") or {})
+            if verification.get('evidence_role') == 'direct_change' and not verification.get('event_key'):
+                verification['event_key'] = local_event_key(item['title'] + ' ' + (verification.get('excerpt') or ''))
             output["query_context"]["verification_log"].append({"source_url": item["source_url"],
                 "status": verification["status"], "reason": verification.get("reason")})
             if verification["status"] == "rejected":
@@ -74,12 +76,13 @@ def run_local_scout(request):
                 if verification["status"] in ("text_corroborated", "context_corroborated")
                 and i.get("verification_status") in ("text_corroborated", "context_corroborated")
                 and i.get("evidence_role") == role
-                and ((i.get("evidence_fingerprint") == fingerprint and i["change_state"] == verification.get("change_state"))
+                and ((fingerprint and i.get("evidence_fingerprint") == fingerprint and i["change_state"] == verification.get("change_state"))
                      or (role == "direct_change" and verification.get("event_key") and i.get("event_key") == verification["event_key"]))
                 and abs((date.fromisoformat(i["published_at"][:10]) - date.fromisoformat(source["published_at"][:10])).days) <= 7), None)
             if duplicate:
                 duplicate["source_ids"].append(sid)
-                duplicate["duplicate_basis"] = "same_plan_revision_or_identical_sentence_within_7_days"
+                duplicate["duplicate_basis"] = "same_event_or_identical_sentence_within_7_days"
+                duplicate["event_grouping_note"] = "동일 문장·사업 식별 또는 시설/행사·시간·범위 표현과 7일 이내 보도로 묶었습니다. 실제 동일 사건 여부·점포 영향은 별도 확인합니다."
                 duplicate.setdefault("supporting_facets", []).append({"source_id": sid,
                     "evidence": verification.get("excerpt"), "change_state": verification.get("change_state"),
                     "published_at": source["published_at"], "date_basis": source.get("date_basis")})

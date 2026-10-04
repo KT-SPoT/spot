@@ -210,6 +210,10 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         checks.append("성별·연령 표의 기준 시점이 미확보입니다. 다른 인구 추이 표의 최신 월이나 분석 생성일을 비율의 기준일로 사용하지 마세요.")
     local_context = []
     for item in valid.get("local", {}).get("insights", []):
+        from src.scouts.local_evidence import nonfactual_change
+        if item.get("evidence_role") == "direct_change" and nonfactual_change(item.get("evidence") or ""):
+            checks.append("Local 질문·희망 표현을 실제 변화 요약에서 제외했습니다.")
+            continue
         if item.get("article_checked") and item.get("verification_status") not in ("text_corroborated", "context_corroborated"):
             checks.append("Local 원문·게시일 대조가 부족한 검색 후보를 지역 변화 요약에서 제외했습니다. 수집 결과의 verification_log를 확인하세요.")
             continue
@@ -233,7 +237,7 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
 
     trend_patterns = []
     trend = valid.get("trend", {})
-    product = request.get("campaign", {}).get("product", "")
+    product = request.get("campaign", {}).get("product") or ""
     cases = {item.get("case_id"): item for item in trend.get("insights", []) if item.get("case_id")}
     patterns = trend.get("reference_patterns", trend.get("patterns", []))
     if not isinstance(patterns, list):
@@ -358,8 +362,12 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         if finding["level"] in ("needs_fix", "manual_review"):
             checks.append(f"{finding.get('module', '공통')}: {finding['message']}")
     if critic_result:
-        checks.append(f"Graph Critic 상태: {critic_result.get('status', '미확인')}. 규칙 검사와 의미·사실 검토는 별개입니다.")
-        checks.extend(str(warning) for warning in critic_result.get("warnings", []))
+        from src.critic.critic import diagnostic_summary
+        diagnostics = diagnostic_summary(critic_result)
+        gpt_state = {"completed": "완료", "pending": "대기", "disabled": "꺼짐", "incomplete": "미완료"}
+        checks.append(f"Critic 진단: 규칙 오류 {diagnostics['invalid_finding_count']}건, 자료 범위·제약 {diagnostics['limitation_finding_count']}건. GPT 연결·차별성 검토 {gpt_state[diagnostics['gpt_status']]}. 수동 검토는 최종 기획 판단이며 실행 실패를 뜻하지 않습니다.")
+        checks.extend(str(warning) for warning in critic_result.get("warnings", [])
+                      if not (diagnostics['gpt_status'] == 'completed' and warning == 'SEMANTIC_AND_FACTUAL_REVIEW_REQUIRED'))
     checks.extend(["이 브리프는 근거 요약 초안이며 품질 최종 승인이 아닙니다.",
                    "지표의 기준 시점·지역 범위·집계 방법을 확인하세요. 매출 비중을 고객 수 비중으로 해석하지 마세요.",
                    "트렌드 패턴은 중복 사례를 포함하므로 패턴별 건수를 합산하지 마세요."])
@@ -398,8 +406,8 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         checks.append('Trend는 참여 방식과 응용 가능성의 조사 참고입니다. 고객 호응 자료는 선택적 보조 근거이며, 미확보만으로 사례를 제외하지 않습니다. 반복 등장하는 방식도 인기·성과를 입증하지 않습니다.')
         pattern_names = ", ".join(str(card.get("name") or card.get("event_name") or "체험 후보") for card in trend_patterns)
         campaign = request.get("campaign", {})
-        product = campaign.get("product") or "요청 제품"
-        implications.append({"statement": f"{pattern_names} 자료를 {product} 체험 목적과 대조해 적합성을 검토하세요. 방문 증가나 매출 효과는 이번 근거로 확정할 수 없습니다.",
+        subject = (campaign.get("product") + " 체험 목적") if campaign.get("product") else "관측된 매장 지역·고객 맥락"
+        implications.append({"statement": f"{pattern_names} 자료를 {subject}과 대조해 적합성을 검토하세요. 방문 증가나 매출 효과는 이번 근거로 확정할 수 없습니다.",
                              "basis": deepcopy(trend_patterns), "kind": "research_question"})
 
     cards = facts + demographics + distributions + local_context + local_changes + trend_patterns

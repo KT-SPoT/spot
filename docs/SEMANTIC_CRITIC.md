@@ -14,10 +14,18 @@ GPT는 출처 ID를 생성하지 않고 사례 ID로만 검토하며 코드는 �
 `research_review`와 Markdown에도 표시한다. useful은 응용 가설의 활용 가능성이지
 실제 선호·효과·경쟁 상권 대비 독보성을 입증한다는 뜻이 아니다. generic 판정도
 참고 사례를 삭제하지 않는다. 응답 형식·사례 ID·누락·모순 검사는 유지한다.
-모델 제안에 미확인 성별×연령 교차 고객군·구매층 표현이 있으면 그 제안만 관측값을
-구분하는 질문으로 대체하고 `review_warning`·`suggestion_basis=policy_fallback`을 기록한다.
+모델 이유·제안에 미확인 성별×연령 교차 고객군·구매층 표현이 있으면 해당 이유는
+보류하고 제안은 관측값을 구분하는 질문으로 대체한다.
+`review_warning`과 `reason_basis`/`suggestion_basis=policy_fallback`을 기록한다.
 사례·판정은 유지하며 Markdown에 보정 사실을 표시한다. 이 최소 정책 검사는
 출처 재인증이나 실제 고객 선호의 승인이 아니다.
+
+2026-10-04: 명시적인 조사 질문·가설, 미측정 호응, 다른 업종 사례, 약한 차별성만으로
+`overclaim=risk`를 주지 않도록 지침을 명확히 했다. 과장은 입력이 미확인 사실·선호·효과를
+단정할 때 평가한다. 기존 관측이 전달됐지만 제안이 활용하지 못하면 `generic`이며
+`needs_context`는 실제로 연결에 필요한 맥락이 없는 경우다.
+규칙 오류·자료 범위 제약·GPT 평가 실행 여부는 `checks.diagnostics`로 따로 전달한다.
+실제 지역 검증은 [2026-10-04 개선 결과](LOCATION_RESEARCH_QUALITY_2026_10_04.md)를 참고한다.
 
 검증 실패·timeout·provider 오류는 안정된 코드로 남기고 브리프를 보존한다.
 Critic 때문에 Scout를 다시 호출하지 않는다. `SPOT_CRITIC_PROFILE=evidence`는

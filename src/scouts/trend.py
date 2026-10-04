@@ -37,14 +37,14 @@ def discovery_plan(request, context):
     clean = lambda value: ' '.join(re.findall(r'[가-힣A-Za-z0-9]+', str(value or '')))
     product = clean(campaign.get('product'))[:60]
     purpose = clean(campaign.get('purpose'))
-    defaults = ('제품 지역 맥락을 연결한 홍보 근거 탐색', '신제품 체험 행사 사전 리서치')
+    defaults = ('제품 지역 맥락을 연결한 홍보 근거 탐색', '신제품 체험 행사 사전 리서치', '매장 지역 고객 맥락 리서치')
     # A verbatim user question is a search focus, never an observed customer fact.
     focus = '' if purpose in defaults else ' '.join(purpose.split()[:4])[:40]
     _, end, _ = search.window(request)
-    targeted = ' '.join(part for part in (product, focus, '행사') if part)[:110]
+    targeted = ' '.join(part for part in (product, focus, '행사') if part)[:110] if product or focus else '오프라인 체험 행사'
     return [
         {'role':'broad', 'query':'팝업', 'reason':'업종을 미리 지정하지 않고 전국 행사 참고 사례 탐색'},
-        {'role':'request', 'query':targeted, 'reason':'입력한 제품·서비스와 조사 질문의 표현을 검색에 반영; 관심·선호를 추정한 검색어가 아님'},
+        {'role':'request' if product or focus else 'experience', 'query':targeted, 'reason':'전국 참여 방식 탐색; 기존 제품·질문 입력 요청은 검색 호환 유지. 지역 관측은 사례 응용 검토에 반영하며 성별·연령으로 취향을 추정하지 않음'},
         {'role':'timing', 'query':f'{end.year} {end.month}월 축제', 'reason':'요청 자료 기준월의 전국 일정·행사 보도 탐색; 실제 행사 일정은 원문에서 확인'},
     ]
 
@@ -99,7 +99,7 @@ def adaptation_hypotheses(tags, product):
         'direct_product_trial': '직접 사용·비교 구조를 매장 제품 체험에 응용할 수 있을까?',
     }
     return [{'kind': 'research_question', 'mechanism': tag,
-             'statement': f'{product}: {applications[tag]} 실제 지원 기능과 고객 반응은 추가 조사.'}
+             'statement': f'{product + ": " if product else ""}{applications[tag]} 제품·기능 선택은 기획 단계에서 확인.'}
             for tag in tags if tag in applications][:3]
 
 
@@ -169,10 +169,7 @@ def run_trend_scout(request, *, context=None, detail_reader=None):
     except (ValueError,TypeError):
         output['errors'].append({'code':'INVALID_RESEARCH_WINDOW'})
         return output
-    product=(request.get('campaign') or {}).get('product')
-    if not isinstance(product,str) or not product.strip():
-        output['errors'].append({'code':'MISSING_CAMPAIGN_PRODUCT'})
-        return output
+    product=(request.get('campaign') or {}).get('product') or ''
     context=deepcopy(context) if isinstance(context,dict) and context.get('request_id')==request.get('request_id') else {}
     queries=build_queries(request,context)
     output['reference_library']=library_references(request,start,end)

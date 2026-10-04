@@ -4,6 +4,24 @@ from typing import Any
 from src.critic.rules import evaluate_rules
 
 
+def diagnostic_summary(critic):
+    """Execution diagnostics are independent of factual approval/manual handoff."""
+    checks = critic.get("checks", {})
+    findings = checks.get("rules", {}).get("findings", [])
+    review = checks.get("semantic_review", {})
+    verdicts = {}
+    for row in review.get("case_reviews", []):
+        verdicts[row["verdict"]] = verdicts.get(row["verdict"], 0) + 1
+    code = review.get("code")
+    return {"rule_status": checks.get("rules", {}).get("rule_status"),
+            "invalid_finding_count": sum(f.get("level") == "needs_fix" for f in findings),
+            "limitation_finding_count": sum(f.get("level") == "manual_review" for f in findings),
+            "excluded_modules": checks.get("excluded_modules", []),
+            "gpt_status": "completed" if review.get("performed") else "disabled" if code == "DISABLED" else "pending" if code is None else "incomplete",
+            "gpt_code": code, "case_verdicts": verdicts,
+            "truth_verified": False}
+
+
 def run_critic(research_bundle: dict[str, Any], *, retry_count=0, max_retry_rounds=1):
     """Real deterministic validation, with narrowly bounded transient retries.
 

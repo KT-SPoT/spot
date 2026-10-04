@@ -255,9 +255,12 @@ class SemanticCriticTests(unittest.TestCase):
         caller.assert_called_once()
         self.assertEqual(on['retry_count'], 1)
         self.assertTrue(on['critic_result']['checks']['semantic_review']['performed'])
-        self.assertEqual(off['research_brief'], on['research_brief'])
+        self.assertEqual({k:v for k,v in off['research_brief'].items() if k != 'needs_manual_check'},
+                         {k:v for k,v in on['research_brief'].items() if k != 'needs_manual_check'})
+        self.assertIn('GPT 연결·차별성 검토 완료', ' '.join(on['research_brief']['needs_manual_check']))
         failed = execute(Mock(side_effect=RuntimeError('PRIVATE')), 'shadow')
-        self.assertEqual(off['research_brief'], failed['research_brief'])
+        self.assertEqual({k:v for k,v in off['research_brief'].items() if k != 'needs_manual_check'},
+                         {k:v for k,v in failed['research_brief'].items() if k != 'needs_manual_check'})
 
     def test_three_area_requests_pass_their_own_scope_through_graph(self):
         # End-to-end wiring with synthetic Scouts/evaluator, not real model accuracy.

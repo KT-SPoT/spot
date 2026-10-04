@@ -16,6 +16,36 @@ def page(body=SENTENCE, pub="2026-09-20"):
 
 
 class LocalEvidenceTests(unittest.TestCase):
+    def test_interview_question_and_aspiration_are_not_changes(self):
+        for text in ('명륜동 상권 등 지역 자산을 어떻게 미래 성장동력으로 키워나갈 계획입니까.',
+                     '명륜동의 새로운 공공도서관이 주민 편의를 위해 내년에 개관했으면 좋겠다는 희망을 밝혔다.'):
+            with patch.object(evidence, 'fetch_article', return_value=(page(text), ITEM['source_url'])):
+                result = evidence.verify_source(ITEM, '명륜동', START, END, {'address':'부산 동래구 명륜동 386'})
+            self.assertEqual(result['status'], 'rejected')
+            self.assertEqual(result['reason'], 'QUESTION_OR_ASPIRATION_NOT_CHANGE')
+
+    def test_repair_reports_share_event_without_merging_different_facilities(self):
+        planned = '명륜동 방향 내성지하차도 포장공사는 오늘 오후 10시에 완료될 예정이다.'
+        reopened = '명륜동 방향 내성지하차도는 지반침하 긴급 정비를 완료하고 오후 5시에 통행을 재개했다.'
+        rows = []
+        for text in (planned, reopened):
+            with patch.object(evidence, 'fetch_article', return_value=(page(text), ITEM['source_url'])):
+                rows.append(evidence.verify_source(dict(ITEM,title='내성지하차도 정비'), '명륜동', START, END, {'address':'부산 동래구 명륜동 386'}))
+        self.assertEqual(rows[0]['event_key'], rows[1]['event_key'])
+        self.assertIsNotNone(rows[0]['event_key'])
+        self.assertEqual(rows[0]['change_state'], 'scheduled')
+        self.assertEqual(rows[1]['change_state'], 'reported_repair_or_reopening')
+        self.assertNotEqual(evidence.facility_event_key(planned), evidence.facility_event_key(planned.replace('내성','다른')))
+        self.assertIsNone(evidence.facility_event_key('내성지하차도와 교대지하차도 정비 공사'))
+
+    def test_holiday_march_groups_only_with_matching_route_time_and_destination(self):
+        a = '개천절 집회. 오후 4시부터 새문안로와 자하문로를 따라 신교사거리까지 행진할 계획이다.'
+        b = '개천절 교통통제. 오후 4시부터는 새문안로와 자하문로를 통해 신교사거리까지 행진할 계획이다.'
+        self.assertIsNotNone(evidence.local_event_key(a))
+        self.assertEqual(evidence.local_event_key(a), evidence.local_event_key(b))
+        self.assertNotEqual(evidence.local_event_key(a), evidence.local_event_key(b.replace('4시','5시')))
+        self.assertIsNone(evidence.local_event_key('개천절 새문안로에서 교통통제 예정'))
+
     def test_article_image_metadata_fallback_and_og_priority(self):
         parser = evidence.ArticleParser()
         parser.feed('<meta name="twitter:image" content="/twitter.jpg"><meta name="og:image" content="/article.jpg">')

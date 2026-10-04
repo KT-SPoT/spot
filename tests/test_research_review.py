@@ -118,6 +118,16 @@ class ResearchReviewTests(unittest.TestCase):
         self.assertEqual(rows[0]['verdict'], 'generic')
         self.assertEqual(rows[0]['suggestion_basis'], 'policy_fallback')
 
+    def test_joint_cohort_reason_is_guarded_but_explicit_warning_is_preserved(self):
+        row = answer(self.payload)['reviews'][0]
+        row['reason'] = '40대 남성 구매층이 많아 매장에 적합합니다.'
+        guarded = guard_suggestions([row])[0]
+        self.assertEqual(guarded['reason_basis'], 'policy_fallback')
+        self.assertNotIn('40대 남성', guarded['reason'])
+        reason = '40대 남성 고객이라고 단정할 수 없습니다.'
+        row['reason'] = reason
+        self.assertEqual(guard_suggestions([row])[0]['reason'], reason)
+
     def test_separate_distribution_suggestion_is_preserved(self):
         raw = answer(self.payload)
         suggestion = '주요 연령 40대와 주요 성별 남성의 각각의 분포를 참고하세요.'

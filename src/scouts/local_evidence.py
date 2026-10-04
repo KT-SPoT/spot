@@ -18,7 +18,38 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from src.scouts import search_runtime as search
 
 MAX_BYTES = 1_500_000
-CHANGE_RE = re.compile(r"개관|개통|입주|착공|준공|신설|건립|확충|공사|계획|승인|오픈")
+CHANGE_RE = re.compile(r"개관|개통|입주|착공|준공|신설|건립|확충|공사|계획|승인|오픈|정비|보수|통행.*재개")
+
+
+def nonfactual_change(sentence):
+    """Questions and aspirations are not reports of an approved/planned change."""
+    return bool(re.search(r"[?？]|계획입니까|어떻게.*(?:할|키워|만들)|바라(?:며|고|는|다)|희망(?:한다|하며|하고)|했으면|해야\s*(?:한다|할|겠)|되길|됐으면", sentence))
+
+
+def facility_event_key(text):
+    """Conservative named-facility repair grouping; caller enforces a 7-day window."""
+    if not re.search(r"침하|단차|정비|보수|포장\s*공사", text):
+        return None
+    names = set(re.findall(r"([가-힣A-Za-z0-9]{2,24}(?:지하차도|터널|대교))", text))
+    if len(names) != 1:
+        return None
+    return hashlib.sha256((next(iter(names)) + "|road_repair").encode()).hexdigest()
+
+
+def local_event_key(text):
+    repair = facility_event_key(text)
+    if repair:
+        return repair
+    # A holiday march with the same named route, destination and start time.
+    # A generic road/traffic article or a one-road mention is insufficient.
+    holiday = re.search(r"개천절|한글날|광복절|삼일절", text)
+    roads = sorted(set(re.findall(r"([가-힣]{2,12}로)(?=와|과|를|을|\s|,)", text)))
+    destination = re.search(r"([가-힣]{2,12}(?:사거리|광장))(?:까지|로)", text)
+    clock = re.search(r"(오전|오후)\s*(\d{1,2})시", text)
+    if not (holiday and len(roads) >= 2 and destination and clock and '행진' in text):
+        return None
+    key = '|'.join([holiday[0], *roads, destination[1], *clock.groups(), 'march'])
+    return hashlib.sha256(key.encode()).hexdigest()
 
 
 def validate_url(url):
@@ -201,10 +232,14 @@ def classify_stage(sentence):
         return "reported_opening"
     if re.search(r"준공(?:했다|하였다|됐다)|입주(?:했다|완료)|착공(?:했다|하였다)|공사를? 시작", sentence):
         return "reported_construction_or_move_in"
+    if re.search(r"(?:정비|보수|공사).*(?:완료|마쳤)|통행.*재개", sentence):
+        return "reported_repair_or_reopening"
     return "unverified"
 
 
 def specific_change(sentence, anchor, start):
+    if nonfactual_change(sentence):
+        return False
     if not 40 <= len(sentence) <= 700 or search.normalized(anchor) not in search.normalized(sentence) or not CHANGE_RE.search(sentence):
         return False
     # Recent articles can cite old move-ins as background, or a different
@@ -232,9 +267,11 @@ def context_evidence(blocks, anchor, store, start=None):
     stem = stem if len(stem) >= 2 else anchor
     districts = re.findall(r"(?:^|\s)([가-힣]+[구군])(?:\s|$)", store.get("address") or "")
     district_present = any(d in text for d in districts)
-    sentences = [s.strip() for block in blocks for s in re.split(r"(?<=[.!?。])\s+", block) if 30 <= len(s.strip()) <= 1000]
+    sentences = [s.strip() for block in blocks for s in re.split(r"(?<=[.!?。])\s+", block) if 30 <= len(s.strip()) <= 1000 and not nonfactual_change(s)]
     historical, direct = [], []
     for sentence in sentences:
+        if nonfactual_change(sentence):
+            continue
         exact = search.normalized(anchor) in search.normalized(sentence)
         local_entity = anchor_present and bool(re.search(re.escape(stem) + r"(?:국제)?(?:지구|\d*호\s*근린공원|\s*중앙공원)", sentence))
         if not (exact or local_entity):
@@ -267,7 +304,7 @@ def context_evidence(blocks, anchor, store, start=None):
     if not sentence:
         return None
     plan_numbers = set(re.findall(r"(\d{1,3})\s*차", text))
-    event_key = None
+    event_key = facility_event_key(sentence) if role == "direct_change" else None
     if role == "direct_change" and "실시계획" in text and len(plan_numbers) == 1 and anchor_present and stem + "지구" in text:
         event_key = hashlib.sha256((anchor + "|실시계획|" + next(iter(plan_numbers))).encode()).hexdigest()
     stage = classify_stage(sentence) if role == "direct_change" else "not_applicable"
@@ -334,6 +371,8 @@ def verify_source(item, anchor, start, end, store=None):
                                 full_text_verified=False)
         else:
             verification["reason"] = "ARTICLE_REGION_CHANGE_NOT_CORROBORATED"
+            if any(nonfactual_change(block) and search.normalized(anchor) in search.normalized(block) for block in blocks):
+                verification.update(status="rejected", reason="QUESTION_OR_ASPIRATION_NOT_CHANGE")
         return verification
     sentence = matches[0]
     stages = {classify_stage(s) for s in matches}
@@ -358,4 +397,6 @@ def verify_source(item, anchor, start, end, store=None):
         if verification["status"] == "candidate":
             verification["status"] = "context_corroborated"
             verification.setdefault("context_note", "원문 문장은 확인했지만 원문 게시일 또는 본문 영역 확인이 부족합니다. 날짜·사업 범위의 추가 확인이 필요합니다.")
+    if verification.get("evidence_role") == "direct_change" and not verification.get("event_key"):
+        verification["event_key"] = facility_event_key(item.get("title", "") + " " + sentence)
     return verification

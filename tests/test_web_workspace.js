@@ -48,8 +48,8 @@ async function scenario(status){
       get('research-form').events.submit({preventDefault(){},target:{product:'테스트 서비스',purpose:question,name:'테스트 매장',address:'부산 테스트 주소',lat:'35.2',lng:'129.08',reference_date:'2026-10-03',radius_m:'1000',lookback_days:'180'}});
       await new Promise(resolve=>setImmediate(resolve));
       const sent=JSON.parse(calls.filter(([path,options])=>path==='/api/research'&&options?.method==='POST').at(-1)[1].body);
-      assert.equal(sent.campaign.product,'테스트 서비스');
-      assert.equal(sent.campaign.purpose,question||'제품·지역 맥락을 연결한 홍보 근거 탐색');
+      assert.equal(sent.campaign.product,null);assert.equal(sent.campaign.target_hint,null);
+      assert.equal(sent.campaign.purpose,'매장 지역·고객 맥락 리서치');
     }
   }else{
     assert.equal(get('overview-content').hidden,true);

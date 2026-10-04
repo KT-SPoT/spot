@@ -43,7 +43,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "parameters": {
-        "jsCode": "const b = $json.body;\nconst valid = b && typeof b === 'object' && !Array.isArray(b)\n  && b.store && typeof b.store === 'object'\n  && b.campaign && typeof b.campaign === 'object';\nif (!valid) return [{json:{valid:false,statusCode:422,body:{error:{code:'INVALID_REQUEST'}}}}];\nconst request = {\n  ...b,\n  schema_version: b.schema_version ?? '0.1',\n  request_id: b.request_id ?? `spot-n8n-${$execution.id}`,\n  research: {\n    ...(b.research ?? {}),\n    reference_date: b.research?.reference_date ?? $now.setZone('Asia/Seoul').toISODate(),\n    radius_m: b.research?.radius_m ?? 1000,\n    lookback_days: b.research?.lookback_days ?? 180,\n  },\n};\nreturn [{json:{valid:true,request}}];"
+        "jsCode": "const b = $json.body;\nconst valid = b && typeof b === 'object' && !Array.isArray(b)\n  && b.store && typeof b.store === 'object'\n  && (b.campaign === undefined || (b.campaign && typeof b.campaign === 'object' && !Array.isArray(b.campaign)));\nif (!valid) return [{json:{valid:false,statusCode:422,body:{error:{code:'INVALID_REQUEST'}}}}];\nconst request = {\n  ...b,\n  campaign: b.campaign ?? {purpose:\"매장 지역·고객 맥락 리서치\",product:null,target_hint:null},\n  schema_version: b.schema_version ?? '0.1',\n  request_id: b.request_id ?? `spot-n8n-${$execution.id}`,\n  research: {\n    ...(b.research ?? {}),\n    reference_date: b.research?.reference_date ?? $now.setZone('Asia/Seoul').toISODate(),\n    radius_m: b.research?.radius_m ?? 1000,\n    lookback_days: b.research?.lookback_days ?? 180,\n  },\n};\nreturn [{json:{valid:true,request}}];"
       },
       "position": [
         220,

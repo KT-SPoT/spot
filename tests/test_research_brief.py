@@ -43,6 +43,14 @@ def fixture():
 
 
 class ResearchBriefTest(unittest.TestCase):
+    def test_cached_question_is_not_promoted_to_a_local_change(self):
+        bundle = fixture()
+        bundle['results']['local']['insights'][0].update(evidence_role='direct_change',
+            evidence='명륜동 상권을 어떻게 미래 성장동력으로 키워나갈 계획입니까.')
+        brief = generate_brief(bundle)
+        self.assertEqual(brief['local_changes'], [])
+        self.assertTrue(any('질문·희망' in text for text in brief['needs_manual_check']))
+
     def test_local_context_is_cited_but_not_counted_as_recent_change(self):
         bundle = fixture()
         card = bundle["results"]["local"]["insights"][0]

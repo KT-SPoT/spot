@@ -69,7 +69,7 @@ def render_pdf(brief, request=None, discovery=None):
         story.append(value)
     store=request.get('store',{}); campaign=request.get('campaign',{}); research=request.get('research',{})
     add('SPoT. / RESEARCH BRIEF','sub');add(store.get('name') or '지역 홍보 리서치','title')
-    add(campaign.get('product') or '홍보 대상은 접수 기록에서 확인해주세요.','sub')
+    add(campaign.get('product') or '매장 지역·고객 맥락 리서치','sub')
     add(store.get('address') or '주소 미확인','small')
     add(f"자료 기준일 {research.get('reference_date') or '미확인'} · 고유 출처 {brief.get('source_count',0)}개 · 조사 초안",'small')
     if campaign.get('purpose'): add('조사 질문: '+campaign['purpose'])

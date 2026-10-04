@@ -856,6 +856,7 @@ def run_quant_scout(request: SpotRequest, *, evidence_sink: Callable | None = No
     # must use another claim kind and remain subject to semantic review.
     for insight in insights:
         insight["claim_kind"] = "public_api_observation"
+        insight["source_ids"] = ["S-Q-001"]
     summary = _build_compact_summary(
         collected.get("admi_nm"),
         radius_m,

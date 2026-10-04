@@ -8,6 +8,15 @@ REQUEST = {"request_id": "trend-test", "campaign": {"product": "Galaxy Z Fold8"}
            "research": {"reference_date": "2026-10-01", "lookback_days": 0}}
 
 class TrendTests(unittest.TestCase):
+    def test_location_only_search_needs_no_product_and_keeps_nationwide_scope(self):
+        request = dict(REQUEST, campaign={'product':None,'purpose':'매장 지역·고객 맥락 리서치'})
+        with patch('src.scouts.search_runtime.news',return_value=[article('음식 축제 체험')]), patch('src.scouts.search_runtime.videos',return_value=[]):
+            result = run_trend_scout(request)
+        self.assertTrue(result['insights'])
+        self.assertEqual(result['query_context']['search_queries'], ['팝업','오프라인 체험 행사','2026 10월 축제'])
+        self.assertFalse(result['errors'])
+        self.assertFalse(any('None' in h['statement'] for c in result['insights'] for h in c['adaptation_hypotheses']))
+
     def test_video_lookup_can_pause_without_removing_key(self):
         with patch.dict('os.environ', {'SPOT_TREND_VIDEO_MODE': 'off', 'YOUTUBE_API_KEY': 'synthetic-preserved-key'}), \
              patch('src.scouts.search_runtime.news', return_value=[article('게임 팝업 체험')]), \
