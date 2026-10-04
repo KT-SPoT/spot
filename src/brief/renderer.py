@@ -79,6 +79,7 @@ def render_markdown(brief):
                  "reported_plan_approval": "계획 변경·승인 보도(공사·운영 완료 아님)",
                  "not_applicable": "배경·주변 맥락",
                  "reported_construction_or_move_in": "공사·입주 단계 보도(현장 미확인)",
+                 "reported_repair_or_reopening": "정비 완료·통행 재개 보도(현장 미확인)",
                  "unverified": "단계 확인 필요"}.get(card.get("change_state"), card.get("change_state"))
         lines.extend(["", f"### {card.get('title', '지역 변화')}", "",
                       str(card.get("evidence") or card.get("statement") or "내용 확인 필요"), "",
@@ -91,8 +92,10 @@ def render_markdown(brief):
             lines.append(f"- 날짜 종류: {_date_basis(card)}")
             if card.get("context_note"):
                 lines.append("- 활용·한계: " + card["context_note"])
+            if card.get("event_grouping_note"):
+                lines.append("- 사건 묶음 기준: " + card["event_grouping_note"])
             for facet in card.get("supporting_facets", []):
-                lines.append(f"- 관련 보도 {facet['source_id']}: {_cell(facet.get('evidence'))}")
+                lines.append(f"- 관련 보도 {facet['source_id']} ({_cell(facet.get('published_at'))}, {_cell(facet.get('change_state'))}): {_cell(facet.get('evidence'))}")
         if card.get("why_it_matters"):
             lines.extend(["", "자료 해석(검토 필요): " + card["why_it_matters"]])
 

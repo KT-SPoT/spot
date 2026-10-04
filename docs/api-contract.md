@@ -20,8 +20,8 @@ This file is the **implementation mirror** of the common schema managed in Notio
     "lng": null
   },
   "campaign": {
-    "purpose": "신제품 체험 행사 사전 리서치",
-    "product": "Galaxy Z Fold8",
+    "purpose": "매장 지역·고객 맥락 리서치",
+    "product": null,
     "target_hint": null
   },
   "research": {
@@ -32,6 +32,19 @@ This file is the **implementation mirror** of the common schema managed in Notio
   }
 }
 ```
+
+### 매장 중심 입력 — 2026-10-04 / Issue #44
+
+사용자 결정에 따라 새 웹 입력은 매장/위치와 조사 기준일·기간·반경만 받는다.
+제품명·자유 조사 목적·관심 고객층 입력은 제거했다. 제품 선택과 기획 목적은
+Research Brief 이후 흥부장 요청에서 추가한다.
+
+HTTP API는 `campaign` 생략을 허용하며 위 기본값으로 정규화한다.
+`campaign.product`는 nullable/생략 가능하다. 명시한 문자열은 비어 있으면 안 된다.
+기존 제품·목적 포함 요청은 호환되지만 모델 기능·고객 호응 리서치 완료를 뜻하지 않는다.
+Scout 함수에는 기본 campaign을 포함한 정규화된 v0.1 요청이 전달된다.
+추적: [Issue #44](https://github.com/KT-SPoT/spot/issues/44).
+이 변경은 사용자 승인에 따른 구현 미러이며 공통 Notion 문서 동기화는 별도 남는다.
 
 ## ScoutResult v0.1 — common envelope
 
@@ -95,6 +108,13 @@ Insights should preserve:
 - publication date
 - locality tag
 - why the change matters
+
+Issue #44: optional `event_key`, `duplicate_basis`, `supporting_facets` and
+`event_grouping_note` retain grouped article provenance and individual reported
+stages/dates. Named-facility repairs or explicitly matched holiday marches may
+be grouped within seven publication days; this is conservative text grouping,
+not proof of event identity or actual store impact. `reported_repair_or_reopening`
+means reported completion/resumed traffic, not an on-site verification.
 
 ### Trend
 
@@ -168,6 +188,12 @@ Status:
 
 Retry instructions must identify the target module and reason.
 
+Issue #44: optional `checks.diagnostics` separates rule status, invalid/limitation
+finding counts, excluded modules, GPT execution status/code and case verdict
+counts. `manual_review` still indicates a human planning handoff, not a failed
+GPT execution. `truth_verified` remains false. GPT guard adjustments may record
+`reason_basis=policy_fallback` as well as `suggestion_basis`/`review_warning`.
+
 ## ResearchBrief v0.1
 
 The Brief is a research output, not a finished event plan.
@@ -222,7 +248,7 @@ See [web experience](web-experience.md) for display and compatibility rules.
 # 선택적인 탐색 메타데이터 (2026-10-03, Issue #42)
 
 Trend Scout v0.1의 기존 자유 형식 `query_context`에 `search_plan` 배열을 추가한다.
-각 항목은 `role`(broad/request/timing), `query`, `reason`이다. 기존 필수 필드·상태는 바뀌지 않는다.
+각 항목은 `role`(broad/request/experience/timing), `query`, `reason`이다. 기존 필수 필드·상태는 바뀌지 않는다.
 연구 HTTP 완료 결과에는 선택 필드 `trend_discovery`로 `search_plan`, `reference_date`,
 `lookback_start`를 전달한다. 과거/오프라인 결과에서는 없거나 null일 수 있다.
 Research Brief v0.1 필수 스키마에는 추가하지 않는다. 후속 공통 Notion 문서 동기화는 Integrator가 담당한다.

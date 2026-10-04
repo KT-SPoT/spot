@@ -17,6 +17,14 @@ BASE = json.loads((ROOT / "samples/critic/research_bundle.synthetic.json").read_
 
 
 class CriticRulesTest(unittest.TestCase):
+    def test_interview_question_is_diagnosed_without_excluding_other_local_facts(self):
+        bundle = copy.deepcopy(BASE)
+        bundle['results']['local']['insights'][0].update(evidence_role='direct_change',
+            evidence='명륜동 상권을 어떻게 미래 성장동력으로 키워나갈 계획입니까.')
+        report = evaluate_rules(bundle)
+        self.assertIn('NONFACTUAL_LOCAL_CHANGE', [f['code'] for f in report['findings']])
+        self.assertFalse(any(f['level']=='needs_fix' for f in report['findings']))
+
     def test_synthetic_acceptance_cases_without_mutation(self):
         self.assertEqual(PACK["data_kind"], "synthetic")
         for case in PACK["cases"]:

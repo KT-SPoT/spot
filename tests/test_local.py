@@ -69,3 +69,12 @@ class LocalTests(unittest.TestCase):
         self.assertEqual(len(result["insights"]),1)
         self.assertEqual(result["insights"][0]["source_ids"],["S-L-001","S-L-002"])
         self.assertEqual(result["insights"][0]["supporting_facets"][0]["change_state"],"reported_plan_approval")
+
+    def test_same_facility_key_more_than_seven_days_apart_is_not_merged(self):
+        rows = [article('명지국제신도시 공사', 'https://example.org/one'),article('명지국제신도시 공사', 'https://example.org/two')]
+        checks = [{'status':'text_corroborated','article_published_at':day,'evidence_role':'direct_change',
+                   'event_key':'same-facility','evidence_fingerprint':day,'excerpt':'합성 공사 보도','change_state':'scheduled'}
+                  for day in ('2026-09-01','2026-09-09')]
+        with patch('src.scouts.search_runtime.news',return_value=rows), patch('src.scouts.local.verify_source',side_effect=checks):
+            result = run_local_scout(REQUEST)
+        self.assertEqual(len(result['insights']),2)

@@ -163,7 +163,7 @@ def enrich_references(output, context, patterns, start, end, *, reader=None):
                     lens['observation'] for fit in fits for lens in fit['question_basis']),
                 '전국 공통 사례는 참여 방식 때문에 함께 참고할 수 있습니다. 성별·연령별 취향 근거가 없어 업종을 다르게 배정하지 않습니다.'
             ]
-            product = output['query_context'].get('product', '대상 제품')
+            product = output['query_context'].get('product') or ''
             hypotheses = []
             for index, mechanism in enumerate(fits[0]['mechanisms'][:3]):
                 if mechanism not in MECHANISM_QUESTIONS:
@@ -176,7 +176,7 @@ def enrich_references(output, context, patterns, start, end, *, reader=None):
                     (lens['question'] for lens in fit['question_basis'] if lens['axis'] == preferred),
                     fit['question_basis'][-1]['question']) for fit in fits)
                 hypotheses.append({'kind': 'research_question', 'mechanism': mechanism,
-                    'statement': f'{product}: {transfer} 방식에서 {check} 검토합니다. {questions} 실제 지원 기능과 고객 반응은 추가 조사.'})
+                    'statement': f'{product + ": " if product else ""}{transfer} 방식에서 {check} 검토합니다. {questions} 제품·기능 선택은 기획 단계에서 확인.'})
             case['adaptation_hypotheses'] = hypotheses
         reference.update(deepcopy({k: case[k] for k in ('case_detail', 'audience_fit', 'limitations',
             'context_source_refs', 'why_relevant', 'adaptation_hypotheses') if k in case}))

@@ -35,6 +35,17 @@ def await_job(client, jid):
 
 
 class ApiTests(unittest.TestCase):
+    def test_store_only_input_is_normalized_without_a_dummy_product(self):
+        captured = []
+        payload = request(); del payload['campaign']
+        with TestClient(create_app(token=TOKEN, runner=lambda p: captured.append(p) or {})) as client:
+            response = client.post('/v1/research/jobs', json=payload, headers=HEADERS)
+            self.assertEqual(response.status_code, 202)
+            await_job(client, response.json()['job_id'])
+        self.assertIsNone(captured[0]['campaign']['product'])
+        self.assertIsNone(captured[0]['campaign']['target_hint'])
+        self.assertEqual(captured[0]['campaign']['purpose'], '매장 지역·고객 맥락 리서치')
+
     def test_health_auth_and_submit_poll(self):
         captured=[]
         def runner(payload):

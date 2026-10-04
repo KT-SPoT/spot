@@ -6,13 +6,16 @@ SPOT is a **지역 맥락 탐색형 AI Research Agent** for the pre-planning sta
 
 Its job is not to generate a finished event plan immediately. It researches the local area, commercial context, recent local changes, and experience trends, then validates the evidence and produces a **Research Brief**.
 
-User decision (2026-10-03): focus on pre-promotion research for a specified store
-and product/service. Remove candidate-site creation and recommendation from the
-web flow; keep one research path. Products identify the research subject and an
-optional question identifies the focus. The planned product-value/customer-signal
-research and question-conditioned discovery are described in
-[promotion research design](PROMOTION_RESEARCH_DESIGN.md); they are not yet
-implemented by changing form labels alone.
+User decision (2026-10-04, supersedes the input design of 2026-10-03): research
+a specified store/location. Remove candidate-site recommendation, product/model,
+free research-purpose and target-hint inputs from the web flow. Product choice,
+promotion goal and operating conditions are supplied after the regional brief,
+in the planning/handoff stage. Keep one research path. Older product/question
+requests remain accepted for compatibility; they are not proof of model-specific
+research. The earlier [promotion research design](PROMOTION_RESEARCH_DESIGN.md)
+is historical design context, not the current input requirement. Track the shared
+interface adjustment in [Issue #44](https://github.com/KT-SPoT/spot/issues/44);
+Notion common-document synchronization remains separate.
 
 User clarification (2026-10-02): SBIZ365 agency API observations, including gender,
 age and peak day/time, are the quantitative baseline and do not require LLM

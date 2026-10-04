@@ -76,6 +76,9 @@ def build_trend_context(request, quant=None, local=None, *, quant_evidence=None)
                 shares = deepcopy(card['shares'])
                 gender_keys = [k for k in ('male', 'female') if k in shares]
                 age_keys = [k for k in ('under_10', 'teens', '20s', '30s', '40s', '50s', '60_plus') if k in shares]
+                # Day/time shares belong to timing, never replace demographics.
+                if not gender_keys and not age_keys:
+                    continue
                 gender = max(gender_keys, key=lambda k: shares[k]['share_pct']) if gender_keys else None
                 age = max(age_keys, key=lambda k: shares[k]['share_pct']) if age_keys else None
                 profile = {'population_kind': card['population_kind'], 'dominant_gender': gender,
@@ -87,7 +90,15 @@ def build_trend_context(request, quant=None, local=None, *, quant_evidence=None)
                 index = next((i for i, p in enumerate(output['population_signals'])
                               if p['population_kind'] == card['population_kind']), None)
                 if index is not None:
-                    profile['metric_refs'] = output['population_signals'][index]['metric_refs']
+                    previous = output['population_signals'][index]
+                    profile['metric_refs'] = previous.get('metric_refs', [])
+                    profile['shares'] = {**previous.get('shares', {}), **shares}
+                    # Sales gender and age can be separate cards. Retain the
+                    # independent other axis instead of clearing its values.
+                    for axis, available in (('gender', gender_keys), ('age', age_keys)):
+                        if not available:
+                            profile['dominant_' + axis] = previous.get('dominant_' + axis)
+                            profile[axis + '_share_pct'] = previous.get(axis + '_share_pct')
                     output['population_signals'][index] = profile
                 else:
                     output['population_signals'].append(profile)

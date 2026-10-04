@@ -14,10 +14,9 @@ MODULES = ("quant", "local", "trend")
 KST = timezone(timedelta(hours=9))
 PENDING_CHECKS = [
     "원문이 주장 내용을 실제로 뒷받침하는지 확인",
-    "지역 구체 신호 최소 2개 여부 — 기존 MVP 초안, 의미 검토 필요",
-    "유사 상권 대비 차이 최소 1개 여부 — 기존 MVP 초안, 의미 검토 필요",
-    "세 Scout 근거의 논리적 연결과 캠페인 관련성 검토",
-    "Scout별 최소 근거 수 및 retry 정책 팀 합의",
+    "지역 관측을 사용한 응용 질문인지, 지역명만 바꿔도 같은 제안인지 검토",
+    "전국 사례의 참여 방식과 매장 지역·고객 관측의 연결 검토",
+    "계획·운영 단계, 인구 모집단, 미확인 호응·효과를 구분",
 ]
 
 
@@ -192,6 +191,9 @@ def evaluate_rules(bundle):
                     add("R06", "DUPLICATE_EVENT_KEY", module, "needs_fix", path + ".event_key", "동일 사건을 인사이트 여러 건으로 계산했다.")
                 event_keys.add(event_key)
             if module == "local":
+                from src.scouts.local_evidence import nonfactual_change
+                if insight.get("evidence_role") == "direct_change" and nonfactual_change(insight.get("evidence") or ""):
+                    add("R07", "NONFACTUAL_LOCAL_CHANGE", module, "manual_review", path, "질문·희망·당위 표현을 실제 지역 변화로 사용할 수 없다. 해당 항목을 변화 요약에서 제외한다.")
                 if not insight.get("change_state"):
                     add("R07", "CHANGE_STAGE_UNAVAILABLE", module, "manual_review", path, "계획·선정·운영 단계 미확보. 표현 의미는 사람이 확인한다.")
                 if not (insight.get("locality_tags") or insight.get("locality_tag")):

@@ -26,6 +26,26 @@ def evidence():
 
 
 class TrendContextTests(unittest.TestCase):
+    def test_time_cards_do_not_clear_demographics_and_separate_sales_axes_merge(self):
+        bundle = evidence()
+        def card(kind, shares):
+            return {'population_kind':kind,'shares':{k:{'share_pct':v} for k,v in shares.items()},
+                    'reference_period':None,'evidence_basis':'public_api_observation',
+                    'scope':'선택 영역','sources':bundle['results']['quant']['sources']}
+        cards = [card('floating_population',{'male':55,'female':45,'60_plus':32}),
+                 card('floating_population',{'14_18':40,'18_24':30}),
+                 card('sales',{'male':40,'female':60}),card('sales',{'20s':35,'30s':25}),
+                 card('sales',{'fri':30,'sat':20})]
+        with patch('src.graph.trend_context.generate_brief',return_value={'unique_local_signals':cards}):
+            ctx = build_trend_context(bundle['request'],bundle['results']['quant'],quant_evidence={})
+        profiles = {p['population_kind']:p for p in ctx['population_signals']}
+        self.assertEqual(profiles['floating_population']['dominant_age'],'60_plus')
+        self.assertEqual(profiles['floating_population']['dominant_gender'],'male')
+        self.assertEqual(profiles['sales']['dominant_age'],'20s')
+        self.assertEqual(profiles['sales']['dominant_gender'],'female')
+        self.assertEqual(profiles['sales']['shares']['female']['share_pct'],60)
+        self.assertNotIn('fri', profiles['sales']['shares'])
+
     def test_cohorts_provenance_missing_shares_and_no_mutation(self):
         bundle = evidence(); before = copy.deepcopy(bundle)
         ctx = build_trend_context(bundle['request'],bundle['results']['quant'],bundle['results']['local'])

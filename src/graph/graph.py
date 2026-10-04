@@ -148,9 +148,14 @@ def build_graph(*, max_retry_rounds=1, semantic_caller=None, semantic_mode=None,
     graph.add_node("critic", observed("critic", lambda state: critic_node(state, max_retry_rounds=max_retry_rounds)))
     graph.add_node("retry", observed("retry", retry_node))
     def semantic_node(state):
+        from src.critic.critic import diagnostic_summary
         critic = deepcopy(state['critic_result'])
         critic['checks']['semantic_review'] = run_semantic(state['research_bundle'], critic,
             caller=semantic_caller, mode=semantic_mode, quant_evidence=state.get('quant_evidence'))
+        critic['checks']['diagnostics'] = diagnostic_summary(critic)
+        if critic['checks']['semantic_review'].get('performed'):
+            critic['warnings'] = [w for w in critic['warnings'] if w != 'SEMANTIC_AND_FACTUAL_REVIEW_REQUIRED']
+            critic['warnings'].append('RESEARCH_INTERPRETATION_NOT_FACTUAL_APPROVAL')
         return {'critic_result': critic}
     graph.add_node("semantic", observed("semantic", semantic_node))
     graph.add_node("brief", observed("brief", brief_node))

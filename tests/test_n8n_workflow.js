@@ -37,3 +37,7 @@ for (const node of workflow.nodes.filter(n=>n.type.endsWith('.webhook'))) {
   assert.equal(node.parameters.responseMode,'responseNode');
 }
 console.log('n8n export: normalization, validation, wiring and credential boundaries passed.');
+
+const locationOnly=run("Normalize request",{body:{store:{name:"Synthetic",address:"Synthetic"}}});
+assert.equal(locationOnly.valid,true);assert.equal(locationOnly.request.campaign.product,null);
+assert.equal(locationOnly.request.campaign.purpose,"매장 지역·고객 맥락 리서치");
