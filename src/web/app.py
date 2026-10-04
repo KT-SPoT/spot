@@ -21,13 +21,13 @@ from pydantic import ValidationError
 
 from src.api.app import redact
 from src.api.models import ResearchRequest
-from src.web import places
+from src.web import places, instagram
 
 STATIC = Path(__file__).parent / 'static'
 COOKIE = 'spot_session'
 
 
-def create_app(*, token=None, n8n_base=None, transport=None, place_transport=None):
+def create_app(*, token=None, n8n_base=None, transport=None, place_transport=None, instagram_transport=None):
     if token is None:
         load_dotenv(Path(__file__).resolve().parents[2] / '.env', encoding='utf-8-sig')
         token = os.getenv('SPOT_N8N_TOKEN') or os.getenv('SPOT_API_TOKEN', '')
@@ -40,6 +40,8 @@ def create_app(*, token=None, n8n_base=None, transport=None, place_transport=Non
                               headers={'X-SPOT-API-Key':token}, transport=transport)
     sessions = {}
     exports = OrderedDict()
+    instagram_lock = asyncio.Lock()
+    instagram_calls = []
     public_origin = os.getenv('SPOT_WEB_PUBLIC_ORIGIN', '').rstrip('/')
     try:
         public = urlsplit(public_origin)
@@ -126,6 +128,40 @@ def create_app(*, token=None, n8n_base=None, transport=None, place_transport=Non
         if not 2 <= len(q.strip()) <= 100:
             return failure('INVALID_PLACE_QUERY',422)
         return await place_request(request, places.search, query=q.strip())
+
+    @app.post('/api/instagram/search')
+    async def instagram_search(request: Request):
+        if not session(request):
+            return failure('SESSION_EXPIRED',401)
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body)>1024:
+                return failure('REQUEST_TOO_LARGE',413)
+        try:
+            import json
+            payload = json.loads(body)
+            hashtag = payload.get('hashtag', '') if isinstance(payload,dict) else ''
+            if not isinstance(hashtag,str):
+                raise ValueError()
+            hashtag = hashtag.strip().lstrip('#')
+            if not re.fullmatch(r'[\w]{1,60}',hashtag):
+                raise ValueError()
+        except (ValueError,TypeError):
+            return failure('INVALID_INSTAGRAM_QUERY',422)
+        async with instagram_lock:
+            now = time.monotonic()
+            instagram_calls[:] = [at for at in instagram_calls if now-at < 60]
+            if len(instagram_calls)>=6:
+                return failure('INSTAGRAM_RATE_LIMIT',429)
+            instagram_calls.append(now)
+            try:
+                result = await instagram.search(os.getenv('SPOT_INSTAGRAM_ACCESS_TOKEN',''),
+                    os.getenv('SPOT_INSTAGRAM_USER_ID',''),os.getenv('SPOT_INSTAGRAM_GRAPH_VERSION','v26.0'),
+                    hashtag,transport=instagram_transport)
+                return JSONResponse(redact(result,sensitive))
+            except instagram.InstagramError as exc:
+                return failure(str(exc),503)
 
     async def upstream(method, path, **kwargs):
         try:

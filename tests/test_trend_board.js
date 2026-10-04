@@ -21,3 +21,17 @@ assert(store.get('spot-media:one').includes('ABcD123'));assert.equal(JSON.string
 board.render(doc,host,brief,{request_id:'two'},()=>{},{});assert(!walk(host).some(e=>e.href==='https://www.instagram.com/p/ABcD123/'));
 board.render(doc,host,{},null,()=>{},{});assert(!walk(host).some(e=>e.tag==='iframe'));
 console.log('Trend board media validation, thumbnails, evidence exclusion and request isolation passed.');
+(async()=>{
+ board.render(doc,host,brief,{request_id:'api'},()=>{},{});
+ const forms=walk(host).filter(e=>e.tag==='form'),search=forms[1];
+ const query=walk(search).find(e=>e.tag==='input');query.value='행사';
+ ctx.fetch=async(url,options)=>{assert.equal(url,'/api/instagram/search');assert.equal(JSON.parse(options.body).hashtag,'행사');return {ok:false,json:async()=>({error:{code:'INSTAGRAM_PERMISSION_REQUIRED'}})};};
+ await search.events.submit({preventDefault(){}});
+ assert(walk(host).some(e=>e.textContent.includes('공개 해시태그 검색 권한이 부족')));
+ ctx.fetch=async()=>({ok:true,json:async()=>({hashtag:'행사',collected_at:'2026-10-04',items:[{url:'https://instagram.com/p/RESULT123/','caption':'<script>untrusted</script>'}]})});
+ await search.events.submit({preventDefault(){}});
+ assert(walk(host).some(e=>e.textContent==='<script>untrusted</script>'));
+ assert(walk(host).some(e=>e.href==='https://www.instagram.com/p/RESULT123/'));
+ assert.equal(JSON.stringify(brief),before);
+ console.log('Instagram lookup permission feedback, safe captions and evidence exclusion passed.');
+})().catch(error=>{console.error(error);process.exitCode=1;});
