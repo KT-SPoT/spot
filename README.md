@@ -160,3 +160,8 @@ python -m src.brief path/to/research_bundle.json --output path/to/brief
 - [Current roadmap](docs/ROADMAP.md)
 - [Decision log](docs/DECISIONS.md)
 - Role guides: [Quant](docs/roles/QUANT.md) · [Local](docs/roles/LOCAL.md) · [Trend](docs/roles/TREND.md) · [Integrator](docs/roles/INTEGRATOR.md)
+# Trend 보드·내보내기·서버 이전 준비
+
+- [뉴스·YouTube·Instagram 참고 보드 및 PDF/흥부장 프롬프트](docs/TREND_BOARD_AND_EXPORTS.md)
+- [Instagram 공식 API 설정 순서와 수집/표시 구분](docs/INSTAGRAM_SETUP.md)
+- [PC 없이 운영할 Linux 서버 구성과 남은 배포 단계](docs/HOSTING_SETUP.md)

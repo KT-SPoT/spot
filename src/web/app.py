@@ -1,5 +1,6 @@
-"""Loopback-only MVP: uvicorn src.web.app:create_app --factory --host 127.0.0.1 --port 8768."""
+"""Session-owned web; public hosting requires an authenticated HTTPS reverse proxy."""
 import asyncio
+from collections import OrderedDict
 from contextlib import asynccontextmanager
 from datetime import datetime
 import hashlib
@@ -14,19 +15,19 @@ from zoneinfo import ZoneInfo
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import ValidationError
 
 from src.api.app import redact
 from src.api.models import ResearchRequest
-from src.web import places
+from src.web import places, instagram
 
 STATIC = Path(__file__).parent / 'static'
 COOKIE = 'spot_session'
 
 
-def create_app(*, token=None, n8n_base=None, transport=None, place_transport=None):
+def create_app(*, token=None, n8n_base=None, transport=None, place_transport=None, instagram_transport=None):
     if token is None:
         load_dotenv(Path(__file__).resolve().parents[2] / '.env', encoding='utf-8-sig')
         token = os.getenv('SPOT_N8N_TOKEN') or os.getenv('SPOT_API_TOKEN', '')
@@ -38,6 +39,17 @@ def create_app(*, token=None, n8n_base=None, transport=None, place_transport=Non
     client = httpx.AsyncClient(base_url=n8n_base.rstrip('/'), timeout=20, follow_redirects=False,
                               headers={'X-SPOT-API-Key':token}, transport=transport)
     sessions = {}
+    exports = OrderedDict()
+    instagram_lock = asyncio.Lock()
+    instagram_calls = []
+    public_origin = os.getenv('SPOT_WEB_PUBLIC_ORIGIN', '').rstrip('/')
+    try:
+        public = urlsplit(public_origin)
+        invalid_public = public_origin and (public.scheme != 'https' or not public.hostname or public.username or public.password or public.query or public.fragment or public.path or public.port not in (None,443))
+    except ValueError:
+        invalid_public = True
+    if invalid_public:
+        raise RuntimeError('SPOT_WEB_PUBLIC_ORIGIN must be an HTTPS origin')
 
     @asynccontextmanager
     async def lifespan(app):
@@ -45,22 +57,22 @@ def create_app(*, token=None, n8n_base=None, transport=None, place_transport=Non
         await client.aclose()
 
     app = FastAPI(title='SPOT local web', docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost', '[::1]'])
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost', '[::1]'] + ([public.hostname] if public_origin else []))
 
     def failure(code, status):
         return JSONResponse({'error':{'code':code}}, status_code=status)
 
     @app.middleware('http')
     async def protect(request, call_next):
-        # Local MVP is deliberately not served through the public research tunnel.
+        # Only the configured origin may submit billable research requests.
         if request.method == 'POST':
             origin = request.headers.get('origin')
-            if origin != str(request.base_url).rstrip('/'):
+            if origin != (public_origin or str(request.base_url).rstrip('/')):
                 return failure('INVALID_ORIGIN', 403)
         response = await call_next(request)
         response.headers['Cache-Control'] = 'no-store'
         response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' https: data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' https://www.instagram.com/embed.js; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' https: data:; frame-src https://www.youtube-nocookie.com https://www.instagram.com; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
         response.headers['Referrer-Policy'] = 'no-referrer'
         return response
 
@@ -83,18 +95,18 @@ def create_app(*, token=None, n8n_base=None, transport=None, place_transport=Non
                 return failure('SESSION_LIMIT', 429)
             sid = secrets.token_urlsafe(32)
             sessions[sid] = {'expires':now+3600, 'jobs':set(), 'requests':{}, 'namespace':secrets.token_hex(8), 'lock':asyncio.Lock()}
-            response.set_cookie(COOKIE, sid, httponly=True, samesite='strict', max_age=3600)
+            response.set_cookie(COOKIE, sid, httponly=True, secure=bool(public_origin), samesite='strict', max_age=3600)
         return response
 
     @app.get('/assets/{name}')
     async def asset(name: str):
-        if name not in ('app.js','style.css','experience.js','leaflet.js','leaflet.css'):
+        if name not in ('app.js','style.css','experience.js','trend-board.js','leaflet.js','leaflet.css'):
             return failure('NOT_FOUND',404)
         return FileResponse(STATIC/name)
 
     @app.get('/api/config')
     async def config():
-        return {'reference_date':datetime.now(ZoneInfo('Asia/Seoul')).date().isoformat(), 'local_only':True}
+        return {'reference_date':datetime.now(ZoneInfo('Asia/Seoul')).date().isoformat(), 'local_only':not bool(public_origin)}
 
     async def place_request(request, operation, **kwargs):
         record = session(request)
@@ -116,6 +128,40 @@ def create_app(*, token=None, n8n_base=None, transport=None, place_transport=Non
         if not 2 <= len(q.strip()) <= 100:
             return failure('INVALID_PLACE_QUERY',422)
         return await place_request(request, places.search, query=q.strip())
+
+    @app.post('/api/instagram/search')
+    async def instagram_search(request: Request):
+        if not session(request):
+            return failure('SESSION_EXPIRED',401)
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body)>1024:
+                return failure('REQUEST_TOO_LARGE',413)
+        try:
+            import json
+            payload = json.loads(body)
+            hashtag = payload.get('hashtag', '') if isinstance(payload,dict) else ''
+            if not isinstance(hashtag,str):
+                raise ValueError()
+            hashtag = hashtag.strip().lstrip('#')
+            if not re.fullmatch(r'[\w]{1,60}',hashtag):
+                raise ValueError()
+        except (ValueError,TypeError):
+            return failure('INVALID_INSTAGRAM_QUERY',422)
+        async with instagram_lock:
+            now = time.monotonic()
+            instagram_calls[:] = [at for at in instagram_calls if now-at < 60]
+            if len(instagram_calls)>=6:
+                return failure('INSTAGRAM_RATE_LIMIT',429)
+            instagram_calls.append(now)
+            try:
+                result = await instagram.search(os.getenv('SPOT_INSTAGRAM_ACCESS_TOKEN',''),
+                    os.getenv('SPOT_INSTAGRAM_USER_ID',''),os.getenv('SPOT_INSTAGRAM_GRAPH_VERSION','v26.0'),
+                    hashtag,transport=instagram_transport)
+                return JSONResponse(redact(result,sensitive))
+            except instagram.InstagramError as exc:
+                return failure(str(exc),503)
 
     async def upstream(method, path, **kwargs):
         try:
@@ -162,6 +208,7 @@ def create_app(*, token=None, n8n_base=None, transport=None, place_transport=Non
                 return error
             status,data = result
             record['jobs'].add(data['job_id'])
+            record.setdefault('job_requests',{})[data['job_id']] = payload
             return JSONResponse(data,status_code=status)
 
     @app.get('/api/research/{job_id}')
@@ -177,6 +224,53 @@ def create_app(*, token=None, n8n_base=None, transport=None, place_transport=Non
         status,data = result
         if data['job_id'] != job_id:
             return failure('INVALID_UPSTREAM',502)
+        if data['status'] == 'completed' and isinstance(data.get('result',{}).get('research_brief'),dict):
+            exports[job_id] = data['result']
+            exports.move_to_end(job_id)
+            if len(exports)>32:
+                exports.popitem(last=False)
         return JSONResponse(data,status_code=status)
+
+    async def completed_export(job_id, request):
+        record=session(request)
+        if not record:
+            return None,None,failure('SESSION_EXPIRED',401)
+        if job_id not in record['jobs']:
+            return None,None,failure('JOB_NOT_FOUND',404)
+        result=exports.get(job_id)
+        if result is None:
+            response=await get_job(job_id,request)
+            if response.status_code!=200:
+                return None,None,response
+            result=exports.get(job_id)
+        if result is None:
+            return None,None,failure('REPORT_NOT_READY',409)
+        return result,record.get('job_requests',{}).get(job_id,{}),None
+
+    @app.get('/api/research/{job_id}/pdf')
+    async def pdf_export(job_id: str, request: Request):
+        result,payload,error=await completed_export(job_id,request)
+        if error is not None:
+            return error
+        from src.brief.pdf import render_pdf
+        try:
+            content=await asyncio.to_thread(render_pdf,result['research_brief'],payload,result.get('trend_discovery'))
+        except Exception:
+            # Never return report contents, parser errors or credential values.
+            return failure('PDF_NOT_READY',503)
+        return Response(content,media_type='application/pdf',headers={'Content-Disposition':'attachment; filename="SPOT-research-brief.pdf"'})
+
+    @app.get('/api/research/{job_id}/handoff')
+    async def handoff_export(job_id: str, request: Request):
+        result,payload,error=await completed_export(job_id,request)
+        if error is not None:
+            return error
+        from src.brief.handoff import render_handoff
+        try:
+            content=render_handoff(result['research_brief'],payload)
+        except (KeyError,TypeError,ValueError):
+            return failure('REPORT_NOT_READY',503)
+        return Response(content,media_type='text/plain; charset=utf-8',
+                        headers={'Content-Disposition':'attachment; filename="SPOT-heung-manager-prompt.txt"'})
 
     return app

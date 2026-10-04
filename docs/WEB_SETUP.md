@@ -8,7 +8,9 @@
 
 매장·주소·제품 또는 서비스와 선택적인 조사 질문을 입력하면 웹 서버가 기존 인증된 n8n 운영 Webhook으로
 조사를 접수한다. 5초 간격으로 작업 상태를 조회하고, 완료 시 브리프·Scout 상태와
-GPT 검토 완료 여부를 표시한다. Markdown 파일로 저장할 수 있다.
+GPT 검토 완료 여부를 표시한다. PDF·흥부장용 프롬프트·Markdown 파일로 저장할 수 있다.
+새 Trend 결과는 검색 이유와 뉴스·YouTube 보드, 표시용 Instagram 링크 영역을 제공한다.
+[내보내기와 보드의 범위](TREND_BOARD_AND_EXPORTS.md), [Instagram 연결 준비](INSTAGRAM_SETUP.md)를 확인한다.
 출력은 `textContent`로 표시하므로 조사 자료의 HTML·스크립트는 실행하지 않는다.
 
 현재 job API는 queued / running / completed / failed만 제공하고 Scout별 중간 결과나
@@ -35,7 +37,8 @@ YouTube 보류 설정은 기존 연구 서버의 설정을 따른다.
 ## 요청·소유권
 
 - 서버가 HttpOnly·SameSite Strict 쿠키로 1시간 세션을 발급한다.
-- 접수·조회는 동일 사이트이며 POST Origin을 검사한다. 허용 Host는 loopback뿐이다.
+- 접수·조회는 동일 사이트이며 POST Origin을 검사한다. 기본 허용 Host는 loopback이다.
+  서버 배포 시 정확한 HTTPS `SPOT_WEB_PUBLIC_ORIGIN`과 인증 프록시가 필요하다.
 - 입력은 기존 ResearchRequest 모델로 검사한다. 좌표는 함께 입력하며 기준일은
   한국 시간의 오늘을 화면 기본값으로 사용한다.
 - 세션별 요청 ID를 별도 namespace로 전달해 다른 세션의 같은 ID와 충돌하지 않는다.
@@ -54,9 +57,10 @@ YouTube 보류 설정은 기존 연구 서버의 설정을 따른다.
 접수하지 않습니다. 지역이 고정되어 보이는 것은 이 재생 화면의 특성입니다.
 미리보기 상단에는 저장 자료 안내와 실제 웹 링크를 표시합니다.
 
-이 웹은 이 PC의 loopback에서 쓰는 MVP다. 로그인 없는 세션은 같은 PC의 브라우저를
+기본 실행은 이 PC의 loopback에서 쓰는 MVP다. 로그인 없는 세션은 같은 PC의 브라우저를
 구분하는 개발용 소유권이며 사용자 계정 인증을 대체하지 않는다.
-외부 공개를 위해 bind 주소를 변경하지 않는다. 공개 배포 전에는 로그인,
+외부 공개를 위해 로컬 실행의 bind 주소만 변경하지 않는다. [상시 서버 구성](HOSTING_SETUP.md)은
+인증 프록시·HTTPS·Secure 쿠키를 준비했으며 실제 배포하지 않았다. 개인별 공개 배포 전에는 로그인,
 HTTPS Secure 쿠키, 계정별 작업 소유권·요청 제한, 영구 작업 저장과 상시 SPOT 호스팅을
 구현해야 한다. 세션과 작업은 각 서버 재시작 시 사라진다.
 임시 연구 터널은 PC·터널 종료 시 끊기며 n8n Cloud 체험 기간도 별도 관리한다.
