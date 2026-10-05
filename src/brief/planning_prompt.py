@@ -102,7 +102,7 @@ SPoT는 매장 후보지를 추천하지 않습니다. 대상 매장의 홍보 �
 
 
 def render_handoff(brief, request, planning=None):
-    """One paragraph in Heung-manager's six-field order; blanks remain editable."""
+    """Readable sections in Heung-manager's six-field order; blanks remain editable."""
     planning=planning or {};store=request.get('store',{});campaign=request.get('campaign',{})
     def clean(value,fallback=''):
         return ' '.join(str(value).split()) if value is not None and str(value).strip() else fallback
@@ -110,7 +110,7 @@ def render_handoff(brief, request, planning=None):
     metrics={c.get('title'):c for c in quant if 'value' in c}
     facility=metrics.get('최다 주요시설 유형',{}).get('value')
     area=f"흥부장, {clean(store.get('name'),'[매장명 입력]')}({clean(store.get('address'),'[주소 입력]')})의 스마트폰·요금제·부가서비스 홍보 행사를 기획해주세요. "
-    area+='① 상권: '+(f'공공기관 선택영역 자료의 주요 시설 유형은 {facility}이며 주변 상권은 지역 관측을 참고해주세요. ' if facility else '[역 주변·주거·시장 등 확인된 주요 상권 설명 입력]. ')
+    area+='\n\n① 상권: '+(f'공공기관 선택영역 자료의 주요 시설 유형은 {facility}이며 주변 상권은 지역 관측을 참고해주세요. ' if facility else '[역 주변·주거·시장 등 확인된 주요 상권 설명 입력]. ')
     profiles=[]
     target_profiles=[c for c in quant if any(t in str(c.get('title')) for t in ('유동인구','매출'))]
     if not target_profiles:target_profiles=quant
@@ -126,27 +126,27 @@ def render_handoff(brief, request, planning=None):
                 peak=max(v for _,v in values)
                 if peak>0:pieces.extend(f'{LABELS[k]} {v:g}%' for k,v in values if v==peak)
         if pieces:profiles.append(f"{c['title']}: {', '.join(pieces)}")
-    area+='② 타깃 고객: '+('; '.join(profiles)+'를 관측 참고로 활용하되, 매장 방문 고객 비중이나 성별·연령의 교차 비율·상품 선호로 단정하지 마세요. ' if profiles else '정량 자료 미확보 — 주요 고객 비중을 추정하지 말고 [실제 매장 고객 특성 입력]을 참고해주세요. ')
+    area+='\n\n② 타깃 고객: '+('\n- '+'\n- '.join(profiles)+'\n위 값은 관측 참고이며 매장 방문 고객 비중이나 성별·연령의 교차 비율·상품 선호로 단정하지 마세요. ' if profiles else '정량 자료 미확보 — 주요 고객 비중을 추정하지 말고 [실제 매장 고객 특성 입력]을 참고해주세요. ')
     product=clean(planning.get('target_product') or campaign.get('product'),'[타깃 상품 입력: 단말기·요금제·부가서비스]')
-    area+=f"③ 타깃 상품: {product}. ④ 행사 기간: {clean(planning.get('event_period'),'[행사 날짜·준비/행사/사후 처리 시간 입력]')}. "
-    area+=f"⑤ 직원 수: {clean(planning.get('staff'),'[일반 업무 인력을 제외한 가용 직원 수 입력]')}. "
-    area+=f"⑥ 판촉물·예산: 보유품은 {clean(planning.get('promotional_items'),'[보유 판촉물 입력]')}, 구매 예산은 {clean(planning.get('budget'),'[구매 가능 예산 입력]')}입니다. "
+    area+=f"\n\n③ 타깃 상품: {product}.\n\n④ 행사 기간: {clean(planning.get('event_period'),'[행사 날짜·준비/행사/사후 처리 시간 입력]')}. "
+    area+=f"\n\n⑤ 직원 수: {clean(planning.get('staff'),'[일반 업무 인력을 제외한 가용 직원 수 입력]')}. "
+    area+=f"\n\n⑥ 판촉물·예산: 보유품은 {clean(planning.get('promotional_items'),'[보유 판촉물 입력]')}, 구매 예산은 {clean(planning.get('budget'),'[구매 가능 예산 입력]')}입니다. "
     local=brief.get('local_changes',[])+[c for c in brief.get('unique_local_signals',[]) if c.get('module')=='local']
     main,_=select_local(local)
     if main:
         card,reading=main[0];date=clean(card.get('published_at'),'날짜 미제공')[:10]
-        area+=f"지역 참고로는 {date} 보도의 ‘{reading['headline']}’를 활용할 수 있습니다. "
+        area+=f"\n\n[지역 참고]\n지역 참고로는 {date} 보도의 ‘{reading['headline']}’를 활용할 수 있습니다. "
     readings=[r for c in brief.get('trend_patterns',[]) if c.get('type')=='reference_case' and (r:=trend_reading(c))]
     if readings:
-        area+='전국 사례에서 참고할 방식은 '+', '.join(dict.fromkeys(r['headline'] for r in readings))+'입니다. '
+        area+='\n\n[전국 체험 참고]\n전국 사례에서 참고할 방식은 '+', '.join(dict.fromkeys(r['headline'] for r in readings))+'입니다. '
     hints=[]
     if any('촬영' in r['headline'] for r in readings):hints.append('카메라 체험 결과물 카드')
     if any('굿즈' in r['headline'] for r in readings):hints.append('기능 체험 완료 카드·작은 기념물')
-    if hints:area+='추가 판촉물 후보로 '+', '.join(hints)+' 등을 검토하되 보유품으로 간주하지 말고 예산·제작 가능 여부에 맞춰 선택해주세요. '
+    if hints:area+='\n\n[판촉물 힌트]\n추가 판촉물 후보로 '+', '.join(hints)+' 등을 검토하되 보유품으로 간주하지 말고 예산·제작 가능 여부에 맞춰 선택해주세요. '
     if metrics.get('주거인구',{}).get('value') and metrics.get('직장인구',{}).get('value'):
-        area+='숨은 기회 후보는 주거·직장 인구가 함께 관측되는 점을 활용해 생활용·업무용 사용 장면을 방문자가 직접 선택하게 하는 체험입니다. '
-    elif readings:area+='숨은 기회 후보는 일회성 경품 수령을 직접 기능 체험과 결과물 제공으로 이어가는 참여 동선입니다. '
+        area+='\n\n[숨은 기회]\n숨은 기회 후보는 주거·직장 인구가 함께 관측되는 점을 활용해 생활용·업무용 사용 장면을 방문자가 직접 선택하게 하는 체험입니다. '
+    elif readings:area+='\n\n[숨은 기회]\n숨은 기회 후보는 일회성 경품 수령을 직접 기능 체험과 결과물 제공으로 이어가는 참여 동선입니다. '
     purpose=clean(planning.get('purpose'))
-    if purpose:area+=f'기획 목적은 {purpose}입니다. '
-    area+='인구 구성과 이 힌트들은 고객 선호나 행사 효과의 증거가 아닙니다. 통계 기준월·집계 범위와 기사 출처는 SPoT 보고서를 따르고, 비어 있는 운영 조건을 임의로 채우지 않은 채 위 6개 조건에 맞는 실행안을 작성해주세요.'
-    return area+'\n'
+    if purpose:area+=f'\n\n[기획 목적]\n기획 목적은 {purpose}입니다. '
+    area+='\n\n[활용 안내]\n인구 구성과 이 힌트들은 고객 선호나 행사 효과의 증거가 아닙니다. 통계 기준월·집계 범위와 기사 출처는 SPoT 보고서를 따르고, 비어 있는 운영 조건을 임의로 채우지 않은 채 위 6개 조건에 맞는 실행안을 작성해주세요.'
+    return '\n'.join(line.rstrip() for line in area.splitlines())+'\n'

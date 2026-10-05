@@ -36,9 +36,9 @@ class PlanningPromptTests(unittest.TestCase):
         self.assertNotIn('javascript:',result)
         self.assertIn('[조사자료 끝]',result)
 
-    def test_final_paragraph_follows_six_fields_and_keeps_operating_blanks(self):
+    def test_readable_prompt_follows_six_fields_and_keeps_operating_blanks(self):
         text=render_handoff({}, {'store':{'name':'새 매장'}})
-        self.assertEqual(len(text.strip().splitlines()),1)
+        self.assertGreater(len(text.strip().splitlines()),6)
         labels=['① 상권:','② 타깃 고객:','③ 타깃 상품:','④ 행사 기간:','⑤ 직원 수:','⑥ 판촉물·예산:']
         self.assertEqual(sorted(text.index(label) for label in labels),[text.index(label) for label in labels])
         self.assertIn('[일반 업무 인력을 제외한 가용 직원 수 입력]',text)
