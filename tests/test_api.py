@@ -133,11 +133,18 @@ class ApiTests(unittest.TestCase):
             'why_here_now':'draft','research_implications':[],
             'needs_manual_check':['https://example.org/?certKey='+TOKEN]}
         run={'all_contracts_valid':True,'module_status':{},'state':{'research_brief':brief,
-             'critic_result':{'status':'manual_review','warnings':[TOKEN]}}}
+             'critic_result':{'status':'manual_review','warnings':[TOKEN]},
+             'trend_result':{'sources':[
+                 {'source_url':'https://www.youtube.com/watch?v=ABCDEFGHIJK','title':TOKEN},
+                 {'source_url':'https://youtube.com.evil.org/watch?v=ABCDEFGHIJK','title':'unsafe'},
+                 {'source_url':'https://news.example/article','title':'news'}]}}}
         with patch('src.integration_smoke.run_smoke',return_value=run),patch.dict('os.environ',{'SPOT_API_TOKEN':TOKEN}):
             result=research_result(bundle['request'],mode='live')
         self.assertNotIn(TOKEN,json.dumps(result))
         self.assertIn('REDACTED',json.dumps(result))
+        self.assertEqual(len(result['trend_discovery']['video_sources']),1)
+        self.assertEqual(result['research_brief']['source_count'],0)
+        self.assertEqual(result['research_brief']['trend_patterns'],[])
 
     def test_real_graph_offline_over_http(self):
         with TestClient(create_app(token=TOKEN,mode='offline')) as client:

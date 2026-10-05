@@ -2,6 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 class Element{
  constructor(tag){this.tag=tag;this.children=[];this.events={};this.attributes={};this.textContent='';}
  append(...c){this.children.push(...c)} replaceChildren(){this.children=[]} setAttribute(k,v){this.attributes[k]=v}
+ insertBefore(e,ref){this.children=this.children.filter(c=>c!==e);this.children.splice(this.children.indexOf(ref),0,e)}
  addEventListener(k,v){this.events[k]=v} set innerHTML(v){throw Error('No HTML injection')}
 }
 const doc={createElement:t=>new Element(t),getElementById:()=>null,body:new Element('body')};
@@ -14,12 +15,33 @@ assert.equal(board.youtubeID('https://youtu.be/ABCDEFGHIJK'),'ABCDEFGHIJK');asse
 const host=new Element('div'),brief={source_count:2,trend_patterns:[{type:'reference_case',case_id:'case-1',event_name:'실제 수집 자료 재생',sources:[{source_url:'https://www.youtube.com/watch?v=ABCDEFGHIJK',title:'영상'}, {source_url:'https://news.example/a',title:'기사',verification:{thumbnail_url:'https://news.example/photo.jpg'}}]}]};
 const before=JSON.stringify(brief);const walk=e=>[e,...e.children.flatMap(walk)];
 board.render(doc,host,brief,{request_id:'one'},()=>{},{});
-assert(walk(host).some(e=>e.tag==='iframe'&&e.src==='https://www.youtube-nocookie.com/embed/ABCDEFGHIJK'));
+assert(!walk(host).some(e=>e.tag==='iframe')); // Third-party playback starts only on click.
+walk(host).find(e=>e.className==='trend-video-cover').events.click();
+assert(walk(host).some(e=>e.tag==='iframe'&&e.src==='https://www.youtube-nocookie.com/embed/ABCDEFGHIJK?autoplay=1'));
 assert(walk(host).some(e=>e.tag==='img'&&e.src==='https://news.example/photo.jpg'));
 const form=walk(host).find(e=>e.tag==='form'),input=walk(form).find(e=>e.tag==='input');input.value='https://instagram.com/p/ABcD123/';form.events.submit({preventDefault(){}});
 assert(store.get('spot-media:one').includes('ABcD123'));assert.equal(JSON.stringify(brief),before);
 board.render(doc,host,brief,{request_id:'two'},()=>{},{});assert(!walk(host).some(e=>e.href==='https://www.instagram.com/p/ABcD123/'));
 board.render(doc,host,{},null,()=>{},{});assert(!walk(host).some(e=>e.tag==='iframe'));
+const discovery={video_sources:[{source_url:'https://youtu.be/12345678901',title:'브리프에 채택되지 않은 참고 영상'}, {source_url:'https://youtube.com.evil.org/watch?v=ABCDEFGHIJK',title:'거절할 URL'}]};
+assert.equal(board.collectVideos(brief,discovery).length,2);
+board.render(doc,host,{trend_patterns:[{type:'reference_case',event_name:'기사 사례',observation:'사례 관측',sources:[{source_url:'https://news.example/a',title:'기사'}]}]},null,()=>{},discovery);
+assert(walk(host).some(e=>e.textContent.includes('뉴스 사례와 별도로 살펴볼 자료입니다')));
+assert(!walk(walk(host).find(e=>e.className==='trend-news trend-selected-case')).some(e=>e.className==='trend-video-cover'));
+assert(walk(host).some(e=>e.src==='https://i.ytimg.com/vi/12345678901/hqdefault.jpg'));
+assert(!walk(host).some(e=>e.tag==='iframe'));
+const caseBrief={trend_patterns:[{type:'reference_case',case_id:'a',event_name:'기사 A',sources:[{source_url:'https://news.example/a',title:'기사 A'}]},{type:'reference_case',case_id:'b',event_name:'기사 B',sources:[{source_url:'https://news.example/b',title:'기사 B'}]}]};
+board.render(doc,host,caseBrief,{request_id:'independent'},()=>{},discovery);
+const videoSection=walk(host).find(e=>e.className==='trend-video-reference');
+assert(host.children.indexOf(videoSection)<host.children.findIndex(e=>e.className==='trend-case-nav'));
+walk(videoSection).find(e=>e.className==='trend-video-cover').events.click();
+walk(host).find(e=>e.className==='trend-case-nav').children[1].events.click();
+assert(walk(host).some(e=>e.className==='trend-case-title'&&e.textContent==='기사 B'));
+assert(walk(host).includes(videoSection));
+assert(walk(videoSection).some(e=>e.tag==='iframe')); // Case selection must not replace independent playback.
+board.render(doc,host,{},null,()=>{},discovery);assert(walk(host).some(e=>e.className==='trend-video-cover'));
+board.renderOverview(doc,host,{},discovery);assert.equal(host.hidden,false);
+board.renderOverview(doc,host,{},{});assert.equal(host.hidden,true);assert.equal(host.children.length,0);
 console.log('Trend board media validation, thumbnails, evidence exclusion and request isolation passed.');
 (async()=>{
  board.render(doc,host,brief,{request_id:'api'},()=>{},{});
