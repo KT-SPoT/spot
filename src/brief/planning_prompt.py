@@ -102,51 +102,71 @@ SPoT는 매장 후보지를 추천하지 않습니다. 대상 매장의 홍보 �
 
 
 def render_handoff(brief, request, planning=None):
-    """Readable sections in Heung-manager's six-field order; blanks remain editable."""
-    planning=planning or {};store=request.get('store',{});campaign=request.get('campaign',{})
-    def clean(value,fallback=''):
-        return ' '.join(str(value).split()) if value is not None and str(value).strip() else fallback
+    """Six-field writing notes, without generating a request to the planning agent."""
+    planning=planning or {};store=request.get('store',{})
+    lines=['흥부장 작성 힌트',store.get('name') or '조사 매장',
+           '조사 결과를 참고해 각 항목을 직접 작성하세요. 힌트는 기획 제안이며 고객 호응·행사 효과를 입증하지 않습니다.']
     quant=[c for c in brief.get('unique_local_signals',[]) if c.get('module')=='quant']
-    metrics={c.get('title'):c for c in quant if 'value' in c}
-    facility=metrics.get('최다 주요시설 유형',{}).get('value')
-    area=f"흥부장, {clean(store.get('name'),'[매장명 입력]')}({clean(store.get('address'),'[주소 입력]')})의 스마트폰·요금제·부가서비스 홍보 행사를 기획해주세요. "
-    area+='\n\n① 상권: '+(f'공공기관 선택영역 자료의 주요 시설 유형은 {facility}이며 주변 상권은 지역 관측을 참고해주세요. ' if facility else '[역 주변·주거·시장 등 확인된 주요 상권 설명 입력]. ')
-    profiles=[]
-    target_profiles=[c for c in quant if any(t in str(c.get('title')) for t in ('유동인구','매출'))]
-    if not target_profiles:target_profiles=quant
-    for c in target_profiles:
-        if not isinstance(c.get('shares'),dict) or not any(t in str(c.get('title')) for t in ('성별','연령')):continue
-        pieces=[]
-        for group in (('male','female'),('under_10','teens','20s','30s','40s','50s','60_plus')):
-            values=[]
-            for key in group:
-                value=c['shares'].get(key,{});share=value.get('share_pct') if isinstance(value,dict) else None
-                if isinstance(share,(int,float)) and not isinstance(share,bool) and math.isfinite(share) and 0<=share<=100:values.append((key,share))
+    fields=[[] for _ in range(6)]
+    summary=brief.get('overview',{}).get('area_summary')
+    if summary and not any(t in summary for t in ('정량 지표','자료 수','근거와 함께 요약')):fields[0].append('조사 참고: '+summary)
+    def source_notes(card):
+        notes=[]
+        for source in card.get('sources',[]):
+            url=source.get('source_url','')
+            try:
+                parts=urlsplit(url)
+                if parts.scheme not in ('http','https') or not parts.hostname or parts.username or parts.password:continue
+            except ValueError:continue
+            notes.append(f"근거: {source.get('title') or source.get('source_name') or '원본 자료'} — {url}")
+        return notes
+    for c in quant:
+        title=str(c.get('title','공공 관측'));index=None;value=None
+        if title in ('최다 주요시설 유형','주거인구','직장인구') and c.get('value') is not None:
+            index=0;value=str(c['value'])+str(c.get('unit',''))
+        elif isinstance(c.get('shares'),dict) and any(t in title for t in ('성별','연령','요일','시간')):
+            values=[(k,v['share_pct']) for k,v in c['shares'].items() if k!='total' and isinstance(v,dict) and isinstance(v.get('share_pct'),(int,float)) and not isinstance(v['share_pct'],bool) and math.isfinite(v['share_pct']) and 0<=v['share_pct']<=100]
             if values:
-                peak=max(v for _,v in values)
-                if peak>0:pieces.extend(f'{LABELS[k]} {v:g}%' for k,v in values if v==peak)
-        if pieces:profiles.append(f"{c['title']}: {', '.join(pieces)}")
-    area+='\n\n② 타깃 고객: '+('\n- '+'\n- '.join(profiles)+'\n위 값은 관측 참고이며 매장 방문 고객 비중이나 성별·연령의 교차 비율·상품 선호로 단정하지 마세요. ' if profiles else '정량 자료 미확보 — 주요 고객 비중을 추정하지 말고 [실제 매장 고객 특성 입력]을 참고해주세요. ')
-    product=clean(planning.get('target_product') or campaign.get('product'),'[타깃 상품 입력: 단말기·요금제·부가서비스]')
-    area+=f"\n\n③ 타깃 상품: {product}.\n\n④ 행사 기간: {clean(planning.get('event_period'),'[행사 날짜·준비/행사/사후 처리 시간 입력]')}. "
-    area+=f"\n\n⑤ 직원 수: {clean(planning.get('staff'),'[일반 업무 인력을 제외한 가용 직원 수 입력]')}. "
-    area+=f"\n\n⑥ 판촉물·예산: 보유품은 {clean(planning.get('promotional_items'),'[보유 판촉물 입력]')}, 구매 예산은 {clean(planning.get('budget'),'[구매 가능 예산 입력]')}입니다. "
-    local=brief.get('local_changes',[])+[c for c in brief.get('unique_local_signals',[]) if c.get('module')=='local']
-    main,_=select_local(local)
-    if main:
-        card,reading=main[0];date=clean(card.get('published_at'),'날짜 미제공')[:10]
-        area+=f"\n\n[지역 참고]\n지역 참고로는 {date} 보도의 ‘{reading['headline']}’를 활용할 수 있습니다. "
-    readings=[r for c in brief.get('trend_patterns',[]) if c.get('type')=='reference_case' and (r:=trend_reading(c))]
-    if readings:
-        area+='\n\n[전국 체험 참고]\n전국 사례에서 참고할 방식은 '+', '.join(dict.fromkeys(r['headline'] for r in readings))+'입니다. '
-    hints=[]
-    if any('촬영' in r['headline'] for r in readings):hints.append('카메라 체험 결과물 카드')
-    if any('굿즈' in r['headline'] for r in readings):hints.append('기능 체험 완료 카드·작은 기념물')
-    if hints:area+='\n\n[판촉물 힌트]\n추가 판촉물 후보로 '+', '.join(hints)+' 등을 검토하되 보유품으로 간주하지 말고 예산·제작 가능 여부에 맞춰 선택해주세요. '
-    if metrics.get('주거인구',{}).get('value') and metrics.get('직장인구',{}).get('value'):
-        area+='\n\n[숨은 기회]\n숨은 기회 후보는 주거·직장 인구가 함께 관측되는 점을 활용해 생활용·업무용 사용 장면을 방문자가 직접 선택하게 하는 체험입니다. '
-    elif readings:area+='\n\n[숨은 기회]\n숨은 기회 후보는 일회성 경품 수령을 직접 기능 체험과 결과물 제공으로 이어가는 참여 동선입니다. '
-    purpose=clean(planning.get('purpose'))
-    if purpose:area+=f'\n\n[기획 목적]\n기획 목적은 {purpose}입니다. '
-    area+='\n\n[활용 안내]\n인구 구성과 이 힌트들은 고객 선호나 행사 효과의 증거가 아닙니다. 통계 기준월·집계 범위와 기사 출처는 SPoT 보고서를 따르고, 비어 있는 운영 조건을 임의로 채우지 않은 채 위 6개 조건에 맞는 실행안을 작성해주세요.'
-    return '\n'.join(line.rstrip() for line in area.splitlines())+'\n'
+                groups=[[item for item in values if item[0] in keys] for keys in (('male','female'),('under_10','teens','20s','30s','40s','50s','60_plus'))] if any(t in title for t in ('성별','연령')) else [values]
+                peaks=[(k,v) for group in groups if group for k,v in group if v==max(n for _,n in group) and v>0]
+                if peaks:
+                    index=3 if any(t in title for t in ('요일','시간')) else 1
+                    value=' / '.join(f'{LABELS.get(k,k)} {v:g}%' for k,v in peaks)
+        if index is not None:
+            fields[index].append(f"조사 참고: {title}: {value} (기준 {c.get('reference_period') or '별도 확인'} · {c.get('scope') or '집계 범위 별도 확인'})")
+            fields[index].extend(source_notes(c))
+    for c in brief.get('local_changes',[])[:2]:
+        fields[0].append(f"조사 참고: {c.get('title') or '지역 변화'} · {str(c.get('published_at') or '보도일 별도 확인')[:10]}: {c.get('evidence') or c.get('statement') or ''}")
+        fields[0].extend(source_notes(c))
+    if not fields[1]:fields[1].append('인구 구성: 정량 자료 미확보. 실제 매장 고객 정보를 별도로 참고하세요.')
+    fields[1].append('선택 힌트: 인구 구성은 주변 상권의 관측입니다. 실제 매장 방문 고객 비중·상품 선호와 구분해 참고하세요. 성별과 연령은 각각의 비중이며 교차 비율이 아닙니다.')
+    product=planning.get('target_product') or request.get('campaign',{}).get('product')
+    if product:fields[2].append('사용자가 지정한 상품: '+str(product))
+    fields[2].append('선택 힌트: 성별·나이만으로 모델이나 요금제를 정하기보다 사용 장면과 공식 상품 기능을 연결해 선택하세요.')
+    fields[3].append('선택 힌트: 관측된 피크 요일·시간은 일정 선택의 참고입니다. 준비·행사·사후 처리에 필요한 시간은 따로 정하세요.')
+    for index,key in ((3,'event_period'),(4,'staff'),(5,'promotional_items'),(5,'budget')):
+        if planning.get(key):fields[index].append('사용자가 정한 조건: '+str(planning[key]))
+    for c in brief.get('trend_patterns',[]):
+        if c.get('type')!='reference_case':continue
+        reading=trend_reading(c)
+        if not reading:continue
+        candidate='카메라 체험 결과물 카드' if '촬영' in reading['headline'] else '기능 체험 완료 카드·작은 기념물' if '굿즈' in reading['headline'] else None
+        index=5 if candidate else 2
+        if not candidate and len(fields[index])>=4:continue
+        fields[index].append('조사 참고: '+str(c.get('event_name') or '전국 체험 사례')+': '+reading['fact'])
+        fields[index].extend(source_notes(c))
+        if candidate:fields[5].append('판촉물 후보: '+candidate+' — 보유품으로 간주하지 않고 예산·제작 가능 여부에 맞춰 검토하세요.')
+        else:fields[2].append('선택 힌트: 선택한 상품의 기능을 직접 써보고 비교하는 사용 장면을 검토하세요.')
+    questions=[['매장 방문 동선에 실제로 연결되는 역·시설·생활권은 어디인가요?'],
+               ['실제 방문 고객은 주로 주민·직장인·통행 고객 중 누구인가요?'],
+               ['홍보할 단말기·요금제·부가서비스와 강조할 가치는 무엇인가요?'],
+               ['희망 날짜와 실제 운영 가능한 시간은 언제인가요?'],
+               ['일반 매장 업무를 제외하고 행사에 투입할 수 있는 직원은 몇 명인가요?', '안내·체험 지원·상담을 동시에 맡을 수 있는지 확인했나요?'],
+               ['현재 보유한 판촉물과 구매·제작에 쓸 수 있는 예산은 얼마인가요?']]
+    for i,label in enumerate(('상권','타깃 고객','타깃 상품','행사 기간','직원 수','판촉물·예산')):
+        lines.extend(['',f'{i+1}. {label}',*dict.fromkeys(fields[i]),*('내가 정할 내용: '+q for q in questions[i])])
+    populations=[next((c.get('value') for c in quant if c.get('title')==title),None) for title in ('주거인구','직장인구')]
+    if all(isinstance(v,(int,float)) and not isinstance(v,bool) and math.isfinite(v) and v>0 for v in populations):
+        lines.extend(['','숨은 기회 후보','관측: 주거인구와 직장인구가 각각 관측된 상권',
+                      '기획 힌트: 방문자가 생활용·업무용 사용 장면을 직접 고르게 하는 체험을 검토할 수 있어요. 두 모집단의 중복·비중이나 실제 고객 선호를 뜻하지 않습니다.'])
+    return '\n'.join(lines)+'\n'
