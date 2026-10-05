@@ -11,6 +11,7 @@ from src.brief.trend_groups import group_coverage
 from src.brief.quant_policy import quant_basis
 from src.brief.failures import failure_summary
 from src.brief.quant_distributions import distribution_cards, valid_share
+from src.brief.experience_connections import connections, reported_actions
 
 
 METRICS = {
@@ -342,6 +343,20 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
             and fit.get('mechanism_source_ids')
             and fit.get('fit_status') == 'hypothesis_not_proven_preference'
             and set(fit['mechanism_source_ids']).issubset(set(ids))]
+        connected = connections(card, facts + demographics + distributions)
+        if connected:
+            card['adaptation_hypotheses'] = connected
+            for hypothesis in connected:
+                for ref in hypothesis['context_source_refs']:
+                    if ref not in card['context_source_refs']:card['context_source_refs'].append(ref)
+                    linked = sources_for('quant', [ref['source_id']])
+                    entries = card['context_sources'].setdefault('quant', [])
+                    for source in linked:
+                        if not any(s['source_id'] == source['source_id'] for s in entries):entries.append(source)
+        elif not reported_actions(card):
+            # Keep the news reference, without pretending a category is an action.
+            card['adaptation_hypotheses'] = []
+            card['limitations'].append('구체적인 참여 행동이 부족해 지역 연결 단서를 생성하지 않았습니다. 전국 행사 소식으로 참고합니다.')
         trend_patterns.append(card)
 
     for item in trend.get('audience_contexts', []):

@@ -271,6 +271,6 @@ def create_app(*, token=None, n8n_base=None, transport=None, place_transport=Non
         except (KeyError,TypeError,ValueError):
             return failure('REPORT_NOT_READY',503)
         return Response(content,media_type='text/plain; charset=utf-8',
-                        headers={'Content-Disposition':'attachment; filename="SPOT-heung-manager-prompt.txt"'})
+                        headers={'Content-Disposition':'attachment; filename="SPOT-heung-manager-clues.txt"'})
 
     return app

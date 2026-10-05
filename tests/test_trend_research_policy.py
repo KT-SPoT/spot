@@ -22,7 +22,9 @@ class TrendResearchPolicyTests(unittest.TestCase):
                     'demographic_response_established': False, 'response_signals': [],
                     'source_ids': [source['source_id']], 'reported_mechanisms': [
                         {'mechanism': 'mission_journey', 'matched_terms': ['미션'], 'source_ids': [source['source_id']]}]}
-        with patch('src.scouts.search_runtime.news', return_value=[article('서울 게임 팝업 미션 체험')]), \
+        reported=article('서울 게임 팝업 미션 체험')
+        reported['description']='참여자는 미션을 수행하고 완료 결과를 확인한다.'
+        with patch('src.scouts.search_runtime.news', return_value=[reported]), \
              patch('src.scouts.search_runtime.videos', return_value=[]):
             bundle['results']['trend'] = run_trend_scout(bundle['request'], context=ctx, detail_reader=detail)
         brief = generate_brief(bundle)

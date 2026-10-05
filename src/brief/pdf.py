@@ -159,15 +159,21 @@ def render_pdf(brief, request=None, discovery=None):
         reading_block(i,c,reading,c.get('event_name') or '전국 행사 참고')
     heading('05  기획에 활용할 연결점')
     note('WHY HERE, NOW?',brief.get('why_here_now'))
-    for item in brief.get('research_implications',[]):
-        text=item.get('statement') or item.get('title') or item if isinstance(item,dict) else item
-        if isinstance(text,str) and sum(bool(c.get('event_name')) and c['event_name'] in text for c in cases)>=2:
-            if main_trend:add('전국 사례에서 참고할 방식은 '+', '.join(r['headline'] for _,r in main_trend)+'입니다. 이 방식을 지역 고객의 사용 장면과 연결하는 기획을 검토하세요.')
-            continue
-        add(text)
+    from src.brief.planning_prompt import build_planning_clues
+    clues=build_planning_clues(brief,request)
+    add('웹의 흥부장 기획 단서와 같은 조사 데이터에서 연결한 아이디어입니다. 연결 아이디어는 실행안이나 성과의 증거가 아닙니다.','small')
+    for field in clues['fields']:
+        block=[Spacer(1,3*mm),p(f"{field['number']}. {field['label']}",'sub')]
+        block.extend(p(text) for text in field['hints'])
+        if not field['hints']:block.append(p(field['note'] or '이 항목으로 연결할 조사 데이터가 없습니다.','small'))
+        story.append(KeepTogether(block))
+    for opportunity in clues['opportunities']:
+        add('숨은 기회 후보','sub');add(opportunity['basis'],'small');add(opportunity['hint'])
     review=brief.get('research_review',{})
     if review:
-        add('고객 연결·차별성 검토: '+('완료' if review.get('performed') else '미완료 / 꺼짐'),'small')
+        rows=review.get('case_reviews',[])
+        label=f"검토 수행 완료 · 응용 보완 {sum(r.get('verdict')!='useful' for r in rows)}/{len(rows)}건" if review.get('performed') else '미완료 / 꺼짐'
+        add('고객 연결·차별성 검토: '+label,'small')
     story.extend([Spacer(1,6*mm),p('보고서 활용 범위','sub')])
     add('본문의 보도된 내용은 출처 자료의 요약이고, 참고할 이유와 매장 활용 힌트는 기획 제안입니다. 기사만으로 현재 방문객 증가나 특정 연령·성별의 선호·행사 성과를 판단하지 않습니다. 사업은 표시된 진행 단계로, 과거 보도는 표시된 날짜로 읽습니다.','small')
     add('매장 조사 반경과 주변 행정구역의 보도 범위는 다를 수 있습니다. 통계의 기준월·모집단은 표에 표시하며, 자료 생성일로 대체하지 않습니다. 뉴스 제공일과 원문 게시일이 다를 수 있으며, 제한된 검색 결과가 모든 사건을 포함하는 것은 아닙니다.','small')
