@@ -69,11 +69,12 @@ const SPOTTrendBoard = (() => {
     }
     cases.forEach((c,i)=>{const b=make('button',undefined,'',nav);b.type='button';b.hidden=i>=3;b.setAttribute('aria-label',c.event_name||'행사 참고 사례');make('span',String(i+1).padStart(2,'0'),'trend-case-number',b);const title=make('span',undefined,'trend-nav-copy',b);make('strong',c.event_name||'행사 참고 사례','',title);make('small',short(c.observation||'원본에서 사례 확인',65),'',title);b.addEventListener('click',()=>select(c,i));});if(cases.length>3){const more=make('button',`다른 사례 ${cases.length-3}개 보기 ↓`,'text-button trend-more-cases',host);host.insertBefore(more,area);more.type='button';let expanded=false;more.addEventListener('click',()=>{expanded=!expanded;[...nav.children].forEach((b,i)=>b.hidden=!expanded&&i>=3);more.textContent=expanded?'사례 목록 접기 ↑':`다른 사례 ${cases.length-3}개 보기 ↓`;});}if(cases.length)select(cases[0],0);
     if(videos.length){
-      const section=make('section',undefined,'trend-video-reference',host);make('p','VIDEO LIBRARY / 독립 참고 자료','eyebrow',section);make('h3','영상으로 살펴보는 체험 현장','',section);make('p','전국에서 수집한 별도의 참고 영상입니다. 위에서 선택한 뉴스 사례의 관련 영상이라는 의미는 아닙니다.','muted',section);
+      const section=make('section',undefined,'trend-video-reference',host);make('p','VIDEO LIBRARY / 독립 참고 자료','eyebrow',section);make('h3','영상으로 살펴보는 체험 현장','',section);make('p','전국에서 수집한 별도의 참고 영상입니다. 뉴스 사례와 별도로 살펴볼 자료입니다.','muted',section);
       const body=make('div',undefined,'trend-reference-body',section),main=make('article',undefined,'trend-media-main',body),list=make('div',undefined,'trend-reference-list',body);
       function chooseVideo(v){main.replaceChildren();player(main,v,'독립 참고 영상 · 행사 동일성·호응 미확인');for(const [i,b] of [...list.children].entries())b.setAttribute('aria-pressed',String(videos[i].id===v.id));attachments.reference_video=v.id;save();}
       for(const v of videos){const b=make('button',undefined,'trend-video-option',list);b.type='button';b.setAttribute('data-video-id',v.id);const img=make('img',undefined,'',b);img.src=`https://i.ytimg.com/vi/${v.id}/default.jpg`;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';img.addEventListener('error',()=>{img.hidden=true;});make('span',v.source.title||v.id,'',b);b.addEventListener('click',()=>chooseVideo(v));}
       chooseVideo(videos.find(v=>v.id===attachments.reference_video)||videos[0]);
+      host.insertBefore(section,nav);
     }
     const plan=make('details',undefined,'trend-search-plan',host);make('summary','검색 과정 · 검색어와 이유','',plan);
     if(discovery?.search_plan?.length)for(const row of discovery.search_plan){make('strong',row.query,'',plan);make('p',row.reason,'muted',plan);}else make('p','저장된 결과에는 검색 계획 기록이 없습니다.','muted',plan);

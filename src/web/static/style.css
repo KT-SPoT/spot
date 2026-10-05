@@ -135,7 +135,7 @@ body:not(.landing) .topbar{background:#f4f3ef;border-color:#dcded7}body:not(.lan
 /* News belongs to the selected case; the video library is independent. */
 .trend-selected-case{max-width:960px}.trend-selected-case .trend-case-title{font-size:28px;max-width:820px}.trend-selected-case .trend-case-summary{max-width:820px}
 .trend-selected-case .trend-news-row img{width:150px;height:100px}.trend-selected-case>.text-button{display:block;margin:12px 0}
-.trend-video-reference{margin-top:36px;padding-top:30px;border-top:2px solid #d9d8d0}
+.trend-video-reference{margin:0 0 36px;padding-top:24px;border-top:2px solid #d9d8d0}
 .trend-video-reference>h3{font-size:27px;margin:10px 0}.trend-video-reference>.muted{font-size:14px;line-height:1.8;margin-bottom:24px}
 .trend-reference-body{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:28px;align-items:start}
 .trend-reference-list{max-height:510px;overflow-y:auto;display:grid;gap:10px;border-top:1px solid #d9d8d0;padding-top:12px}
