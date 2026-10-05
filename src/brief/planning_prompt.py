@@ -114,7 +114,7 @@ def build_planning_clues(brief, request, planning=None):
         return [(k,v) for k,v in values if v==maximum and v>0]
     def peak_text(items):return ' / '.join(f'{LABELS.get(k,k)} {v:g}%' for k,v in items)
     def add(index,card,text):
-        fields[index].append('조사에서 발견한 내용: '+text)
+        if text:fields[index].append('조사에서 발견한 내용: '+text)
         for source in card.get('sources',[]):
             url=source.get('source_url','')
             try:
@@ -163,6 +163,18 @@ def build_planning_clues(brief, request, planning=None):
         if planning.get(key):fields[index].append('사용자가 정한 조건: '+str(planning[key]))
     for c in brief.get('trend_patterns',[]):
         if c.get('type')!='reference_case':continue
+        connected=[h for h in c.get('adaptation_hypotheses',[]) if isinstance(h,dict)
+                   and h.get('kind')=='research_question' and str(h.get('statement','')).startswith('지역 관측:')]
+        if connected:
+            for h in connected:
+                index=5 if h.get('mechanism')=='collectible_reward' else 2
+                add(index,c,f"{c.get('event_name') or '전국 참고 사례'}: {c.get('observation') or ''}")
+                hint(index,h['statement'])
+                for card in quant:
+                    if any(s.get('source_id')==r.get('source_id') for s in card.get('sources',[])
+                           for r in h.get('context_source_refs',[]) if r.get('module')=='quant'):
+                        add(index,card,None)
+            continue
         fact=str(c.get('observation') or '');name=c.get('event_name') or '전국 체험 사례'
         if ('□' in fact or '브리핑' in name) and '...' in fact:continue
         mechanisms={h.get('mechanism') for h in c.get('adaptation_hypotheses',[]) if isinstance(h,dict)}

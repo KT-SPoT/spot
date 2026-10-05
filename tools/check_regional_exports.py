@@ -16,6 +16,7 @@ from src.brief.generator import generate_brief
 from src.brief.planning_prompt import build_planning_clues, render_handoff
 from src.brief.pdf import render_pdf
 from src.brief.renderer import render_markdown
+from src.critic.research_review import build_research_input
 
 
 def compact(text):
@@ -33,6 +34,12 @@ def compare(inputs, output, pdf_output):
         before = deepcopy(bundle)
         request = bundle['request']
         brief = generate_brief(bundle, bundle['critic'], quant_evidence=bundle.get('quant_evidence'))
+        review_input = build_research_input(bundle, bundle['critic'], quant_evidence=bundle.get('quant_evidence'))
+        linked_questions = [h['statement'] for c in brief['trend_patterns'] if c.get('type') == 'reference_case'
+                            for h in c.get('adaptation_hypotheses', []) if h.get('statement', '').startswith('지역 관측:')]
+        supplied_questions = [h['statement'] for c in review_input['cases']
+                              for h in c.get('adaptation_hypotheses', []) if h.get('statement', '').startswith('지역 관측:')]
+        assert linked_questions == supplied_questions, 'Critic must receive the same planning connections'
         clues = build_planning_clues(brief, request)
         payload = {'brief': brief, 'request': request}
         executable = shutil.which('node') or shutil.which('node.exe')

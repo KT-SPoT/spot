@@ -9,7 +9,7 @@ const SPOTPlanningHints = (() => {
     const valid=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=100;
     const peaks=(c,keys)=>{const items=Object.entries(c.shares||{}).filter(([k,v])=>k!=='total'&&(!keys||keys.includes(k))&&valid(v?.share_pct));const max=Math.max(...items.map(([,v])=>v.share_pct));return max>0?items.filter(([,v])=>v.share_pct===max).map(([key,v])=>({key,value:v.share_pct,label:labels[key]||key})):[];};
     const peakText=items=>items.map(p=>`${p.label} ${p.value}%`).join(' / ');
-    function add(field,card,text){if(!field.basis.includes(text))field.basis.push(text);for(const source of card.sources||[]){const url=safeUrl(source.source_url);if(url&&!field.sources.some(s=>s.url===url))field.sources.push({url,title:source.title||source.source_name||'원본 근거'});}}
+    function add(field,card,text){if(text&&!field.basis.includes(text))field.basis.push(text);for(const source of card.sources||[]){const url=safeUrl(source.source_url);if(url&&!field.sources.some(s=>s.url===url))field.sources.push({url,title:source.title||source.source_name||'원본 근거'});}}
     const hint=(i,text)=>{if(!fields[i].hints.includes(text))fields[i].hints.push(text);};
     for(const c of quant){
       const title=c.title||'공공 관측',period=`기준 ${c.reference_period||'별도 확인'} · ${c.scope||'집계 범위 별도 확인'}`;
@@ -36,6 +36,8 @@ const SPOTPlanningHints = (() => {
     }
     if(request.campaign?.product)fields[2].basis.push(`사용자가 지정한 상품: ${request.campaign.product}`);
     for(const c of (brief.trend_patterns||[]).filter(c=>c.type==='reference_case')){
+      const connected=(c.adaptation_hypotheses||[]).filter(h=>h.kind==='research_question'&&String(h.statement||'').startsWith('지역 관측:'));
+      if(connected.length){for(const h of connected){const idx=h.mechanism==='collectible_reward'?5:2;add(fields[idx],c,`${c.event_name||'전국 참고 사례'}: ${c.observation||''}`);hint(idx,h.statement);for(const card of quant)if((card.sources||[]).some(s=>(h.context_source_refs||[]).some(r=>r.module==='quant'&&r.source_id===s.source_id)))add(fields[idx],card,null);}continue;}
       const observation=c.observation||'',name=c.event_name||'전국 체험 사례',mechanisms=new Set((c.adaptation_hypotheses||[]).map(h=>h.mechanism));
       if((observation.includes('□')||/브리핑/.test(name))&&observation.includes('...'))continue;
       if(mechanisms.has('photo_sharing')&&/촬영|SNS|공유|유튜브/.test(observation)){

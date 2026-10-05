@@ -49,9 +49,13 @@ const SPOTTrendBoard = (() => {
       const full=make('details',undefined,'trend-source-reading',news);make('summary','보도 내용 전체 읽기','',full);make('p',card.observation||'내용 미확보','',full);
       const applied=make('section',undefined,'trend-application',area);make('p','FROM CASE TO STORE','eyebrow',applied);make('h3','이 사례에서 무엇을 참고할까?','',applied);
       const reading=make('div',undefined,'trend-application-grid',applied);
-      const mechanism=make('article',undefined,'',reading);make('p','01 / 체험 방식','trend-reading-label',mechanism);make('h4','자료에서 확인한 장면','',mechanism);make('p',short(card.observation||'체험 방식은 원문 확인이 필요합니다.',180),'',mechanism);
-      const adaptation=make('article',undefined,'',reading);make('p','02 / 매장 연결점','trend-reading-label',adaptation);make('h4','매장 응용은 조사 가설','',adaptation);const question=card.adaptation_hypotheses?.[0];make('p',short(typeof question==='string'?question:question?.statement||'응용 질문을 만들 자료가 미확보됐습니다.',180),'',adaptation);
-      const check=make('article',undefined,'',reading);make('p','03 / 확인할 점','trend-reading-label',check);make('h4','호응과 효과는 별도 확인','',check);make('p','지역 고객 구성만으로 취향을 단정하지 않습니다. 체험 이해도와 참여 의향은 추가 확인할 항목입니다.','',check);
+      const question=card.adaptation_hypotheses?.[0],statement=typeof question==='string'?question:question?.statement||'';
+      const linked=statement.startsWith('지역 관측:');
+      const action=linked?statement.split('사례에서 참고할 행동: ')[1]?.split(' 연결 단서:')[0]:null;
+      const mechanism=make('article',undefined,'',reading);make('p','01 / 체험 방식','trend-reading-label',mechanism);make('h4','보도에서 참고할 행동','',mechanism);make('p',action||short(card.observation||'구체적인 참여 행동 자료가 부족합니다.',180),'',mechanism);
+      const adaptation=make('article',undefined,'',reading);make('p','02 / 매장 연결점','trend-reading-label',adaptation);make('h4','지역 관측 → 기획 질문','',adaptation);
+      if(linked){make('p',statement.split(' 사례에서 참고할 행동:')[0],'muted',adaptation);make('p',statement.split('연결 단서: ')[1]||statement,'',adaptation);}else make('p',statement||'전국 행사 소식으로 참고합니다. 지역과 연결할 구체적인 행동 단서가 부족합니다.','',adaptation);
+      const check=make('article',undefined,'',reading);make('p','03 / 해석 범위','trend-reading-label',check);make('h4','선호·성과의 증거와 구분','',check);make('p','연결점은 기획 후보를 넓히는 질문입니다. 인구·매출 구성은 서로 다른 집계이며 고객의 취향이나 행사 효과를 입증하지 않습니다.','',check);
       const details=make('details',undefined,'trend-application-detail',area);make('summary','응용 질문 전체 · 선정 이유 · 고객 맥락','',details);for(const q of card.adaptation_hypotheses||[])make('p',q.statement||q,'',details);const why=make('button','선정 이유와 연결 근거 보기 ↗','text-button',details);why.type='button';why.addEventListener('click',()=>evidence(card,'trend'));
       const social=make('details',undefined,'trend-social',area);social.open=Array.isArray(owned.instagram)&&owned.instagram.length>0;make('summary','Instagram · 시각 참고 추가','',social);make('p','행사 공식 게시물이나 릴스를 추가하세요. 이 탭에만 보관되며 브리프·GPT·근거 수에 포함되지 않습니다.','muted',social);
       const form=make('form',undefined,'social-link-form',social),label=make('label','인스타그램 게시물 주소','',form),input=make('input',undefined,'',label);input.type='url';input.required=true;input.placeholder='https://www.instagram.com/p/…/';input.maxLength=300;const add=make('button','링크 추가','button',form);add.type='submit';const status=make('p','','muted',social);status.setAttribute('role','status');
