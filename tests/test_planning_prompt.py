@@ -41,10 +41,10 @@ class PlanningPromptTests(unittest.TestCase):
         self.assertGreater(len(text.strip().splitlines()),6)
         labels=['1. 상권','2. 타깃 고객','3. 타깃 상품','4. 행사 기간','5. 직원 수','6. 판촉물·예산']
         self.assertEqual(sorted(text.index(label) for label in labels),[text.index(label) for label in labels])
-        self.assertIn('일반 매장 업무를 제외하고',text)
+        self.assertIn('가용 직원 수·업무 배치에 관한 조사 데이터 없음',text)
         self.assertNotIn('기획해주세요',text)
         self.assertNotIn('실행안을 작성',text)
-        self.assertIn('구매·제작에 쓸 수 있는 예산',text)
+        self.assertIn('예산 데이터 없음',text)
         self.assertIn('정량 자료 미확보',text)
 
     def test_user_conditions_and_promo_candidate_do_not_become_observed_inventory(self):
@@ -56,7 +56,7 @@ class PlanningPromptTests(unittest.TestCase):
         self.assertIn('사용자가 정한 조건: 2명',text)
         self.assertIn('사용자가 정한 조건: 휴대폰 거치대',text)
         self.assertIn('카메라 체험 결과물 카드',text)
-        self.assertIn('보유품으로 간주하지',text)
+        self.assertIn('보유품·제작비·예산 데이터 없음',text)
         self.assertIn('사용자가 지정한 상품: 중저가 단말기',text)
 
     def test_peak_time_is_not_event_duration_and_population_is_not_visitors(self):
@@ -67,6 +67,22 @@ class PlanningPromptTests(unittest.TestCase):
         text=render_handoff(brief,{})
         self.assertIn('14~18시 55%',text)
         self.assertIn('2026-08',text)
-        self.assertIn('필요한 시간은 따로 정',text)
+        self.assertIn('행사 소요 시간에 대한 관측은 아님',text)
         self.assertNotIn('숨은 기회 후보',text)
         self.assertNotIn('4시간 행사',text)
+
+    def test_ideas_depend_on_observed_case_and_profile_not_generic_advice(self):
+        brief={'unique_local_signals':[{'module':'quant','title':'유동인구 연령 구성','shares':{'20s':{'share_pct':35},'60_plus':{'share_pct':20}}}],
+               'trend_patterns':[{'type':'reference_case','event_name':'촬영 팝업','observation':'촬영 결과를 SNS로 공유한다.',
+                                  'adaptation_hypotheses':[{'mechanism':'photo_sharing'}]}]}
+        text=render_handoff(brief,{})
+        self.assertIn('20대 35%',text)
+        self.assertIn('‘촬영 팝업’의 촬영·공유 방식 → 카메라·영상 기능',text)
+        self.assertNotIn('선택하세요',text)
+        self.assertNotIn('내가 정할 내용',text)
+        brief['trend_patterns']=[]
+        brief['unique_local_signals'][0]['shares']={'60_plus':{'share_pct':65}}
+        changed=render_handoff(brief,{})
+        self.assertIn('60대 이상 65%',changed)
+        self.assertNotIn('20대 35%',changed)
+        self.assertNotIn('카메라 체험 결과물 카드',changed)

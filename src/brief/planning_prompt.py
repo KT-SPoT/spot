@@ -102,71 +102,87 @@ SPoT는 매장 후보지를 추천하지 않습니다. 대상 매장의 홍보 �
 
 
 def render_handoff(brief, request, planning=None):
-    """Six-field writing notes, without generating a request to the planning agent."""
-    planning=planning or {};store=request.get('store',{})
-    lines=['흥부장 작성 힌트',store.get('name') or '조사 매장',
-           '조사 결과를 참고해 각 항목을 직접 작성하세요. 힌트는 기획 제안이며 고객 호응·행사 효과를 입증하지 않습니다.']
-    quant=[c for c in brief.get('unique_local_signals',[]) if c.get('module')=='quant']
+    """Evidence-derived clues, rather than generic directions to the reader."""
+    planning=planning or {}
     fields=[[] for _ in range(6)]
-    summary=brief.get('overview',{}).get('area_summary')
-    if summary and not any(t in summary for t in ('정량 지표','자료 수','근거와 함께 요약')):fields[0].append('조사 참고: '+summary)
-    def source_notes(card):
-        notes=[]
+    quant=[c for c in brief.get('unique_local_signals',[]) if c.get('module')=='quant']
+    def valid(value):return isinstance(value,(int,float)) and not isinstance(value,bool) and math.isfinite(value) and 0<=value<=100
+    def peaks(card,keys=None):
+        values=[(k,v['share_pct']) for k,v in card.get('shares',{}).items() if k!='total' and (keys is None or k in keys) and isinstance(v,dict) and valid(v.get('share_pct'))]
+        maximum=max((v for _,v in values),default=0)
+        return [(k,v) for k,v in values if v==maximum and v>0]
+    def peak_text(items):return ' / '.join(f'{LABELS.get(k,k)} {v:g}%' for k,v in items)
+    def add(index,card,text):
+        fields[index].append('조사에서 발견한 내용: '+text)
         for source in card.get('sources',[]):
             url=source.get('source_url','')
             try:
                 parts=urlsplit(url)
                 if parts.scheme not in ('http','https') or not parts.hostname or parts.username or parts.password:continue
             except ValueError:continue
-            notes.append(f"근거: {source.get('title') or source.get('source_name') or '원본 자료'} — {url}")
-        return notes
+            fields[index].append(f"근거: {source.get('title') or source.get('source_name') or '원본 자료'} — {url}")
+    def hint(index,text):fields[index].append('데이터에서 연결한 아이디어: '+text)
     for c in quant:
-        title=str(c.get('title','공공 관측'));index=None;value=None
+        title=str(c.get('title','공공 관측'));period=f"기준 {c.get('reference_period') or '별도 확인'} · {c.get('scope') or '집계 범위 별도 확인'}"
         if title in ('최다 주요시설 유형','주거인구','직장인구') and c.get('value') is not None:
-            index=0;value=str(c['value'])+str(c.get('unit',''))
-        elif isinstance(c.get('shares'),dict) and any(t in title for t in ('성별','연령','요일','시간')):
-            values=[(k,v['share_pct']) for k,v in c['shares'].items() if k!='total' and isinstance(v,dict) and isinstance(v.get('share_pct'),(int,float)) and not isinstance(v['share_pct'],bool) and math.isfinite(v['share_pct']) and 0<=v['share_pct']<=100]
-            if values:
-                groups=[[item for item in values if item[0] in keys] for keys in (('male','female'),('under_10','teens','20s','30s','40s','50s','60_plus'))] if any(t in title for t in ('성별','연령')) else [values]
-                peaks=[(k,v) for group in groups if group for k,v in group if v==max(n for _,n in group) and v>0]
-                if peaks:
-                    index=3 if any(t in title for t in ('요일','시간')) else 1
-                    value=' / '.join(f'{LABELS.get(k,k)} {v:g}%' for k,v in peaks)
-        if index is not None:
-            fields[index].append(f"조사 참고: {title}: {value} (기준 {c.get('reference_period') or '별도 확인'} · {c.get('scope') or '집계 범위 별도 확인'})")
-            fields[index].extend(source_notes(c))
+            add(0,c,f"{title}: {c['value']}{c.get('unit','')} ({period})")
+            if title=='최다 주요시설 유형' and c['value']:
+                facility=str(c['value'])
+                scene='시설 방문 전후에 참여하는 짧은 사진 촬영·정리 체험' if any(t in facility for t in ('의료','복지')) else '학교생활 사진·영상 제작 체험' if any(t in facility for t in ('교육','학교')) else '이동 중 지도·길찾기 기능 체험' if any(t in facility for t in ('교통','역')) else '장보기 동선의 스마트폰 결제 기능 체험' if any(t in facility for t in ('시장','쇼핑','상업')) else None
+                if scene:hint(0,f'주요 시설 유형 ‘{facility}’ → {scene}이라는 생활권 접점 후보.')
+        if isinstance(c.get('shares'),dict) and any(t in title for t in ('성별','연령','요일','시간')):
+            gender=peaks(c,('male','female'));age=peaks(c,('under_10','teens','20s','30s','40s','50s','60_plus'))
+            items=gender+age if any(t in title for t in ('성별','연령')) else peaks(c)
+            index=3 if any(t in title for t in ('요일','시간')) else 1
+            if items:add(index,c,f'{title}: {peak_text(items)} ({period})')
+            population=title.split(' 성별')[0].split(' 연령')[0]
+            if age:hint(1,f"{population}에서 {peak_text(age)}가 최다 연령 구간 — {'·'.join(LABELS[k] for k,_ in age)} 고객군을 이 상권의 타깃 후보로 연결할 단서.")
+            male_entry=c['shares'].get('male');female_entry=c['shares'].get('female')
+            male=male_entry.get('share_pct') if isinstance(male_entry,dict) else None
+            female=female_entry.get('share_pct') if isinstance(female_entry,dict) else None
+            if valid(male) and valid(female) and male+female>0 and abs(male-female)<=10:
+                hint(1,f'{population} 남성 {male:g}%·여성 {female:g}% — 성별 격차가 {abs(male-female):.1f}%p인 관측. 특정 성별보다 사용 장면을 앞세운 홍보 구성의 단서.')
+            if index==3 and items:
+                contact='상담·구매 접점' if '매출' in title else '매장 발견·체험 접점'
+                label='·'.join(LABELS.get(k,k)+('요일' if '요일' in title else '') for k,_ in items)
+                hint(3,f'{title}의 최다 구간은 {peak_text(items)} — {label} {contact}의 운영 후보.')
     for c in brief.get('local_changes',[])[:2]:
-        fields[0].append(f"조사 참고: {c.get('title') or '지역 변화'} · {str(c.get('published_at') or '보도일 별도 확인')[:10]}: {c.get('evidence') or c.get('statement') or ''}")
-        fields[0].extend(source_notes(c))
-    if not fields[1]:fields[1].append('인구 구성: 정량 자료 미확보. 실제 매장 고객 정보를 별도로 참고하세요.')
-    fields[1].append('선택 힌트: 인구 구성은 주변 상권의 관측입니다. 실제 매장 방문 고객 비중·상품 선호와 구분해 참고하세요. 성별과 연령은 각각의 비중이며 교차 비율이 아닙니다.')
+        fact=c.get('evidence') or c.get('statement') or '';name=c.get('title') or '지역 변화'
+        add(0,c,f"{name} · {str(c.get('published_at') or '보도일 별도 확인')[:10]}: {fact}")
+        if ('통행' in fact and '재개' in fact) or any(t in fact for t in ('개통','교통')):
+            hint(0,f'‘{name}’의 이동·통행 변화 → 매장 오는 길·길찾기를 소재로 한 안내 콘텐츠 후보.')
+        elif any(t in fact for t in ('개관','개점','신설')):hint(0,f'‘{name}’의 시설 변화 — 새 시설 이용 목적과 매장 노출 접점을 연결할 지역 단서.')
+        elif any(t in fact for t in ('입주','주거','아파트')):hint(0,f'‘{name}’의 주거 변화 — 생활권 변화를 연결할 지역 단서. 보도된 사업 단계가 현재 고객 증가와 같지는 않음.')
     product=planning.get('target_product') or request.get('campaign',{}).get('product')
     if product:fields[2].append('사용자가 지정한 상품: '+str(product))
-    fields[2].append('선택 힌트: 성별·나이만으로 모델이나 요금제를 정하기보다 사용 장면과 공식 상품 기능을 연결해 선택하세요.')
-    fields[3].append('선택 힌트: 관측된 피크 요일·시간은 일정 선택의 참고입니다. 준비·행사·사후 처리에 필요한 시간은 따로 정하세요.')
     for index,key in ((3,'event_period'),(4,'staff'),(5,'promotional_items'),(5,'budget')):
         if planning.get(key):fields[index].append('사용자가 정한 조건: '+str(planning[key]))
     for c in brief.get('trend_patterns',[]):
         if c.get('type')!='reference_case':continue
-        reading=trend_reading(c)
-        if not reading:continue
-        candidate='카메라 체험 결과물 카드' if '촬영' in reading['headline'] else '기능 체험 완료 카드·작은 기념물' if '굿즈' in reading['headline'] else None
-        index=5 if candidate else 2
-        if not candidate and len(fields[index])>=4:continue
-        fields[index].append('조사 참고: '+str(c.get('event_name') or '전국 체험 사례')+': '+reading['fact'])
-        fields[index].extend(source_notes(c))
-        if candidate:fields[5].append('판촉물 후보: '+candidate+' — 보유품으로 간주하지 않고 예산·제작 가능 여부에 맞춰 검토하세요.')
-        else:fields[2].append('선택 힌트: 선택한 상품의 기능을 직접 써보고 비교하는 사용 장면을 검토하세요.')
-    questions=[['매장 방문 동선에 실제로 연결되는 역·시설·생활권은 어디인가요?'],
-               ['실제 방문 고객은 주로 주민·직장인·통행 고객 중 누구인가요?'],
-               ['홍보할 단말기·요금제·부가서비스와 강조할 가치는 무엇인가요?'],
-               ['희망 날짜와 실제 운영 가능한 시간은 언제인가요?'],
-               ['일반 매장 업무를 제외하고 행사에 투입할 수 있는 직원은 몇 명인가요?', '안내·체험 지원·상담을 동시에 맡을 수 있는지 확인했나요?'],
-               ['현재 보유한 판촉물과 구매·제작에 쓸 수 있는 예산은 얼마인가요?']]
+        fact=str(c.get('observation') or '');name=c.get('event_name') or '전국 체험 사례'
+        if ('□' in fact or '브리핑' in name) and '...' in fact:continue
+        mechanisms={h.get('mechanism') for h in c.get('adaptation_hypotheses',[]) if isinstance(h,dict)}
+        if 'photo_sharing' in mechanisms and any(t in fact for t in ('촬영','SNS','공유','유튜브')):
+            add(2,c,f'{name}: {fact}');hint(2,f'‘{name}’의 촬영·공유 방식 → 카메라·영상 기능을 직접 체험하는 상품 접점 후보. 특정 모델 선호에 대한 조사는 아님.')
+            add(5,c,f'{name}: {fact}');hint(5,f'‘{name}’의 촬영·공유 접점 → 카메라 체험 결과물 카드·사진 인화물이라는 판촉물 후보. 체험 결과가 가져갈 물건으로 이어지는 구성.')
+        elif 'collectible_reward' in mechanisms and any(t in fact for t in ('굿즈','수집','소장','기념품')):
+            add(5,c,f'{name}: {fact}');hint(5,f'‘{name}’의 굿즈·소장 접점 → 기능 체험 완료 카드·소장용 스티커·작은 기념물이라는 판촉물 후보. 체험 결과와 기념물을 함께 남기는 구성.')
+        elif 'direct_product_trial' in mechanisms and any(t in fact for t in ('체험','직접 사용','비교')):
+            scene='스마트폰 게임 실행·반응 비교' if '게임' in name+fact else '스마트폰 기능을 직접 써보는 비교 체험'
+            add(2,c,f'{name}: {fact}');hint(2,f'‘{name}’의 직접 체험 방식 → {scene}라는 상품 접점 후보. 해당 상품의 효과·선호를 입증한 자료는 아님.')
+    notes={1:'성별·연령은 각각의 구성비이며 교차 비율이 아님. 유동·주거·직장 인구와 매출은 서로 다른 집계. 실제 방문 고객 비중·상품 선호와 다름.',
+           2:'모델별 고객 선호·가격대·공식 상품 사양은 이번 리서치에 없음.',
+           3:'요일·시간대는 각각의 집계이며 교차 집계가 아님. 행사 소요 시간에 대한 관측은 아님.',
+           4:'가용 직원 수·업무 배치에 관한 조사 데이터 없음.',
+           5:'판촉물 후보는 조사 사례에서 연결한 아이디어. 보유품·제작비·예산 데이터 없음.'}
+    lines=['흥부장 기획 단서',request.get('store',{}).get('name') or '조사 매장',
+           '조사에서 발견한 사실과 그 사실에서 연결한 아이디어. 연결 아이디어는 고객 호응·행사 효과의 증거가 아닙니다.']
     for i,label in enumerate(('상권','타깃 고객','타깃 상품','행사 기간','직원 수','판촉물·예산')):
-        lines.extend(['',f'{i+1}. {label}',*dict.fromkeys(fields[i]),*('내가 정할 내용: '+q for q in questions[i])])
-    populations=[next((c.get('value') for c in quant if c.get('title')==title),None) for title in ('주거인구','직장인구')]
-    if all(isinstance(v,(int,float)) and not isinstance(v,bool) and math.isfinite(v) and v>0 for v in populations):
-        lines.extend(['','숨은 기회 후보','관측: 주거인구와 직장인구가 각각 관측된 상권',
-                      '기획 힌트: 방문자가 생활용·업무용 사용 장면을 직접 고르게 하는 체험을 검토할 수 있어요. 두 모집단의 중복·비중이나 실제 고객 선호를 뜻하지 않습니다.'])
+        lines.extend(['',f'{i+1}. {label}',*dict.fromkeys(fields[i])])
+        if not fields[i]:lines.append('정량 자료 미확보 — 인구 구성 데이터 없음.' if i==1 else '이 항목으로 연결할 조사 데이터가 없습니다.')
+        if i in notes:lines.append(notes[i])
+    populations=[next((c for c in quant if c.get('title')==title),{}) for title in ('주거인구','직장인구')]
+    if all(isinstance(c.get('value'),(int,float)) and not isinstance(c['value'],bool) and math.isfinite(c['value']) and c['value']>0 for c in populations):
+        basis=' / '.join(f"{c['title']} {c['value']}{c.get('unit') or '명'} ({c.get('reference_period') or '기준 별도 확인'})" for c in populations)
+        lines.extend(['','숨은 기회 후보',basis,'주민의 생활 장면·직장인의 업무 장면을 각각 입구로 둔 두 가지 체험 동선 후보. 두 모집단의 합산·중복·상품 선호를 뜻하지 않음.'])
     return '\n'.join(lines)+'\n'

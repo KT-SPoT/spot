@@ -8,12 +8,17 @@ const brief={unique_local_signals:[
 const before=JSON.stringify(brief),model=hints.build(brief,{store:{name:'테스트 매장'}}),text=hints.text(model);
 assert.equal(model.fields.length,6);assert.equal(JSON.stringify(brief),before);
 assert(text.includes('남성 50% / 여성 50%'));assert(text.includes('2026-08 · 선택영역'));
-assert(text.includes('20대 35%'));assert(text.includes('교차 비율이 아닙니다'));
-assert(text.includes('14~18시 55%'));assert(text.includes('필요한 시간은 따로 정'));
+assert(text.includes('20대 35%'));assert(text.includes('교차 비율이 아님'));
+assert(text.includes('14~18시 55%'));assert(text.includes('행사 소요 시간에 대한 관측은 아님'));
 assert(!text.includes('4시간 행사'));assert(!text.includes('기획해주세요'));assert(!text.includes('password'));assert(!text.includes('javascript:'));
-assert(text.includes('카메라 체험 결과물 카드'));assert(text.includes('보유품과 구분'));assert.equal(model.opportunities.length,1);
+assert(text.includes('카메라 체험 결과물 카드'));assert(text.includes('보유품·제작비·예산 데이터 없음'));assert.equal(model.opportunities.length,1);
 assert.equal(hints.build({unique_local_signals:[{module:'quant',title:'주거인구',value:true},{module:'quant',title:'직장인구',value:90}]}).opportunities.length,0);
-assert.equal(model.fields[4].basis.length,0);assert.equal(hints.build().fields[2].basis.length,0);
+assert.equal(model.fields[4].basis.length,0);assert.equal(model.fields[4].hints.length,0);assert.equal(hints.build().fields[2].hints.length,0);
+assert(!/선택하세요|확인하세요|정해주세요|내가 정할 내용/.test(text));
+assert(model.fields[2].hints.some(t=>t.includes('촬영 체험')&&t.includes('카메라·영상')));
+assert(model.fields[1].hints.some(t=>t.includes('20대 35%')));
+const changed=structuredClone(brief);changed.unique_local_signals[0].shares={'60_plus':{share_pct:65},'20s':{share_pct:20}};changed.unique_local_signals[1].shares={'18_23':{share_pct:70}};changed.trend_patterns=[];
+const changedModel=hints.build(changed);assert(changedModel.fields[1].hints.some(t=>t.includes('60대 이상 65%')));assert(!changedModel.fields[1].hints.some(t=>t.includes('20대 35%')));assert(changedModel.fields[3].hints.some(t=>t.includes('18~23시')));assert.equal(changedModel.fields[5].hints.length,0);
 class Element{constructor(tag){this.tag=tag;this.children=[];this.textContent='';this.listeners={};}append(...items){this.children.push(...items);}replaceChildren(){this.children=[];}setAttribute(){}addEventListener(name,fn){this.listeners[name]=fn;}}
 const doc={createElement:t=>new Element(t)},root=new Element('section');hints.render(doc,root,model);
 const nodes=[];function walk(n){nodes.push(n);for(const c of n.children)walk(c);}walk(root);
