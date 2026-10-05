@@ -22,6 +22,26 @@ BRIEF = {**generate_brief(fixture()),'source_count':1,'overview':{'area_summary'
  'trend_patterns':[], 'needs_manual_check':['정량 자료 미확보']}
 
 class ExportTests(unittest.TestCase):
+    @unittest.skipUnless(any(Path(p).is_file() for p in (
+        '/usr/share/fonts/truetype/nanum/NanumGothic.ttf','/mnt/c/Windows/Fonts/malgun.ttf','C:/Windows/Fonts/malgun.ttf')),
+        'Korean font required for PDF rendering')
+    def test_pdf_carries_the_same_data_clues_and_does_not_call_review_approval(self):
+        import copy
+        from src.brief.planning_prompt import build_planning_clues
+        brief=copy.deepcopy(BRIEF)
+        brief['unique_local_signals']=[{'module':'quant','title':'매출액 연령별 비중',
+            'shares':{'20s':{'share_pct':65},'60_plus':{'share_pct':15}},'reference_period':'2026-08'}]
+        brief['trend_patterns']=[{'type':'reference_case','event_name':'촬영 체험 사례',
+            'observation':'촬영 결과를 SNS로 공유한다.', 'adaptation_hypotheses':[{'mechanism':'photo_sharing'}]}]
+        brief['research_review']={'performed':True,'case_reviews':[{'verdict':'generic'}]}
+        text=''.join(''.join(p.extract_text().split()) for p in PdfReader(BytesIO(render_pdf(brief,PAYLOAD))).pages)
+        for field in build_planning_clues(brief,PAYLOAD)['fields']:
+            for hint in field['hints']:self.assertIn(''.join(hint.split()),text)
+        self.assertIn('20대65%',text)
+        self.assertIn('카메라체험결과물카드',text)
+        self.assertIn('응용보완1/1건',text)
+        self.assertNotIn('검토승인',text)
+
     @unittest.skipUnless(any(Path(p).is_file() for p in (os.getenv('SPOT_PDF_FONT_PATH','/no-font'),
         '/usr/share/fonts/truetype/nanum/NanumGothic.ttf','/mnt/c/Windows/Fonts/malgun.ttf','C:/Windows/Fonts/malgun.ttf')),
         'Korean font required for PDF rendering')

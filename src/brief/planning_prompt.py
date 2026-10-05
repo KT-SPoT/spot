@@ -101,10 +101,11 @@ SPoT는 매장 후보지를 추천하지 않습니다. 대상 매장의 홍보 �
     return '\n'.join(lines)+'\n'
 
 
-def render_handoff(brief, request, planning=None):
+def build_planning_clues(brief, request, planning=None):
     """Evidence-derived clues, rather than generic directions to the reader."""
     planning=planning or {}
     fields=[[] for _ in range(6)]
+    age_groups={}
     quant=[c for c in brief.get('unique_local_signals',[]) if c.get('module')=='quant']
     def valid(value):return isinstance(value,(int,float)) and not isinstance(value,bool) and math.isfinite(value) and 0<=value<=100
     def peaks(card,keys=None):
@@ -136,7 +137,9 @@ def render_handoff(brief, request, planning=None):
             index=3 if any(t in title for t in ('요일','시간')) else 1
             if items:add(index,c,f'{title}: {peak_text(items)} ({period})')
             population=title.split(' 성별')[0].split(' 연령')[0]
-            if age:hint(1,f"{population}에서 {peak_text(age)}가 최다 연령 구간 — {'·'.join(LABELS[k] for k,_ in age)} 고객군을 이 상권의 타깃 후보로 연결할 단서.")
+            if age:
+                group='·'.join(LABELS[k] for k,_ in age)
+                age_groups.setdefault(group,[]).append(f'{population} {peak_text(age)}')
             male_entry=c['shares'].get('male');female_entry=c['shares'].get('female')
             male=male_entry.get('share_pct') if isinstance(male_entry,dict) else None
             female=female_entry.get('share_pct') if isinstance(female_entry,dict) else None
@@ -146,6 +149,7 @@ def render_handoff(brief, request, planning=None):
                 contact='상담·구매 접점' if '매출' in title else '매장 발견·체험 접점'
                 label='·'.join(LABELS.get(k,k)+('요일' if '요일' in title else '') for k,_ in items)
                 hint(3,f'{title}의 최다 구간은 {peak_text(items)} — {label} {contact}의 운영 후보.')
+    for group,rows in age_groups.items():hint(1,f"{' / '.join(rows)} → 해당 집계의 최다 연령 구간은 {group}. {group} 고객군을 타깃 후보로 연결할 단서.")
     for c in brief.get('local_changes',[])[:2]:
         fact=c.get('evidence') or c.get('statement') or '';name=c.get('title') or '지역 변화'
         add(0,c,f"{name} · {str(c.get('published_at') or '보도일 별도 확인')[:10]}: {fact}")
@@ -169,20 +173,31 @@ def render_handoff(brief, request, planning=None):
             add(5,c,f'{name}: {fact}');hint(5,f'‘{name}’의 굿즈·소장 접점 → 기능 체험 완료 카드·소장용 스티커·작은 기념물이라는 판촉물 후보. 체험 결과와 기념물을 함께 남기는 구성.')
         elif 'direct_product_trial' in mechanisms and any(t in fact for t in ('체험','직접 사용','비교')):
             scene='스마트폰 게임 실행·반응 비교' if '게임' in name+fact else '스마트폰 기능을 직접 써보는 비교 체험'
-            add(2,c,f'{name}: {fact}');hint(2,f'‘{name}’의 직접 체험 방식 → {scene}라는 상품 접점 후보. 해당 상품의 효과·선호를 입증한 자료는 아님.')
+            add(2,c,f'{name}: {fact}');hint(2,f'‘{name}’의 직접 체험 방식 → 상품 접점 후보: {scene}. 해당 상품의 효과·선호를 입증한 자료는 아님.')
     notes={1:'성별·연령은 각각의 구성비이며 교차 비율이 아님. 유동·주거·직장 인구와 매출은 서로 다른 집계. 실제 방문 고객 비중·상품 선호와 다름.',
            2:'모델별 고객 선호·가격대·공식 상품 사양은 이번 리서치에 없음.',
            3:'요일·시간대는 각각의 집계이며 교차 집계가 아님. 행사 소요 시간에 대한 관측은 아님.',
            4:'가용 직원 수·업무 배치에 관한 조사 데이터 없음.',
            5:'판촉물 후보는 조사 사례에서 연결한 아이디어. 보유품·제작비·예산 데이터 없음.'}
-    lines=['흥부장 기획 단서',request.get('store',{}).get('name') or '조사 매장',
-           '조사에서 발견한 사실과 그 사실에서 연결한 아이디어. 연결 아이디어는 고객 호응·행사 효과의 증거가 아닙니다.']
+    model={'title':'흥부장 기획 단서','store':request.get('store',{}).get('name') or '조사 매장','fields':[], 'opportunities':[]}
     for i,label in enumerate(('상권','타깃 고객','타깃 상품','행사 기간','직원 수','판촉물·예산')):
-        lines.extend(['',f'{i+1}. {label}',*dict.fromkeys(fields[i])])
-        if not fields[i]:lines.append('정량 자료 미확보 — 인구 구성 데이터 없음.' if i==1 else '이 항목으로 연결할 조사 데이터가 없습니다.')
-        if i in notes:lines.append(notes[i])
+        contents=list(dict.fromkeys(fields[i]))
+        missing=not contents
+        if missing:contents.append('정량 자료 미확보 — 인구 구성 데이터 없음.' if i==1 else '이 항목으로 연결할 조사 데이터가 없습니다.')
+        if i in notes:contents.append(notes[i])
+        model['fields'].append({'number':i+1,'label':label,'lines':contents,
+                                'hints':[t.removeprefix('데이터에서 연결한 아이디어: ') for t in contents if t.startswith('데이터에서 연결한 아이디어: ')],
+                                'note':notes.get(i,'')})
     populations=[next((c for c in quant if c.get('title')==title),{}) for title in ('주거인구','직장인구')]
     if all(isinstance(c.get('value'),(int,float)) and not isinstance(c['value'],bool) and math.isfinite(c['value']) and c['value']>0 for c in populations):
         basis=' / '.join(f"{c['title']} {c['value']}{c.get('unit') or '명'} ({c.get('reference_period') or '기준 별도 확인'})" for c in populations)
-        lines.extend(['','숨은 기회 후보',basis,'주민의 생활 장면·직장인의 업무 장면을 각각 입구로 둔 두 가지 체험 동선 후보. 두 모집단의 합산·중복·상품 선호를 뜻하지 않음.'])
+        model['opportunities'].append({'basis':basis,'hint':'주민의 생활 장면·직장인의 업무 장면을 각각 입구로 둔 두 가지 체험 동선 후보. 두 모집단의 합산·중복·상품 선호를 뜻하지 않음.'})
+    return model
+
+
+def render_handoff(brief, request, planning=None):
+    model=build_planning_clues(brief,request,planning)
+    lines=[model['title'],model['store'],'조사에서 발견한 사실과 그 사실에서 연결한 아이디어. 연결 아이디어는 고객 호응·행사 효과의 증거가 아닙니다.']
+    for field in model['fields']:lines.extend(['',f"{field['number']}. {field['label']}",*field['lines']])
+    for opportunity in model['opportunities']:lines.extend(['','숨은 기회 후보',opportunity['basis'],opportunity['hint']])
     return '\n'.join(lines)+'\n'

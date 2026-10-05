@@ -5,6 +5,7 @@ const SPOTPlanningHints = (() => {
   function build(brief={},request={}){
     const quant=(brief.unique_local_signals||[]).filter(c=>c.module==='quant');
     const fields=['상권','타깃 고객','타깃 상품','행사 기간','직원 수','판촉물·예산'].map((label,i)=>({number:i+1,label,basis:[],hints:[],sources:[],note:''}));
+    const ageGroups=new Map();
     const valid=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=100;
     const peaks=(c,keys)=>{const items=Object.entries(c.shares||{}).filter(([k,v])=>k!=='total'&&(!keys||keys.includes(k))&&valid(v?.share_pct));const max=Math.max(...items.map(([,v])=>v.share_pct));return max>0?items.filter(([,v])=>v.share_pct===max).map(([key,v])=>({key,value:v.share_pct,label:labels[key]||key})):[];};
     const peakText=items=>items.map(p=>`${p.label} ${p.value}%`).join(' / ');
@@ -20,12 +21,13 @@ const SPOTPlanningHints = (() => {
         const idx=/요일|시간/.test(title)?3:1;
         if(items.length)add(fields[idx],c,`${title}: ${peakText(items)} (${period})`);
         const population=title.replace(/ 성별.*| 연령.*/,'');
-        if(age.length)hint(1,`${population}에서 ${peakText(age)}가 최다 연령 구간 — ${age.map(p=>p.label).join('·')} 고객군을 이 상권의 타깃 후보로 연결할 단서.`);
+        if(age.length){const key=age.map(p=>p.label).join('·');const rows=ageGroups.get(key)||[];rows.push(`${population} ${peakText(age)}`);ageGroups.set(key,rows);}
         const male=c.shares.male?.share_pct,female=c.shares.female?.share_pct;
         if(valid(male)&&valid(female)&&male+female>0&&Math.abs(male-female)<=10)hint(1,`${population} 남성 ${male}%·여성 ${female}% — 성별 격차가 ${Math.abs(male-female).toFixed(1)}%p인 관측. 특정 성별보다 사용 장면을 앞세운 홍보 구성의 단서.`);
         if(idx===3&&items.length){const contact=/매출/.test(title)?'상담·구매 접점':'매장 발견·체험 접점';hint(3,`${title}의 최다 구간은 ${peakText(items)} — ${items.map(p=>p.label+(/요일/.test(title)?'요일':'')).join('·')} ${contact}의 운영 후보.`);}
       }
     }
+    for(const [group,rows] of ageGroups)hint(1,`${rows.join(' / ')} → 해당 집계의 최다 연령 구간은 ${group}. ${group} 고객군을 타깃 후보로 연결할 단서.`);
     for(const c of (brief.local_changes||[]).slice(0,2)){
       const fact=c.evidence||c.statement||'',name=c.title||'지역 변화';add(fields[0],c,`${name} · ${(c.published_at||'보도일 별도 확인').slice(0,10)}: ${fact}`);
       if(/통행.*재개|개통|교통/.test(fact))hint(0,`‘${name}’의 이동·통행 변화 → 매장 오는 길·길찾기를 소재로 한 안내 콘텐츠 후보.`);
@@ -42,7 +44,7 @@ const SPOTPlanningHints = (() => {
       }else if(mechanisms.has('collectible_reward')&&/굿즈|수집|소장|기념품/.test(observation)){
         add(fields[5],c,`${name}: ${observation}`);hint(5,`‘${name}’의 굿즈·소장 접점 → 기능 체험 완료 카드·소장용 스티커·작은 기념물이라는 판촉물 후보. 체험 결과와 기념물을 함께 남기는 구성.`);
       }else if(mechanisms.has('direct_product_trial')&&/체험|직접 사용|비교/.test(observation)){
-        add(fields[2],c,`${name}: ${observation}`);hint(2,`‘${name}’의 직접 체험 방식 → ${/게임/.test(name+' '+observation)?'스마트폰 게임 실행·반응 비교':'스마트폰 기능을 직접 써보는 비교 체험'}라는 상품 접점 후보. 해당 상품의 효과·선호를 입증한 자료는 아님.`);
+        add(fields[2],c,`${name}: ${observation}`);hint(2,`‘${name}’의 직접 체험 방식 → 상품 접점 후보: ${/게임/.test(name+' '+observation)?'스마트폰 게임 실행·반응 비교':'스마트폰 기능을 직접 써보는 비교 체험'}. 해당 상품의 효과·선호를 입증한 자료는 아님.`);
       }
     }
     fields[1].note='성별·연령은 각각의 구성비이며 교차 비율이 아님. 유동·주거·직장 인구와 매출은 서로 다른 집계. 실제 방문 고객 비중·상품 선호와 다름.';
