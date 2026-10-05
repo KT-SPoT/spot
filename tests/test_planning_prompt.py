@@ -1,5 +1,6 @@
 import copy
 import unittest
+from src.brief.planning_prompt import render_support
 from src.brief.handoff import render_handoff
 
 
@@ -12,7 +13,7 @@ class PlanningPromptTests(unittest.TestCase):
                               'sources':[{'source_url':'https://news.example/traffic','title':'교통 보도'}]}]}
         before=copy.deepcopy(brief)
         request={'store':{'name':'테스트 매장'},'campaign':{'product':'검토할 모델'}}
-        result=render_handoff(brief,request)
+        result=render_support(brief,request)
         self.assertIn('20대 0%',result)
         self.assertIn('60대 이상 72%',result)
         self.assertNotIn('invalid',result)
@@ -25,7 +26,7 @@ class PlanningPromptTests(unittest.TestCase):
         self.assertEqual(brief['unique_local_signals'][0]['reference_period'],'2026-07')
 
     def test_missing_inputs_remain_undecided_and_sources_are_safe(self):
-        result=render_handoff({'local_changes':[{'title':'연결점이 약한 기사','evidence':'역사를 소개한다.',
+        result=render_support({'local_changes':[{'title':'연결점이 약한 기사','evidence':'역사를 소개한다.',
             'sources':[{'source_url':'https://user:password@news.example/a'},{'source_url':'javascript:alert(1)'}]}]}, {})
         self.assertIn('정량 자료 미확보',result)
         self.assertIn('미정 — 사용자가 기획 단계에서 선택',result)
@@ -34,3 +35,24 @@ class PlanningPromptTests(unittest.TestCase):
         self.assertNotIn('password',result)
         self.assertNotIn('javascript:',result)
         self.assertIn('[조사자료 끝]',result)
+
+    def test_final_paragraph_follows_six_fields_and_keeps_operating_blanks(self):
+        text=render_handoff({}, {'store':{'name':'새 매장'}})
+        self.assertEqual(len(text.strip().splitlines()),1)
+        labels=['① 상권:','② 타깃 고객:','③ 타깃 상품:','④ 행사 기간:','⑤ 직원 수:','⑥ 판촉물·예산:']
+        self.assertEqual(sorted(text.index(label) for label in labels),[text.index(label) for label in labels])
+        self.assertIn('[일반 업무 인력을 제외한 가용 직원 수 입력]',text)
+        self.assertIn('[구매 가능 예산 입력]',text)
+        self.assertIn('정량 자료 미확보',text)
+
+    def test_user_conditions_and_promo_candidate_do_not_become_observed_inventory(self):
+        brief={'trend_patterns':[{'type':'reference_case','observation':'현장 체험을 촬영해 SNS로 공유한다.',
+                                 'adaptation_hypotheses':[{'mechanism':'photo_sharing'}]}]}
+        text=render_handoff(brief,{}, {'event_period':'11월 2일, 준비 포함 4시간','staff':'2명',
+                                    'promotional_items':'휴대폰 거치대','budget':'10만원','target_product':'중저가 단말기'})
+        self.assertIn('④ 행사 기간: 11월 2일, 준비 포함 4시간',text)
+        self.assertIn('⑤ 직원 수: 2명',text)
+        self.assertIn('보유품은 휴대폰 거치대',text)
+        self.assertIn('카메라 체험 결과물 카드',text)
+        self.assertIn('보유품으로 간주하지',text)
+        self.assertIn('③ 타깃 상품: 중저가 단말기',text)
