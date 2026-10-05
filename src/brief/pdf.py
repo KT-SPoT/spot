@@ -13,7 +13,8 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, PageBreak
+from reportlab.graphics.shapes import Drawing, Rect, String, Line
 
 LOCK = Lock()
 INK = colors.HexColor('#263c32')
@@ -33,6 +34,8 @@ def _font():
         if font is None:
             raise RuntimeError('PDF_KOREAN_FONT_MISSING')
         pdfmetrics.registerFont(TTFont('SpotKorean', str(font)))
+        bold = font.with_name('NanumGothicBold.ttf') if 'Nanum' in font.name else font.with_name('malgunbd.ttf')
+        pdfmetrics.registerFont(TTFont('SpotKoreanBold', str(bold if bold.is_file() else font)))
     return 'SpotKorean'
 
 
@@ -42,14 +45,22 @@ def render_pdf(brief, request=None, discovery=None):
     styles = {key: ParagraphStyle(key, fontName=font, fontSize=size, leading=leading,
               textColor=INK, spaceAfter=after, wordWrap='CJK', alignment=TA_LEFT)
               for key,size,leading,after in [('body',9,15,7),('small',7.5,12,5),
-                  ('title',25,35,15),('heading',15,23,11),('sub',11,18,8)]}
+                  ('title',28,39,16),('heading',20,29,16),('sub',12,19,10)]}
     for key in ('title','heading','sub'):
         styles[key].keepWithNext = True
+        styles[key].fontName = 'SpotKoreanBold'
     story=[]; sources={}
     def p(value,kind='body'):
         return Paragraph(escape(str(value or '자료 미확보')).replace('\n','<br/>'),styles[kind])
     def add(value,kind='body'): story.append(p(value,kind))
-    def heading(value): story.extend([Spacer(1,7*mm),p(value,'heading')])
+    def heading(value): story.extend([PageBreak(),p(value,'heading')])
+    def concise(value,limit=240):
+        text=' '.join(str(value or '자료 미확보').split())
+        return text if len(text)<=limit else text[:limit].rstrip()+'…'
+    def note(title,text):
+        box=Table([[p(title,'sub')],[p(text)]],colWidths=[WIDTH],hAlign='LEFT')
+        box.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,-1),PAPER),('LEFTPADDING',(0,0),(-1,-1),14),('RIGHTPADDING',(0,0),(-1,-1),14),('TOPPADDING',(0,0),(-1,0),12),('BOTTOMPADDING',(0,-1),(-1,-1),12)]))
+        story.extend([box,Spacer(1,5*mm)])
     def refs(card):
         linked=[]
         for source in card.get('sources',[]):
@@ -73,11 +84,21 @@ def render_pdf(brief, request=None, discovery=None):
     add(store.get('address') or '주소 미확인','small')
     add(f"자료 기준일 {research.get('reference_date') or '미확인'} · 고유 출처 {brief.get('source_count',0)}개 · 조사 초안",'small')
     if campaign.get('purpose'): add('조사 질문: '+campaign['purpose'])
-    heading('01  지역 요약');add(brief.get('overview',{}).get('area_summary'))
+    story.extend([Spacer(1,7*mm),p('01  지역을 읽는 핵심 요약','heading')]);note('AREA SUMMARY',brief.get('overview',{}).get('area_summary'))
     if brief.get('overview',{}).get('primary_customer_signal'):add(brief['overview']['primary_customer_signal'])
     add('인구·매출 구성은 관측 자료입니다. 고객 선호·구매 의향이나 행사 효과로 단정하지 않습니다.','small')
-    heading('02  상권과 고객 구성')
     quant=[c for c in brief.get('unique_local_signals',[]) if c.get('module')=='quant']
+    highlights=[c for c in quant if c.get('title') in ('월별 일평균 유동인구','업소당 월평균 매출액','주거인구','직장인구','핸드폰 소매업 업소 수','세대수') and 'value' in c][:6]
+    if highlights:
+        cells=[]
+        for c in highlights:
+            value=c['value'];value=f'{value:,}' if isinstance(value,(int,float)) else str(value)
+            cells.append([p(c.get('title'),'small'),p(value+str(c.get('unit','')),'sub'),p(f"{c.get('reference_period') or '기간 미확인'} · {refs(c)}",'small')])
+        rows=[cells[i:i+3]+['']*(3-len(cells[i:i+3])) for i in range(0,len(cells),3)]
+        cards=Table(rows,colWidths=[WIDTH/3]*3,hAlign='LEFT');cards.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('BACKGROUND',(0,0),(-1,-1),PAPER),('BOX',(0,0),(-1,-1),.3,colors.white),('INNERGRID',(0,0),(-1,-1),4,colors.white),('LEFTPADDING',(0,0),(-1,-1),12),('TOPPADDING',(0,0),(-1,-1),12),('BOTTOMPADDING',(0,0),(-1,-1),10)]));story.extend([Spacer(1,5*mm),cards])
+    story.extend([Spacer(1,7*mm),p('REPORT GUIDE','sub')]);add('02 고객 구성과 활동 시간 / 03 지역 변화 / 04 전국 체험 사례 / 05 기획 시사점과 확인 사항 / 06 출처','small')
+    heading('02  상권과 고객 구성')
+    add('소상공인365가 제공한 관측 지표입니다. 유동·주거·직장인구와 매출의 조사 대상·기간을 구분해 읽습니다.','small')
     metrics=[c for c in quant if 'value' in c]
     if metrics:
         rows=[[p('관측 항목','small'),p('값','small'),p('기준·근거','small')]]
@@ -91,46 +112,65 @@ def render_pdf(brief, request=None, discovery=None):
     for c in quant:
         shares=c.get('shares');
         if not isinstance(shares,dict): continue
-        rows=[]
+        values=[]
         for key,item in shares.items():
             if key=='total': continue
             value=item.get('share_pct') if isinstance(item,dict) else None
             if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or not 0<=value<=100: continue
-            bar=Table([['']],colWidths=[max(0.5,value)*.8*mm],rowHeights=[3*mm])
-            bar.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,-1),INK)]))
             label=labels.get(key,key.replace('_','~')+'시' if key in ('05_09','09_12','12_14','14_18','18_23','23_05') else key)
-            rows.append([p(label,'small'),bar,p(f'{value:g}%','small')])
-        if rows:
+            values.append((label,value))
+        if values:
             refs(c); block=[Spacer(1,6*mm),p(c.get('title'),'sub'),p(f"{c.get('scope') or '범위 미확인'} · {c.get('reference_period') or '기간 미확인'} · {refs(c)}",'small')]
-            t=Table(rows,colWidths=[32*mm,110*mm,30*mm],hAlign='LEFT');t.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'MIDDLE'),('TOPPADDING',(0,0),(-1,-1),5),('BOTTOMPADDING',(0,0),(-1,-1),5)]));block.append(t);story.append(KeepTogether(block))
+            # All panels use the same 0-100% scale, including zero-valued observations.
+            height=len(values)*19+24;chart=Drawing(WIDTH,height);start=72;bar_width=WIDTH-start-55
+            for tick in (0,25,50,75,100):
+                x=start+bar_width*tick/100;chart.add(Line(x,18,x,height,strokeColor=colors.HexColor('#e2e5df'),strokeWidth=.4));chart.add(String(x,3,str(tick)+'%',fontName=font,fontSize=7,fillColor=INK,textAnchor='middle'))
+            peak=max(v for _,v in values)
+            for i,(label,value) in enumerate(values):
+                y=height-(i+1)*19+3;chart.add(String(0,y,label,fontName=font,fontSize=8,fillColor=INK));chart.add(Rect(start,y-1,bar_width*value/100,8,strokeColor=None,fillColor=ACCENT if value==peak else colors.HexColor('#9bb2a4')));chart.add(String(start+bar_width+10,y,f'{value:g}%',fontName=font,fontSize=8,fillColor=INK))
+            block.append(chart);story.append(KeepTogether(block))
     heading('03  지역 변화와 생활권 맥락')
     local=brief.get('local_changes',[])+[c for c in brief.get('unique_local_signals',[]) if c.get('module')=='local']
     if not local: add('출처가 연결된 지역 변화 자료 미확보.')
-    for c in local:
-        story.append(KeepTogether([p(c.get('title'),'sub'),p(c.get('evidence') or c.get('statement')),p(f"{c.get('published_at') or '날짜 미확인'} · {c.get('scope') or '지역 범위 확인 필요'} · {refs(c)}",'small')]))
+    direct_ids={id(c) for c in brief.get('local_changes',[])}
+    for i,c in enumerate(local,1):
+        kind='직접 지역 변화' if id(c) in direct_ids else '생활권 맥락·지역 배경'
+        story.append(KeepTogether([Spacer(1,2*mm),p(f'{i:02} / {kind}','small'),p(c.get('title'),'sub'),p(concise(c.get('evidence') or c.get('statement'),240)),p(f"{c.get('published_at') or '날짜 미확인'} · {c.get('scope') or '지역 범위 확인 필요'} · {refs(c)}",'small')]))
     heading('04  전국 행사 참고와 홍보 연결점')
     cases=[c for c in brief.get('trend_patterns',[]) if c.get('type') in ('reference_case','audience_context')]
     if not cases: add('출처가 연결된 행사 참고 사례 미확보.')
     for i,c in enumerate(cases,1):
-        add(f"{i:02}  {c.get('event_name') or '전국 참고 자료'}",'sub');add(c.get('observation'))
-        add(f"{c.get('scope') or '검색 참고 자료'} · {refs(c)}",'small')
-        for q in c.get('adaptation_hypotheses',[])[:3]: add('응용 질문: '+q['statement'])
-        for fit in c.get('audience_fit',[])[:1]:add(fit.get('rationale'),'small')
+        block=[Spacer(1,5*mm),p(f"{i:02}  {c.get('event_name') or '전국 참고 자료'}",'sub'),p(concise(c.get('observation'),360)),p(f"{c.get('scope') or '검색 참고 자료'} · {refs(c)}",'small')]
+        for q in c.get('adaptation_hypotheses',[])[:2]:block.append(p('매장 응용 질문 요약: '+concise(q.get('statement') if isinstance(q,dict) else q,180)))
+        block.append(p('행사 발생·보도와 매장 응용 가설은 구분합니다. 고객 호응·성과는 미확인입니다.','small'));story.append(KeepTogether(block))
     add('참여 방식 분류는 시장 추세·인기도의 증거가 아닙니다. 추가 Instagram 게시물과 수동 연결 영상은 이 보고서의 조사 근거에 포함하지 않습니다.','small')
-    if discovery.get('search_plan'):
-        heading('탐색 범위와 검색 이유')
-        for row in discovery['search_plan']:add(row['query'],'sub');add(row['reason'],'small')
-    heading('05  홍보 리서치 시사점')
-    add(brief.get('why_here_now'))
+    heading('05  기획에 활용할 연결점')
+    note('WHY HERE, NOW?',brief.get('why_here_now'))
     for item in brief.get('research_implications',[]):
         add(item.get('statement') or item.get('title') or item if isinstance(item,dict) else item)
     review=brief.get('research_review',{})
     if review:
         add('고객 연결·차별성 검토: '+('완료' if review.get('performed') else '미완료 / 꺼짐'),'small')
-    heading('06  기획 전 확인할 사항')
-    for text in brief.get('needs_manual_check',[])[:12]:add('- '+text,'small')
+    story.extend([Spacer(1,6*mm),p('기획 전 확인할 사항','sub')])
+    diagnostic_labels={
+        'RADIUS_NOT_VERIFIED':'기사 속 사건이 매장 조사 반경 안에 있는지는 별도 확인이 필요합니다.',
+        'NAVER_DATE_IS_PROVIDED_AT':'원문 게시일이 미확인인 자료는 뉴스 제공일로 표시될 수 있습니다.',
+        'DISTINCT_ARTICLES_MAY_DESCRIBE_SAME_EVENT':'서로 다른 기사도 같은 사건을 다룰 수 있습니다.',
+        'DISTINCT_SOURCES_NOT_DISTINCT_EVENTS':'출처 수를 독립 행사 수로 해석하지 마세요.',
+        'BOUNDED_SEARCH_NOT_EXHAUSTIVE':'검색 범위와 건수가 제한되어 모든 자료를 포함하지 않습니다.',
+        'YOUTUBE_CONTENT_NOT_WATCHED':'YouTube 검색 정보만 수집했으며 영상 본문은 분석하지 않았습니다.',
+        'HISTORICAL_LIBRARY_NOT_LIVE_EVIDENCE':'과거 참고 사례는 현재 발생한 사건의 근거가 아닙니다.',
+        'OPTIONAL_ARTICLE_WORDING_CHECKS_NOT_EVENT_OR_AUDIENCE_VERIFICATION':'기사 표현 대조는 실제 행사나 고객 호응을 검증한 결과가 아닙니다.',
+        'RESEARCH_INTERPRETATION_NOT_FACTUAL_APPROVAL':'AI 해석 검토는 사실·성과의 최종 승인을 의미하지 않습니다.'}
+    for text in brief.get('needs_manual_check',[])[:12]:
+        for code,label in diagnostic_labels.items():text=text.replace(code,label)
+        add('- '+text.replace('partial 결과','일부 자료만 확보한 결과'),'small')
     if not brief.get('needs_manual_check'):add('출처별 시점·범위와 응용 가설을 확인해주세요.')
-    heading('출처 목록')
+    heading('06  출처와 탐색 범위')
+    add('본문 출처 번호와 대응하는 원본 링크입니다. 게시 시점·지역 범위·사업 단계를 원문에서 확인하세요.','small')
+    if discovery.get('search_plan'):
+        add('사용한 검색어','sub')
+        for row in discovery['search_plan']:add(row['query'],'small');add(row['reason'],'small')
     for url,(n,s) in sources.items():
         add(f"[{n}] {s.get('title') or s.get('source_name') or '원본 자료'}",'small')
         story.append(Paragraph(f'<link href="{escape(url,quote=True)}" color="#315c4d">{escape(url)}</link>',styles['small']))

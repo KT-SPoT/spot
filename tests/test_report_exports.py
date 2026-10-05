@@ -24,6 +24,26 @@ BRIEF = {**generate_brief(fixture()),'source_count':1,'overview':{'area_summary'
 class ExportTests(unittest.TestCase):
     @unittest.skipUnless(any(Path(p).is_file() for p in (os.getenv('SPOT_PDF_FONT_PATH','/no-font'),
         '/usr/share/fonts/truetype/nanum/NanumGothic.ttf','/mnt/c/Windows/Fonts/malgun.ttf','C:/Windows/Fonts/malgun.ttf')),
+        'Korean font required for PDF rendering')
+    def test_report_sections_and_observations_preserve_zero_and_sources(self):
+        import copy
+        brief=copy.deepcopy(BRIEF)
+        brief['unique_local_signals']=[{'module':'quant','title':'유동인구 요일별 비중','shares':{'mon':{'share_pct':0},'tue':{'share_pct':75}},'sources':[{'source_url':'https://public.example/data','title':'공공 관측'}]}]
+        brief['needs_manual_check']=['local: RADIUS_NOT_VERIFIED']
+        before=copy.deepcopy(brief)
+        reader=PdfReader(BytesIO(render_pdf(brief,PAYLOAD)))
+        text='\n'.join(page.extract_text() for page in reader.pages)
+        self.assertIn('REPORT GUIDE',text)
+        self.assertIn('75%',text)
+        self.assertIn('0%',text)
+        self.assertIn('매장 조사 반경',text)
+        self.assertNotIn('RADIUS_NOT_VERIFIED',text)
+        self.assertIn('https://public.example/data',text)
+        self.assertEqual(brief,before)
+        self.assertGreaterEqual(len(reader.pages),6)
+
+    @unittest.skipUnless(any(Path(p).is_file() for p in (os.getenv('SPOT_PDF_FONT_PATH','/no-font'),
+        '/usr/share/fonts/truetype/nanum/NanumGothic.ttf','/mnt/c/Windows/Fonts/malgun.ttf','C:/Windows/Fonts/malgun.ttf')),
         'Korean font required for PDF rendering; install fonts-nanum')
     def test_pdf_korean_empty_quant_and_clickable_sources(self):
         content=render_pdf(BRIEF,PAYLOAD)
