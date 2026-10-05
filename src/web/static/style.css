@@ -78,3 +78,56 @@ body:not(.landing) .topbar{background:#f4f3ef;border-color:#dcded7}body:not(.lan
 @media(max-width:720px){.trend-case-reading{grid-template-columns:1fr;gap:12px}.trend-media-main,.trend-news{padding:16px}.trend-media-main h3{font-size:19px}.social-link-form{flex-direction:column;align-items:stretch}.trend-intro h2{font-size:23px}.section-title:has(.export-actions){align-items:start;gap:12px;flex-direction:column}}
 
 .trend-board .eyebrow{color:#9a503b}.trend-news-row .text-button,.trend-screen .text-button,.trend-social .text-button{color:#315a50}.trend-screen.no-media{min-height:0;padding:20px;margin-bottom:12px}
+
+/* Editorial reading order: cases, media + reporting, then store questions. */
+.trend-intro{max-width:none;margin-bottom:28px}
+.trend-intro h2{font-size:32px;letter-spacing:-1px;line-height:1.4;margin:10px 0}
+.trend-intro>.muted{font-size:14px;line-height:1.8}
+.trend-case-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;overflow:visible;padding:0;margin:0 0 32px;border-top:1px solid #d9d8d0;border-bottom:1px solid #d9d8d0}
+.trend-case-nav button{display:flex;align-items:start;gap:12px;min-width:0;padding:19px 16px;border:0;background:transparent;color:#282c29;font-size:14px;line-height:1.6}
+.trend-case-nav button[aria-pressed=true]{background:#eee9dd;color:#282c29;box-shadow:inset 0 -2px #a5452b}
+.trend-case-nav button[hidden]{display:none}.trend-more-cases{display:block;margin:-18px 0 28px}
+.trend-case-number{color:#9a503b;font-size:12px;padding-top:2px;flex-shrink:0}
+.trend-nav-copy{min-width:0}.trend-nav-copy strong{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:600}
+.trend-nav-copy small{display:block;font-size:12px;color:#62675d;margin-top:8px;line-height:1.7}
+.trend-media-grid{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:32px;align-items:start}
+.trend-media-main,.trend-news{padding:0;background:transparent;border:0}
+.trend-media-main>.eyebrow,.trend-news>.eyebrow{margin:0 0 14px;font-size:11px;letter-spacing:1.6px;color:#66685e}
+.trend-screen{min-height:0;background:#e8e6df;overflow:hidden}
+.trend-video-cover{display:block;position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;padding:0;border:0;background:#e8e6df;cursor:pointer}
+.trend-video-cover img{display:block;width:100%;height:100%;object-fit:cover}
+.trend-play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:30px;padding:14px 22px;background:rgba(255,255,255,.95);color:#282c29;font-size:14px;box-shadow:0 3px 18px rgba(0,0,0,.15);white-space:nowrap}
+.trend-video-copy{padding-top:16px}
+.trend-media-label{font-size:12px;color:#9a503b;margin:0 0 8px;line-height:1.7}
+.trend-video-copy h3{font-size:23px;letter-spacing:-.5px;line-height:1.5;margin:0 0 10px}
+.trend-video-copy>.muted{font-size:12px;margin:0 0 12px}
+.trend-video-copy .media-caption{padding:0;font-size:12px;line-height:1.8;color:#66685e;margin-top:12px}
+.trend-news .trend-case-title{font-size:24px;letter-spacing:-.5px;line-height:1.5;margin:0 0 12px}
+.trend-case-summary{font-size:14px;line-height:1.9;margin:0 0 20px;color:#4f554d}
+.trend-news-row{padding:18px 0;border-top:1px solid #d9d8d0}
+.trend-news-row a{font-size:15px;font-weight:600;line-height:1.7;color:#303730!important}
+.trend-news-row .story-number{font-size:12px;color:#9a503b}
+.trend-news-row .muted{font-size:12px;line-height:1.7}
+.trend-evidence-level{font-size:12px;line-height:1.8;color:#62675d;border-top:1px solid #d9d8d0;padding-top:16px}
+.trend-source-reading{font-size:13px;margin-top:16px}.trend-source-reading p{font-size:14px;line-height:1.9}
+.trend-video-shelf{border-top:1px solid #d9d8d0;padding-top:16px;margin-top:20px;font-size:13px}
+.trend-video-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}
+.trend-video-option{display:flex;align-items:start;gap:10px;text-align:left;background:transparent;border:0;padding:8px;font-size:13px;line-height:1.7;cursor:pointer;color:#303730;min-width:0}
+.trend-video-option[aria-pressed=true]{background:#eee9dd}
+.trend-video-option img{width:82px;aspect-ratio:16/9;object-fit:cover;flex-shrink:0}.trend-video-option span{min-width:0;overflow-wrap:anywhere}
+.trend-application{margin-top:32px;padding:26px 0;border-top:1px solid #d9d8d0;border-bottom:1px solid #d9d8d0}
+.trend-application>.eyebrow{font-size:11px;color:#9a503b;letter-spacing:1.6px;margin:0 0 10px}
+.trend-application>h3{font-size:25px;letter-spacing:-.5px;margin:0 0 25px}
+.trend-application-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
+.trend-reading-label{font-size:12px;color:#9a503b;margin:0 0 10px}
+.trend-application-grid h4{font-size:17px;line-height:1.6;margin:0 0 10px}
+.trend-application-grid article>p:last-child{font-size:14px;line-height:1.9;color:#555d52;margin:0}
+.trend-application-detail,.trend-social,.trend-search-plan,.trend-taxonomy{margin-top:18px;padding:16px 0;border:0;border-bottom:1px solid #d9d8d0;font-size:13px}
+.trend-application-detail>p{font-size:14px;line-height:1.9}
+.trend-social>summary,.trend-application-detail>summary,.trend-search-plan>summary{font-weight:500;cursor:pointer}
+.overview-video{margin-top:24px}
+.overview-video-body{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:24px;align-items:center}
+.overview-video-body .trend-video-copy{padding:0}.overview-video-body .trend-video-copy h3{font-size:22px}
+@media(max-width:1100px){.trend-media-grid{gap:24px}.trend-case-nav{grid-template-columns:repeat(2,minmax(0,1fr))}.trend-video-list{grid-template-columns:1fr}.trend-application-grid{gap:20px}}
+@media(max-width:850px){.trend-media-grid{grid-template-columns:1fr}.trend-application-grid{grid-template-columns:1fr;gap:24px}.overview-video-body{grid-template-columns:1fr}.trend-intro h2{font-size:27px}}
+@media(max-width:600px){.trend-case-nav{grid-template-columns:1fr}.trend-case-nav button{padding:16px 12px}.trend-nav-copy small{display:none}.trend-intro h2{font-size:24px}.trend-video-copy h3,.trend-news .trend-case-title{font-size:21px}.trend-application>h3{font-size:22px}.trend-video-option img{width:72px}}

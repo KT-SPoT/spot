@@ -251,4 +251,8 @@ Trend Scout v0.1의 기존 자유 형식 `query_context`에 `search_plan` 배열
 각 항목은 `role`(broad/request/experience/timing), `query`, `reason`이다. 기존 필수 필드·상태는 바뀌지 않는다.
 연구 HTTP 완료 결과에는 선택 필드 `trend_discovery`로 `search_plan`, `reference_date`,
 `lookback_start`를 전달한다. 과거/오프라인 결과에서는 없거나 null일 수 있다.
+2026-10-05 화면 개선에서 선택적인 `video_sources` 배열(최대 10개)을 추가한다.
+이는 Trend가 수집한 YouTube 출처를 브리프 채택 여부와 별도로 표시하기 위한 메타데이터다.
+동일 행사·호응 인증 또는 Brief 근거 수에 추가되는 자료라는 의미는 아니다.
+이전 결과에서 이 필드가 없으면 브리프에 연결된 영상 출처만 사용한다.
 Research Brief v0.1 필수 스키마에는 추가하지 않는다. 후속 공통 Notion 문서 동기화는 Integrator가 담당한다.
