@@ -30,7 +30,7 @@ class PlanningPromptTests(unittest.TestCase):
             'sources':[{'source_url':'https://user:password@news.example/a'},{'source_url':'javascript:alert(1)'}]}]}, {})
         self.assertIn('정량 자료 미확보',result)
         self.assertIn('미정 — 사용자가 기획 단계에서 선택',result)
-        self.assertIn('추가 배경 자료',result)
+        self.assertIn('연결점이 약한 기사',result)
         self.assertIn('예산·인력·공간·기간',result)
         self.assertNotIn('password',result)
         self.assertNotIn('javascript:',result)
