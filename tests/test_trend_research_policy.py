@@ -22,17 +22,19 @@ class TrendResearchPolicyTests(unittest.TestCase):
                     'demographic_response_established': False, 'response_signals': [],
                     'source_ids': [source['source_id']], 'reported_mechanisms': [
                         {'mechanism': 'mission_journey', 'matched_terms': ['미션'], 'source_ids': [source['source_id']]}]}
-        with patch('src.scouts.search_runtime.news', return_value=[article('서울 게임 팝업 미션 체험')]), \
+        reported=article('서울 게임 팝업 미션 체험')
+        reported['description']='참여자는 미션을 수행하고 완료 결과를 확인한다.'
+        with patch('src.scouts.search_runtime.news', return_value=[reported]), \
              patch('src.scouts.search_runtime.videos', return_value=[]):
             bundle['results']['trend'] = run_trend_scout(bundle['request'], context=ctx, detail_reader=detail)
         brief = generate_brief(bundle)
         card = next(c for c in brief['trend_patterns'] if c.get('type') == 'reference_case')
         self.assertTrue(card['audience_fit'])
-        self.assertTrue(card['adaptation_hypotheses'])
+        self.assertEqual(card['adaptation_hypotheses'],[])
         self.assertIn('확보 가능할 때 보조 근거', card['audience_fit'][0]['next_check'])
         rendered = render_markdown(brief)
-        self.assertIn('미확보만으로 사례를 제외하지 않습니다', rendered)
-        self.assertIn('활용을 막는 조건은 아닙니다', rendered)
+        self.assertIn('참여자는 미션을 수행', rendered)
+        self.assertNotIn('미확보', rendered)
         self.assertFalse(card['case_detail']['event_verified'])
         bundle['module_status']['trend'] = bundle['results']['trend']['status']
         payload = build_input(bundle, run_critic(bundle))

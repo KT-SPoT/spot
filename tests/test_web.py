@@ -38,6 +38,28 @@ class WebTests(unittest.TestCase):
             client.cookies.clear();client.get('/')
             self.assertEqual(client.get('/api/research/'+JOB).status_code,404)
 
+    def test_planning_asset_and_handoff_download(self):
+        calls=[]
+        def handler(request):
+            calls.append(request)
+            return httpx.Response(202 if request.method=='POST' else 200,json={
+                'job_id':JOB,'status':'queued' if request.method=='POST' else 'completed',
+                'result':{'research_brief':{'unique_local_signals':[], 'local_changes':[], 'trend_patterns':[]}}})
+        with self.client(handler) as client:
+            client.get('/')
+            asset=client.get('/assets/planning-hints.js')
+            self.assertEqual(asset.status_code,200)
+            self.assertIn('SPOTPlanningHints',asset.text)
+            self.assertEqual(client.get('/assets/secrets.env').status_code,404)
+            client.post('/api/research',json=PAYLOAD,headers={'Origin':'http://localhost'})
+            client.get('/api/research/'+JOB)
+            count=len(calls)
+            exported=client.get('/api/research/'+JOB+'/handoff')
+            self.assertEqual(exported.status_code,200)
+            self.assertIn('attachment;',exported.headers['content-disposition'])
+            self.assertIn('흥부장 기획 단서',exported.text)
+            self.assertEqual(len(calls),count)  # Cached export does not rerun research.
+
     def test_origin_and_validation_prevent_upstream(self):
         def handler(request): self.fail('Must not call n8n')
         with self.client(handler) as client:

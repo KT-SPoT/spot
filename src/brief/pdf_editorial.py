@@ -34,18 +34,24 @@ def local_reading(card):
 
 
 def select_local(cards):
-    main=[];extra=[];topics=set()
+    main=[];extra=[];seen=set()
     for card in cards:
-        reading=local_reading(card)
-        if reading and reading['topic'] not in topics:
-            topics.add(reading['topic']);main.append((card,reading))
-        else:
-            # Related reports remain in the appendix; no assertion that they are the same event.
-            extra.append(card)
+        title=str(card.get('title') or '').strip()
+        fact=str(card.get('evidence') or card.get('statement') or '').strip()
+        urls={s.get('source_url') for s in card.get('sources',[]) if s.get('source_url')}
+        keys=urls|{title,fact};keys.discard('')
+        if keys & seen:continue
+        seen.update(keys)
+        if (title or fact) and len(main)<4:
+            main.append((card,{'headline':title or '지역 소식','fact':excerpt(fact) if fact else '',
+                               'meaning':'','hint':''}))
+        else:extra.append(card)
     return main,extra
 
 
-def trend_reading(card):
+def trend_reading(card, brief=None):
+    linked=[q for q in card.get('adaptation_hypotheses',[]) if isinstance(q,dict) and str(q.get('statement','')).startswith('지역 관측:')]
+    if not linked:return None
     fact=str(card.get('observation') or '')
     mechanisms={q.get('mechanism') for q in card.get('adaptation_hypotheses',[]) if isinstance(q,dict)}
     choices=[
@@ -63,5 +69,9 @@ def trend_reading(card):
         return None
     for mechanism,terms,headline,meaning,hint in choices:
         if mechanism in mechanisms and any(term in fact for term in terms):
-            return {'headline':headline,'fact':excerpt(fact,terms),'meaning':meaning,'hint':hint}
+            statement=linked[0]['statement']
+            matching=next((r for r in (brief or {}).get('research_implications',[]) if r.get('synthesis_id')==linked[0].get('synthesis_id') and r.get('synthesis_id')),None)
+            observation=matching['interpretation'] if matching else meaning
+            question=statement.split('연결 단서: ')[-1]
+            return {'headline':headline,'fact':excerpt(fact,terms),'meaning':observation,'hint':question}
     return None

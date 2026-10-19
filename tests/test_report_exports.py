@@ -22,6 +22,31 @@ BRIEF = {**generate_brief(fixture()),'source_count':1,'overview':{'area_summary'
  'trend_patterns':[], 'needs_manual_check':['정량 자료 미확보']}
 
 class ExportTests(unittest.TestCase):
+    @unittest.skipUnless(any(Path(p).is_file() for p in (
+        '/usr/share/fonts/truetype/nanum/NanumGothic.ttf','/mnt/c/Windows/Fonts/malgun.ttf','C:/Windows/Fonts/malgun.ttf')),
+        'Korean font required for PDF rendering')
+    def test_pdf_carries_the_same_data_clues_and_does_not_call_review_approval(self):
+        import copy
+        from src.brief.planning_prompt import build_compact_clues
+        brief=copy.deepcopy(BRIEF)
+        brief['unique_local_signals']=[{'module':'quant','title':'매출액 연령별 비중',
+            'shares':{'20s':{'share_pct':65},'60_plus':{'share_pct':15}},'reference_period':'2026-08'}]
+        brief['trend_patterns']=[{'type':'reference_case','event_name':'촬영 체험 사례',
+            'observation':'촬영 결과를 SNS로 공유한다.', 'adaptation_hypotheses':[{'mechanism':'photo_sharing'}]}]
+        brief['research_review']={'performed':True,'case_reviews':[{'verdict':'generic'}]}
+        text=''.join(''.join(p.extract_text().split()) for p in PdfReader(BytesIO(render_pdf(brief,PAYLOAD))).pages)
+        fields=build_compact_clues(brief,PAYLOAD)['fields']
+        for field in fields:
+            self.assertIn(''.join(field['label'].split()),text)
+            if field['summary']:self.assertIn(''.join(field['summary'].split()),text)
+        self.assertIn('20대65%',text)
+        self.assertEqual(fields[2]['summary'],'')
+        self.assertEqual(fields[4]['summary'],'')
+        self.assertEqual(fields[5]['summary'],'')
+        self.assertNotIn('카메라체험결과물카드',text)
+        self.assertNotIn('응용보완',text)
+        self.assertNotIn('검토승인',text)
+
     @unittest.skipUnless(any(Path(p).is_file() for p in (os.getenv('SPOT_PDF_FONT_PATH','/no-font'),
         '/usr/share/fonts/truetype/nanum/NanumGothic.ttf','/mnt/c/Windows/Fonts/malgun.ttf','C:/Windows/Fonts/malgun.ttf')),
         'Korean font required for PDF rendering')
@@ -40,7 +65,8 @@ class ExportTests(unittest.TestCase):
         self.assertNotIn('RADIUS_NOT_VERIFIED',text)
         self.assertIn('https://public.example/data',text)
         self.assertEqual(brief,before)
-        self.assertGreaterEqual(len(reader.pages),6)
+        self.assertTrue(reader.pages)
+        self.assertIn('출처와 탐색 범위',text)
 
     @unittest.skipUnless(any(Path(p).is_file() for p in (os.getenv('SPOT_PDF_FONT_PATH','/no-font'),
         '/usr/share/fonts/truetype/nanum/NanumGothic.ttf','/mnt/c/Windows/Fonts/malgun.ttf','C:/Windows/Fonts/malgun.ttf')),
@@ -49,8 +75,8 @@ class ExportTests(unittest.TestCase):
         content=render_pdf(BRIEF,PAYLOAD)
         reader=PdfReader(BytesIO(content))
         text='\n'.join(page.extract_text() for page in reader.pages)
-        self.assertIn('저장된 광화문',text)
-        self.assertIn('정량 자료 미확보',text)
+        self.assertIn('지역 문화행사 보도',text)
+        self.assertNotIn('정량 자료 미확보',text)
         self.assertIn('예정 자료 & 확인 <필요>',text)
         self.assertTrue(any(page.get('/Annots') for page in reader.pages))
         self.assertNotIn('Instagram 공개 게시물',text)
@@ -73,7 +99,8 @@ class ExportTests(unittest.TestCase):
             self.assertTrue(pdf.content.startswith(b'%PDF'))
             handoff=c.get('/api/research/'+JOB+'/handoff')
             self.assertIn('흥부장',handoff.text)
-            self.assertIn('스마트폰',handoff.text)
+            self.assertRegex(handoff.text,r'3\. 타깃 상품\n\s*4\. 행사 기간')
+            self.assertRegex(handoff.text,r'5\. 직원 수\n\s*6\. 판촉물 예산')
             self.assertEqual(calls,['POST','GET'])
             formatter.assert_called_once()
             c.cookies.clear();c.get('/')
@@ -90,7 +117,8 @@ class ExportTests(unittest.TestCase):
             c.get('/');c.post('/api/research',json=PAYLOAD,headers={'Origin':'http://localhost'})
             self.assertEqual(c.get('/api/research/'+JOB+'/pdf').status_code,409)
             self.assertEqual(calls,['POST','GET'])
-        self.assertIn('인구 구성',render_handoff(BRIEF,PAYLOAD))
+        self.assertRegex(render_handoff(BRIEF,PAYLOAD),r'2\. 타깃 고객\n\s*3\. 타깃 상품')
+        self.assertNotIn('미확보',render_handoff(BRIEF,PAYLOAD))
 
     def test_public_origin_secure_cookie_and_exact_origin(self):
         with patch.dict('os.environ',{'SPOT_WEB_PUBLIC_ORIGIN':'https://spot.example'}):

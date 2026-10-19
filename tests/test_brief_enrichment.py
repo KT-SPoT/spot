@@ -36,7 +36,9 @@ class BriefEnrichmentTests(unittest.TestCase):
         self.assertEqual(refs[0]['article_count'], 2)
         self.assertEqual({s['source_id'] for s in refs[0]['sources']}, {'t0', 't1'})
         self.assertEqual((pattern['evidence_count'], pattern['article_count']), (2, 3))
-        self.assertIn('동일 행사 여부', render_markdown(brief))
+        # Reader report shows the grouping; the same-event caveat stays in structured data.
+        self.assertIn('관련 보도: 2건을 후보 묶음 1개로 표시', render_markdown(brief))
+        self.assertTrue(any('동일 행사 여부' in text for text in refs[0]['limitations']))
         self.assertEqual(brief['source_count'], 5)
         self.assertEqual(bundle, before)
 

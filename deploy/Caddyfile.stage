@@ -1,0 +1,12 @@
+{$SPOT_WEB_DOMAIN} {
+    respond "SPoT login setup is pending." 503
+}
+{$SPOT_API_DOMAIN} {
+    @research path /v1/research/jobs /v1/research/jobs/* /health
+    handle @research {
+        reverse_proxy api:8765
+    }
+    handle {
+        respond 404
+    }
+}

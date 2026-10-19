@@ -88,4 +88,5 @@ class LiveSelectionTests(unittest.TestCase):
         brief = generate_brief(bundle)
         self.assertEqual(brief['trend_patterns'][0]['type'], 'audience_context')
         self.assertIn('고객층 조사 맥락', render_markdown(brief))
-        self.assertIn('체험 패턴 0개·참고 후보 0건', brief['overview']['area_summary'])
+        self.assertNotIn('축제 참여 의사', brief['overview']['area_summary'])
+        self.assertFalse(any(c.get('type')=='reference_case' for c in brief['trend_patterns']))

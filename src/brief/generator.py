@@ -11,6 +11,7 @@ from src.brief.trend_groups import group_coverage
 from src.brief.quant_policy import quant_basis
 from src.brief.failures import failure_summary
 from src.brief.quant_distributions import distribution_cards, valid_share
+from src.brief.experience_connections import connections, reported_actions
 
 
 METRICS = {
@@ -229,6 +230,8 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         if item.get("evidence_role") in ("surrounding_context", "background"):
             card["scope"] = ("같은 행정구역의 보조 맥락; 거리·생활권 연결·점포 영향 미확인"
                              if item["evidence_role"] == "surrounding_context" else "지역 설명을 위한 배경 자료; 최근 변화로 집계하지 않음")
+            if item.get("type") == "local_place":
+                card["scope"] = f"매장 좌표 기준 직선거리 {item['place']['distance_m']}m; 검색된 장소"
             local_context.append(card)
         else:
             local_changes.append(card)
@@ -342,6 +345,20 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
             and fit.get('mechanism_source_ids')
             and fit.get('fit_status') == 'hypothesis_not_proven_preference'
             and set(fit['mechanism_source_ids']).issubset(set(ids))]
+        connected = connections(card, facts + demographics + distributions, local_changes + local_context)
+        if connected:
+            card['adaptation_hypotheses'] = connected
+            for hypothesis in connected:
+                for ref in hypothesis['context_source_refs']:
+                    if ref not in card['context_source_refs']:card['context_source_refs'].append(ref)
+                    linked = sources_for(ref['module'], [ref['source_id']])
+                    entries = card['context_sources'].setdefault(ref['module'], [])
+                    for source in linked:
+                        if not any(s['source_id'] == source['source_id'] for s in entries):entries.append(source)
+        else:
+            # Keep the news reference, without pretending a category is an action.
+            card['adaptation_hypotheses'] = []
+            card['limitations'].append('구체적인 참여 행동이 부족해 지역 연결 단서를 생성하지 않았습니다. 전국 행사 소식으로 참고합니다.')
         trend_patterns.append(card)
 
     for item in trend.get('audience_contexts', []):
@@ -375,7 +392,15 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         checks.append("교통시설 원문 표의 시군구 기준 표기와 선택 영역 행의 범위를 확인하세요.")
 
     primary = None
-    if demographics:
+    sales_age=next((c for c in distributions if c.get('population_kind')=='sales' and c.get('distribution_kind')=='age'),None)
+    if sales_age and any(v['share_pct']>0 for v in sales_age['shares'].values()):
+        maximum=max(v['share_pct'] for v in sales_age['shares'].values())
+        winners=' / '.join(AGE_LABELS[k] for k,v in sales_age['shares'].items() if v['share_pct']==maximum)
+        complete=all(k in sales_age['shares'] for k in AGE_LABELS if k!='under_10')
+        primary=f"매출액 {'연령 비중' if complete else '확보 연령 중'}: {winners} {maximum:g}%가 가장 높음. 매출액 구성비이며 고객 수나 상품 선호를 뜻하지 않습니다."
+    elif any('dominant_sales_age' in c.get('metric_refs',[]) for c in facts):
+        primary=next(c['statement'] for c in facts if 'dominant_sales_age' in c.get('metric_refs',[]))
+    elif demographics:
         primary = " / ".join(card["statement"] for card in demographics)
     elif facts:
         population_facts = [fact for fact in facts if fact["metric_refs"][0] in
@@ -383,32 +408,8 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
         if population_facts:
             primary = " / ".join(fact["statement"] for fact in population_facts)
 
-    implications = []
-    fact_by_metric = {fact["metric_refs"][0]: fact for fact in facts}
-    if facts:
-        implications.append({"statement": "상권·인구 수치를 함께 검토하되 자료 시점과 모집단을 구분해 조사 가설을 세우세요.",
-                             "basis": deepcopy(facts), "kind": "research_question"})
-    competition = fact_by_metric.get("telecom_store_count")
-    change = fact_by_metric.get("telecom_store_yoy_percent")
-    if competition and change:
-        implications.append({"statement": f"핸드폰 소매업 {competition['value']:,}개, 전년동월 대비 {change['value']:g}%라는 관측을 바탕으로 경쟁 점포의 실제 영업 상태와 구성 변화를 확인하세요. 점포 수 변화만으로 경쟁 강도나 매출 기회를 확정할 수 없습니다.",
-                             "basis": deepcopy([competition, change]), "kind": "research_question"})
-    if demographics:
-        implications.append({"statement": " / ".join(card["statement"] for card in demographics) + ". 생활·통근·통행 맥락을 구분해 제품 체험 수요를 추가 조사하세요. 인구 구성만으로 구매 고객을 정하지 않습니다.",
-                             "basis": deepcopy(demographics), "kind": "research_question"})
-    if local_changes:
-        implications.append({"statement": "지역 변화의 사업 단계와 점포 생활권 관련성을 확인하세요. 계획·선정 발표를 현재 운영 또는 입주로 해석하지 마세요.",
-                             "basis": deepcopy(local_changes), "kind": "research_question"})
-    if local_context:
-        implications.append({"statement": "주변 행정구역 변화와 지역 배경 자료를 조사 질문으로 활용하세요. 점포 생활권 연결과 영향 여부를 추가 확인하고 최근 지역 변화·고객 증가와 구분하세요.",
-                             "basis": deepcopy(local_context), "kind": "research_question"})
-    if trend_patterns:
-        checks.append('Trend는 참여 방식과 응용 가능성의 조사 참고입니다. 고객 호응 자료는 선택적 보조 근거이며, 미확보만으로 사례를 제외하지 않습니다. 반복 등장하는 방식도 인기·성과를 입증하지 않습니다.')
-        pattern_names = ", ".join(str(card.get("name") or card.get("event_name") or "체험 후보") for card in trend_patterns)
-        campaign = request.get("campaign", {})
-        subject = (campaign.get("product") + " 체험 목적") if campaign.get("product") else "관측된 매장 지역·고객 맥락"
-        implications.append({"statement": f"{pattern_names} 자료를 {subject}과 대조해 적합성을 검토하세요. 방문 증가나 매출 효과는 이번 근거로 확정할 수 없습니다.",
-                             "basis": deepcopy(trend_patterns), "kind": "research_question"})
+    from src.brief.regional_insights import regional_insights
+    implications = regional_insights(facts + demographics + distributions, local_changes + local_context)
 
     cards = facts + demographics + distributions + local_context + local_changes + trend_patterns
     urls = {source["source_url"] for card in cards for source in card.get("sources", [])}
@@ -417,18 +418,15 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
     address = store.get("address") or context.get("area_name") or "조사 지역 미확인"
     reference_count = sum(card.get("type") == "reference_case" for card in trend_patterns)
     audience_context_count = sum(card.get('type') == 'audience_context' for card in trend_patterns)
-    area_summary = f"{address}: 정량 지표 {len(facts)}개, 직접 지역 변화 {len(local_changes)}건, 보조 맥락·배경 {len(local_context)}건, 체험 패턴 {len(trend_patterns)-reference_count-audience_context_count}개·참고 후보 {reference_count}건을 근거와 함께 요약했습니다. 자료 수는 독립 사건 수의 확정값이 아닙니다."
-    if audience_context_count:
-        area_summary += f' 전국 고객층 조사 맥락 {audience_context_count}건을 별도로 제공합니다.'
-    if not cards:
-        area_summary = f"{address}: 요약할 출처 연결 근거가 없습니다. 재수집 또는 자료 보완이 필요합니다."
+    area_summary = address + ': ' + ' '.join(row['observation'] + ' ' + row['interpretation'] for row in implications[:3])
+    if not implications:
+        area_summary = f"{address}의 지역 보도와 전국 체험 참고 자료를 정리했습니다."
     result = {"schema_version": "0.1", "request_id": request_id,
             "status": "manual_review" if cards else "failed",
             "overview": {"area_summary": area_summary, "primary_customer_signal": primary},
             "local_changes": local_changes, "unique_local_signals": facts + demographics + distributions + local_context,
             "trend_patterns": trend_patterns,
-            "why_here_now": ("위 주소의 상권·인구 자료와 조회 기간의 생활권 변화, 체험 사례를 함께 검토할 수 있습니다. "
-                             "지금 실행해야 할 이유나 다른 상권 대비 차별성은 근거의 시점·지역 관련성을 확인하기 전까지 확정하지 않습니다.") if cards else "근거 부족으로 why here / why now를 판단할 수 없습니다.",
+            "why_here_now": ' '.join(row['statement'] for row in implications[:2]) or "수집한 지역 보도와 전국 행사 자료를 기획 참고로 제공합니다.",
             "research_implications": implications,
             "needs_manual_check": list(dict.fromkeys(checks)), "source_count": len(urls)}
     review = (critic_result or {}).get('checks', {}).get('semantic_review', {})
@@ -441,7 +439,19 @@ def generate_brief(bundle, critic_result=None, *, quant_evidence=None):
                 card = case_cards[row['case_id']]
                 result['research_review']['case_reviews'].append({**deepcopy(row), 'event_name': card.get('event_name'),
                     'source_ids': [s['source_id'] for s in card['sources']]})
+    reviews={r['case_id']:r for r in result.get('research_review',{}).get('case_reviews',[])}
+    for card in trend_patterns:
+        if card.get('type')!='reference_case':continue
+        row=reviews.get(card['case_id'])
+        if row and (row['verdict'] not in ('useful','generic') or
+                    row.get('dimensions',{}).get('transfer_logic')!='clear' or
+                    row.get('dimensions',{}).get('overclaim')!='clear'):
+            card['adaptation_hypotheses']=[]
+        card['why_relevant']=[h['statement'] for h in card.get('adaptation_hypotheses',[])] or ['전국 행사 보도의 참여 방식을 참고합니다.']
+    from src.brief.area_summary import area_summary as summarize_area
+    result['overview']['area_summary'] = summarize_area(result)
     return result
+
 
 
 def mock_brief(request_id: str) -> dict[str, Any]:

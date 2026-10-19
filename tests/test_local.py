@@ -12,6 +12,8 @@ def article(title, url="https://example.org/article"):
 
 class LocalTests(unittest.TestCase):
     def setUp(self):
+        places = patch("src.scouts.local_places.collect_places")
+        places.start(); self.addCleanup(places.stop)
         self.verifier = patch("src.scouts.local.verify_source", return_value={
             "status": "text_corroborated", "article_published_at": "2026-10-01",
             "excerpt": "합성 명지국제신도시 개관 예정 근거", "change_state": "scheduled",
@@ -41,6 +43,24 @@ class LocalTests(unittest.TestCase):
             result = run_local_scout(dict(REQUEST, store={"lat": 35, "lng": 129}))
         provider.assert_not_called()
         self.assertEqual(result["status"], "failed")
+
+    def test_road_address_expands_only_to_requested_city_district(self):
+        request=dict(REQUEST,store={'address':'부산 동구 부산진성공원로 23'})
+        rows=[article('부산 동구 문화시설 개관','https://example.org/busan'),
+              article('광주 동구 문화시설 개관','https://example.org/wrong')]
+        with patch('src.scouts.search_runtime.news',return_value=rows) as news:
+            result=run_local_scout(request)
+        self.assertEqual(news.call_count,4)
+        self.assertEqual(len(result['insights']),1)
+        self.assertEqual(result['insights'][0]['evidence_role'],'surrounding_context')
+        self.assertEqual(result['insights'][0]['locality_tags'],['동구'])
+        self.assertIn('점포 인근 변화나 영향으로 확인한 자료가 아닙니다',result['sources'][0]['verification']['context_note'])
+
+    def test_empty_search_is_not_an_api_failure_or_no_real_changes(self):
+        with patch('src.scouts.search_runtime.news',return_value=[]):
+            result=run_local_scout(REQUEST)
+        self.assertIn('NO_MATCHING_LOCAL_CHANGE_NEWS',result['warnings'])
+        self.assertIn('실제 변화가 없다는 뜻은 아닙니다',result['summary'])
 
     def test_identical_report_sentence_merges_source_references(self):
         rows = [article("명지국제신도시 개관", "https://example.org/one"),

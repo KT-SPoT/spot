@@ -11,14 +11,23 @@ class EditorialTests(unittest.TestCase):
                {'title':'관련 개발 보도','evidence':'도심복합개발 사업에 참여한다.'}]
         before=copy.deepcopy(cards)
         main,extra=select_local(cards)
-        self.assertEqual(len(main),1)
-        self.assertEqual(main[0][1]['stage'],'협약·추진 단계')
-        self.assertEqual(len(extra),2)
+        self.assertEqual(len(main),3)
+        self.assertEqual(main[0][1]['headline'],cards[0]['title'])
+        self.assertEqual(main[0][1]['meaning'],'')
+        self.assertEqual(len(extra),0)
         self.assertEqual(cards,before)
+
+    def test_unclassified_news_is_kept_and_duplicate_sources_are_not_repeated(self):
+        card={'title':'명동 두 번째 플래그십 오픈','evidence':'관광객에게 브랜드 공간을 선보일 계획이다.',
+              'sources':[{'source_url':'https://news.example/a'}]}
+        main,extra=select_local([card,{**card,'title':'같은 원문 재수집'}])
+        self.assertEqual(len(main),1)
+        self.assertIn('관광객',main[0][1]['fact'])
+        self.assertEqual(extra,[])
 
     def test_trend_hint_requires_reported_element_and_existing_hypothesis(self):
         card={'observation':'현장 체험을 촬영하고 SNS로 소개한다.',
-              'adaptation_hypotheses':[{'mechanism':'photo_sharing'}]}
+              'adaptation_hypotheses':[{'mechanism':'photo_sharing','statement':'지역 관측: 저녁 매출액 48%. 사례에서 참고할 행동: 촬영 결과 공유. 연결 단서: 카메라 기능 비교 접점을 검토합니다.'}]}
         reading=trend_reading(card)
         self.assertIn('촬영',reading['fact'])
         self.assertIn('카메라',reading['hint'])

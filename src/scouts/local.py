@@ -38,8 +38,12 @@ def run_local_scout(request):
                            "원문 대조는 보도 내용의 확인이며 실제 사건·점포 반경을 검증하지 않습니다.",
                            "NAVER_DATE_IS_PROVIDED_AT", "DISTINCT_ARTICLES_MAY_DESCRIBE_SAME_EVENT",
                            "BOUNDED_SEARCH_NOT_EXHAUSTIVE"]
+    from src.scouts.local_places import collect_places
+    collect_places(request, output)
     if not anchor:
         output["errors"].append({"code": "MISSING_LOCATION_CONTEXT"})
+        output["status"] = "partial" if output["insights"] else "failed"
+        output["finished_at"] = search.now()
         return output
     seen = set()
     checked = 0
@@ -47,16 +51,31 @@ def run_local_scout(request):
     address = (request.get("store") or {}).get("address") or ""
     city = address.split()[0] if address.split() else ""
     query_anchor = " ".join(dict.fromkeys([city, anchor])).strip()
-    for query in (query_anchor, query_anchor + " 개관 개통 입주"):
+    queries=[(query_anchor,anchor,False),(query_anchor+' 개관 개통 입주',anchor,False)]
+    district=re.search(r'(?:^|\s)([가-힣]+구)(?:\s|$)', address)
+    city_short=re.sub(r'(?:광역시|특별시|특별자치시)$','',city)
+    # Road names are rarely used in headlines. Also look at the explicitly
+    # supplied city/district, without presenting district news as store changes.
+    if district and not re.search(r'(?:동|읍|면|신도시)$',anchor):
+        scope=' '.join((city_short,district[1]))
+        queries.extend([(scope+' 지역 변화',district[1],True),(scope+' 개관 개통 입주',district[1],True)])
+    output['query_context']['search_queries']=[q for q,_,_ in queries]
+    for query, search_anchor, surrounding in queries:
         for item in search.collect(output, search.news, query, start, end):
             text = item["title"] + " " + item["description"]
-            if search.normalized(anchor) not in search.normalized(text) or not any(w in text for w in CHANGE_WORDS):
+            if search.normalized(search_anchor) not in search.normalized(text) or not any(w in text for w in CHANGE_WORDS):
+                continue
+            if surrounding and search.normalized(city_short) not in search.normalized(text):
                 continue
             if item["source_url"] in seen or checked >= 15:
                 continue
             seen.add(item["source_url"])
             checked += 1
-            verification = verify_source(item, anchor, start, end, request.get("store") or {})
+            verification = dict(verify_source(item, search_anchor, start, end, request.get("store") or {}))
+            if surrounding:
+                verification.update(evidence_role='surrounding_context',
+                    context_note=f'{city_short} {search_anchor} 보도입니다. 점포 인근 변화나 영향으로 확인한 자료가 아닙니다.',
+                    classification_basis='requested_city_district_not_store_radius')
             if verification.get('evidence_role') == 'direct_change' and not verification.get('event_key'):
                 verification['event_key'] = local_event_key(item['title'] + ' ' + (verification.get('excerpt') or ''))
             output["query_context"]["verification_log"].append({"source_url": item["source_url"],
@@ -95,10 +114,13 @@ def run_local_scout(request):
                 "context_note": verification.get("context_note"), "classification_basis": verification.get("classification_basis"),
                 "date_basis": source.get("date_basis"),
                 "evidence_basis": "article_text" if verification.get("excerpt") else "search_passage",
-                "locality_tags": [anchor], "source_ids": [sid], "verification_status": verification["status"]})
+                "locality_tags": [search_anchor], "source_ids": [sid], "verification_status": verification["status"]})
     output["status"] = "partial" if output["insights"] else "failed"
     corroborated = sum(i["verification_status"] == "text_corroborated" for i in output["insights"])
     roles = {role: sum(i.get("evidence_role") == role for i in output["insights"]) for role in ("direct_change", "surrounding_context", "background")}
     output["summary"] = f"{anchor}: 직접 변화 {roles['direct_change']}건, 주변 행정구역 맥락 {roles['surrounding_context']}건, 배경 자료 {roles['background']}건. 원문·게시일 엄격 대조 {corroborated}건이며 문맥 분류·실제 영향은 별도 검토 필요."
+    if not output['insights']:
+        output['warnings'].append('LOCAL_SEARCH_FAILED' if output['errors'] else 'NO_MATCHING_LOCAL_CHANGE_NEWS')
+        output['summary']='지역 뉴스 검색에 실패했습니다.' if output['errors'] else '검색 범위에서 조건에 맞는 지역 변화 뉴스를 찾지 못했습니다. 실제 변화가 없다는 뜻은 아닙니다.'
     output["finished_at"] = search.now()
     return output

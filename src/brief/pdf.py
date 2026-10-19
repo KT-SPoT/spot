@@ -16,6 +16,8 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, PageBreak
 from reportlab.graphics.shapes import Drawing, Rect, String, Line
 from src.brief.pdf_editorial import excerpt, select_local, trend_reading
+from src.brief.publication import publication_text
+from src.brief.area_summary import area_summary
 
 LOCK = Lock()
 INK = colors.HexColor('#263c32')
@@ -52,11 +54,11 @@ def render_pdf(brief, request=None, discovery=None):
         styles[key].fontName = 'SpotKoreanBold'
     story=[]; sources={}
     def p(value,kind='body'):
-        return Paragraph(escape(str(value or '자료 미확보')).replace('\n','<br/>'),styles[kind])
+        return Paragraph(escape(publication_text(value)).replace('\n','<br/>'),styles[kind])
     def add(value,kind='body'): story.append(p(value,kind))
     def heading(value): story.extend([PageBreak(),p(value,'heading')])
     def concise(value,limit=240):
-        text=' '.join(str(value or '자료 미확보').split())
+        text=' '.join(publication_text(value).split())
         return text if len(text)<=limit else text[:limit].rstrip()+'…'
     def note(title,text):
         box=Table([[p(title,'sub')],[p(text)]],colWidths=[WIDTH],hAlign='LEFT')
@@ -64,8 +66,8 @@ def render_pdf(brief, request=None, discovery=None):
         story.extend([box,Spacer(1,5*mm)])
     def reading_block(number,card,reading,label):
         block=[Spacer(1,5*mm),p(f'{number:02} / {label}','small'),p(reading['headline'],'sub')]
-        for title,key in [('보도된 내용','fact'),('참고할 이유','meaning'),('매장 활용 힌트 · 기획 제안','hint')]:
-            block.extend([p(title,'small'),p(reading[key])])
+        for title,key in [('무엇을 했나','fact'),('우리 지역에서 참고할 점','meaning'),('검토할 아이디어','hint')]:
+            if reading.get(key):block.extend([p(title,'small'),p(reading[key])])
         date=str(card.get('published_at') or next((s.get('published_at') for s in card.get('sources',[]) if s.get('published_at')),None) or '날짜 미제공')[:10]
         stage=' · '+reading['stage'] if reading.get('stage') else ''
         block.append(p(f"{date}{stage} · {refs(card)}",'small'))
@@ -80,7 +82,7 @@ def render_pdf(brief, request=None, discovery=None):
         for items in card.get('context_sources',{}).values():
             for source in items:
                 refs({'sources':[source]})
-        return '출처 '+', '.join(linked) if linked else '출처 미확보'
+        return '출처 '+', '.join(linked) if linked else ''
     def table(rows,widths):
         value=Table(rows,colWidths=widths,repeatRows=1,hAlign='LEFT')
         value.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),PAPER),('VALIGN',(0,0),(-1,-1),'TOP'),
@@ -93,9 +95,7 @@ def render_pdf(brief, request=None, discovery=None):
     add(store.get('address') or '주소 미확인','small')
     add(f"자료 기준일 {research.get('reference_date') or '미확인'} · 고유 출처 {brief.get('source_count',0)}개 · 조사 초안",'small')
     if campaign.get('purpose'): add('조사 질문: '+campaign['purpose'])
-    story.extend([Spacer(1,7*mm),p('01  지역을 읽는 핵심 요약','heading')]);note('AREA SUMMARY',brief.get('overview',{}).get('area_summary'))
-    if brief.get('overview',{}).get('primary_customer_signal'):add(brief['overview']['primary_customer_signal'])
-    add('인구·매출 구성은 관측 자료입니다. 고객 선호·구매 의향이나 행사 효과로 단정하지 않습니다.','small')
+    story.extend([Spacer(1,7*mm),p('01  지역을 읽는 핵심 요약','heading')]);note('AREA SUMMARY',area_summary(brief))
     quant=[c for c in brief.get('unique_local_signals',[]) if c.get('module')=='quant']
     highlights=[c for c in quant if c.get('title') in ('월별 일평균 유동인구','업소당 월평균 매출액','주거인구','직장인구','핸드폰 소매업 업소 수','세대수') and 'value' in c][:6]
     if highlights:
@@ -105,7 +105,7 @@ def render_pdf(brief, request=None, discovery=None):
             cells.append([p(c.get('title'),'small'),p(value+str(c.get('unit','')),'sub'),p(f"{c.get('reference_period') or '기준월 미제공'} · {refs(c)}",'small')])
         rows=[cells[i:i+3]+['']*(3-len(cells[i:i+3])) for i in range(0,len(cells),3)]
         cards=Table(rows,colWidths=[WIDTH/3]*3,hAlign='LEFT');cards.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('BACKGROUND',(0,0),(-1,-1),PAPER),('BOX',(0,0),(-1,-1),.3,colors.white),('INNERGRID',(0,0),(-1,-1),4,colors.white),('LEFTPADDING',(0,0),(-1,-1),12),('TOPPADDING',(0,0),(-1,-1),12),('BOTTOMPADDING',(0,0),(-1,-1),10)]));story.extend([Spacer(1,5*mm),cards])
-    story.extend([Spacer(1,7*mm),p('REPORT GUIDE','sub')]);add('02 고객 구성과 활동 시간 / 03 지역 변화 / 04 전국 체험 사례 / 05 기획 시사점과 확인 사항 / 06 출처','small')
+    story.extend([Spacer(1,7*mm),p('REPORT GUIDE','sub')]);add('고객 구성과 활동 시간 / 지역 관측과 기획 인사이트 / 전국 행사 참고 / 원본 출처','small')
     heading('02  상권과 고객 구성')
     add('소상공인365가 제공한 관측 지표입니다. 유동·주거·직장인구와 매출의 조사 대상·기간을 구분해 읽습니다.','small')
     metrics=[c for c in quant if 'value' in c]
@@ -115,7 +115,6 @@ def render_pdf(brief, request=None, discovery=None):
             value=c['value'];value=f'{value:,}' if isinstance(value,(int,float)) else str(value)
             rows.append([p(c.get('title'),'small'),p(value+str(c.get('unit','')),'small'),p(f"{c.get('reference_period') or '기준월 미제공'} / {c.get('scope') or '집계 범위 미제공'}\n{refs(c)}",'small')])
         table(rows,[65*mm,35*mm,74*mm])
-    else: add('정량 자료 미확보. 다른 조사 자료를 보존하며 수치를 추정하지 않습니다.')
     labels={'male':'남성','female':'여성','under_10':'10세 미만','teens':'10대','20s':'20대','30s':'30대','40s':'40대','50s':'50대','60_plus':'60대 이상',
             'mon':'월','tue':'화','wed':'수','thu':'목','fri':'금','sat':'토','sun':'일'}
     for c in quant:
@@ -138,36 +137,41 @@ def render_pdf(brief, request=None, discovery=None):
             for i,(label,value) in enumerate(values):
                 y=height-(i+1)*19+3;chart.add(String(0,y,label,fontName=font,fontSize=8,fillColor=INK));chart.add(Rect(start,y-1,bar_width*value/100,8,strokeColor=None,fillColor=ACCENT if value==peak else colors.HexColor('#9bb2a4')));chart.add(String(start+bar_width+10,y,f'{value:g}%',fontName=font,fontSize=8,fillColor=INK))
             block.append(chart);story.append(KeepTogether(block))
-    heading('03  지역 변화와 생활권 맥락')
     local=brief.get('local_changes',[])+[c for c in brief.get('unique_local_signals',[]) if c.get('module')=='local']
     main_local,extra_local=select_local(local)
-    add('이동 경로·주거·시설 변화 중 매장 기획과 연결할 수 있는 주제를 먼저 읽습니다. 같은 주제의 관련 기사와 역사·행정 배경 자료는 뒤의 참고자료에 모았습니다.','small')
-    if not main_local:add('현재 자료에서 매장 활용 연결점을 정리할 지역 변화가 충분하지 않습니다. 수집한 기사들은 참고자료에 보존했습니다.')
+    heading('03  지역 소식과 생활권 맥락')
+    add('지역에서 보도된 소식을 짧게 모았습니다. 기사별 장소와 시점을 함께 살펴보세요.','small')
     direct_ids={id(c) for c in brief.get('local_changes',[])}
     for i,(c,reading) in enumerate(main_local,1):
-        reading_block(i,c,reading,'대상 지역 관련 보도' if id(c) in direct_ids else '주변 생활권 참고')
-    heading('04  전국 행사 참고와 홍보 연결점')
+        date=str(c.get('published_at') or next((s.get('published_at') for s in c.get('sources',[]) if s.get('published_at')),'') or '')[:10]
+        story.append(KeepTogether([Spacer(1,5*mm),p(f'{i:02}  '+reading['headline'],'sub'),
+            p(reading['fact']),p(' · '.join(filter(None,[date,'지역 관련 보도' if id(c) in direct_ids else '주변 생활권 참고',refs(c)])),'small')]))
+    if not main_local:add('이번 보고서는 상권 지표와 전국 체험 사례를 중심으로 구성했습니다.','body')
     cases=[c for c in brief.get('trend_patterns',[]) if c.get('type') in ('reference_case','audience_context')]
     main_trend=[];extra_trend=[]
     for c in cases:
-        reading=trend_reading(c)
+        reading=trend_reading(c,brief)
         if reading:main_trend.append((c,reading))
         else:extra_trend.append(c)
-    add('업종이 달라도 매장에 참고할 수 있는 참여 방식에 집중합니다. 보도된 요소와 기존 브리프의 응용 방식이 연결되는 사례만 본문에 배치합니다.','small')
-    if not main_trend:add('현재 자료에서는 참여 방식과 매장 활용 연결점을 함께 정리할 사례가 충분하지 않습니다.')
-    for i,(c,reading) in enumerate(main_trend,1):
+    if main_trend:
+        heading('04  전국 행사 참고와 홍보 연결점')
+        add('상권 관측과 전국 사례를 함께 보며 검토할 기획 참고를 정리했습니다. 추가 행사 보도는 뒤의 참고 자료에서도 살펴볼 수 있습니다.','small')
+    extra_trend.extend(c for c,_ in main_trend[3:])
+    for i,(c,reading) in enumerate(main_trend[:3],1):
         reading_block(i,c,reading,c.get('event_name') or '전국 행사 참고')
     heading('05  기획에 활용할 연결점')
     note('WHY HERE, NOW?',brief.get('why_here_now'))
-    for item in brief.get('research_implications',[]):
-        text=item.get('statement') or item.get('title') or item if isinstance(item,dict) else item
-        if isinstance(text,str) and sum(bool(c.get('event_name')) and c['event_name'] in text for c in cases)>=2:
-            if main_trend:add('전국 사례에서 참고할 방식은 '+', '.join(r['headline'] for _,r in main_trend)+'입니다. 이 방식을 지역 고객의 사용 장면과 연결하는 기획을 검토하세요.')
-            continue
-        add(text)
-    review=brief.get('research_review',{})
-    if review:
-        add('고객 연결·차별성 검토: '+('완료' if review.get('performed') else '미완료 / 꺼짐'),'small')
+    for row in brief.get('research_implications',[]):
+        if not row.get('observation'):continue
+        add(row['title'],'sub');add(row['observation']);add(row['interpretation']+' '+row['question'])
+        add(' / '.join(refs(card) for card in row.get('basis',[])),'small')
+    from src.brief.planning_prompt import build_compact_clues
+    clues=build_compact_clues(brief,request)
+    add('인구·매출, 성별·연령, 요일·시간대는 별도 집계입니다. 행사 아이디어는 참고안입니다.','small')
+    for field in clues['fields']:
+        block=[Spacer(1,3*mm),p(f"{field['number']}. {field['label']}",'sub')]
+        block.append(p(field['summary']) if field['summary'] else Spacer(1,6*mm))
+        story.append(KeepTogether(block))
     story.extend([Spacer(1,6*mm),p('보고서 활용 범위','sub')])
     add('본문의 보도된 내용은 출처 자료의 요약이고, 참고할 이유와 매장 활용 힌트는 기획 제안입니다. 기사만으로 현재 방문객 증가나 특정 연령·성별의 선호·행사 성과를 판단하지 않습니다. 사업은 표시된 진행 단계로, 과거 보도는 표시된 날짜로 읽습니다.','small')
     add('매장 조사 반경과 주변 행정구역의 보도 범위는 다를 수 있습니다. 통계의 기준월·모집단은 표에 표시하며, 자료 생성일로 대체하지 않습니다. 뉴스 제공일과 원문 게시일이 다를 수 있으며, 제한된 검색 결과가 모든 사건을 포함하는 것은 아닙니다.','small')
@@ -179,7 +183,7 @@ def render_pdf(brief, request=None, discovery=None):
     extras=[('지역 참고 기사',c) for c in extra_local]+[('전국 행사 추가 자료',c) for c in extra_trend]
     if extras:
         heading('부록  추가 기사와 배경 자료')
-        add('본문의 핵심 연결점과 별도로 보관한 자료입니다. 연결 근거가 약한 기사, 같은 주제의 추가 보도, 여러 사건을 묶은 기사도 포함됩니다. 전체 조사 기록은 원문 브리프에서 확인할 수 있습니다.','small')
+        add('지역 보도의 추가 내용과 전국 행사의 참여 방식을 살펴볼 참고 자료입니다.','small')
         for label,c in extras:
             block=[Spacer(1,3*mm),p(label,'small'),p(c.get('title') or c.get('event_name') or '참고 기사','sub'),p(excerpt(c.get('evidence') or c.get('statement') or c.get('observation'))),p(refs(c),'small')]
             story.append(KeepTogether(block))

@@ -4,9 +4,12 @@ Quant and Local run in parallel; Trend consumes their bounded context.
 Critic validates evidence and permits one bounded transient-error retry round.
 """
 
+import os
+
 from langgraph.graph import END, START, StateGraph
 
 from src.brief.generator import generate_brief
+from src.brief.pipeline import enrich_brief, execution_review, synthesis_enabled
 from copy import deepcopy
 from src.critic.critic import run_critic
 from src.critic.semantic import run_semantic
@@ -108,21 +111,35 @@ def retry_node(state: SpotState) -> dict:
     return updates
 
 
-def brief_node(state: SpotState) -> dict:
+def brief_node(state: SpotState, *, allow_synthesis=True) -> dict:
     bundle = deepcopy(state["research_bundle"])
     excluded = state.get("critic_result", {}).get("checks", {}).get("excluded_modules", [])
     for module in excluded:
         if isinstance(bundle.get("results", {}).get(module), dict):
             bundle["results"][module]["status"] = "failed"
             bundle["module_status"][module] = "failed"
-    return {"research_brief": generate_brief(bundle, state.get("critic_result"),
-                                            quant_evidence=None if "quant" in excluded else state.get("quant_evidence"))}
+    brief=generate_brief(bundle, state.get("critic_result"),
+                         quant_evidence=None if "quant" in excluded else state.get("quant_evidence"))
+    updates={"research_brief":enrich_brief(brief,
+        reference_date=state['request'].get('research',{}).get('reference_date'), request=state['request']) if allow_synthesis else brief}
+    if allow_synthesis and synthesis_enabled():
+        from src.critic.critic import diagnostic_summary
+        critic=deepcopy(state['critic_result'])
+        critic['checks']['semantic_review']=execution_review(updates['research_brief'])
+        critic['checks']['diagnostics']=diagnostic_summary(critic)
+        if critic['checks']['semantic_review']['performed']:
+            critic['warnings']=[w for w in critic.get('warnings',[]) if w!='SEMANTIC_AND_FACTUAL_REVIEW_REQUIRED']
+            if 'RESEARCH_INTERPRETATION_NOT_FACTUAL_APPROVAL' not in critic['warnings']:
+                critic['warnings'].append('RESEARCH_INTERPRETATION_NOT_FACTUAL_APPROVAL')
+        updates['critic_result']=critic
+    return updates
 
 
 def build_graph(*, max_retry_rounds=1, semantic_caller=None, semantic_mode=None, progress=None):
     if type(max_retry_rounds) is not int or max_retry_rounds not in (0, 1):
         raise ValueError("max_retry_rounds must be 0 or 1")
     graph = StateGraph(SpotState)
+    selected_semantic_mode=semantic_mode if semantic_mode is not None else os.getenv('SPOT_SEMANTIC_MODE','off')
 
     def observed(name, fn):
         def run(state):
@@ -150,6 +167,10 @@ def build_graph(*, max_retry_rounds=1, semantic_caller=None, semantic_mode=None,
     def semantic_node(state):
         from src.critic.critic import diagnostic_summary
         critic = deepcopy(state['critic_result'])
+        if synthesis_enabled() and selected_semantic_mode=='shadow':
+            critic['checks']['semantic_review']={'profile':'research','performed':False,
+                'code':'DEFERRED_TO_BRIEF_SYNTHESIS','call_count':0,'case_reviews':[],'truth_verified':False}
+            return {'critic_result':critic}
         critic['checks']['semantic_review'] = run_semantic(state['research_bundle'], critic,
             caller=semantic_caller, mode=semantic_mode, quant_evidence=state.get('quant_evidence'))
         critic['checks']['diagnostics'] = diagnostic_summary(critic)
@@ -158,7 +179,7 @@ def build_graph(*, max_retry_rounds=1, semantic_caller=None, semantic_mode=None,
             critic['warnings'].append('RESEARCH_INTERPRETATION_NOT_FACTUAL_APPROVAL')
         return {'critic_result': critic}
     graph.add_node("semantic", observed("semantic", semantic_node))
-    graph.add_node("brief", observed("brief", brief_node))
+    graph.add_node("brief", observed("brief", lambda state:brief_node(state,allow_synthesis=selected_semantic_mode=='shadow')))
 
     # Gather independent measurements before context-dependent discovery.
     graph.add_edge(START, "quant")

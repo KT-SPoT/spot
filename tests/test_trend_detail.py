@@ -125,7 +125,9 @@ class TrendDetailTests(unittest.TestCase):
         brief = generate_brief(bundle)
         card = next(c for c in brief['trend_patterns'] if c.get('type') == 'reference_case')
         self.assertTrue(card['audience_fit'])
-        self.assertIn('본문 참여 방식 표현', render_markdown(brief))
+        # Article mechanism checks stay in structured data, not the reader report.
+        self.assertTrue(card['case_detail']['reported_mechanisms'])
+        self.assertIn('전국 체험 참고:', render_markdown(brief))
         payload = build_input(bundle, run_critic(bundle))
         self.assertTrue(any(c['content'].get('audience_fit') for c in payload['claims'] if isinstance(c['content'], dict)))
         for fit in trend['insights'][0]['audience_fit']:

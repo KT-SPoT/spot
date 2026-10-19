@@ -97,8 +97,8 @@ class TrendContextTests(unittest.TestCase):
         refs=[c for c in brief['trend_patterns'] if c.get('type')=='reference_case']
         self.assertEqual(len(refs),3)
         self.assertIn('quant',refs[0]['context_sources'])
-        self.assertIn('선정 이유',text)
-        self.assertIn('실제 행사 참여자의 성별·연령',text)
+        self.assertIn('전국 체험 참고',text)
+        self.assertNotIn('인구 신호와 후보 메타데이터의 표현 겹침',text)
         self.assertEqual(brief['source_count'],5)
 
     def test_single_candidate_in_brief_without_repeated_pattern(self):
@@ -109,7 +109,8 @@ class TrendContextTests(unittest.TestCase):
         bundle['results']['trend']=result
         brief=generate_brief(bundle)
         self.assertEqual(len(brief['trend_patterns']),1)
-        self.assertIn('체험 패턴 0개·참고 후보 1건',brief['overview']['area_summary'])
+        self.assertNotIn('전국 체험',brief['overview']['area_summary'])
+        self.assertEqual(len(brief['trend_patterns']),1)
 
     def test_library_does_not_replace_search_failures(self):
         bundle=evidence()

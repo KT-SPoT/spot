@@ -48,12 +48,18 @@ def research_result(request, *, mode, progress=None):
     secrets = [v for k, v in os.environ.items() if v and len(v) >= 8 and
                any(word in k.upper() for word in ("KEY", "SECRET", "TOKEN", "CLIENT_ID", "PASSWORD"))]
     brief = redact(state["research_brief"], secrets)
+    trend=state.get('trend_result',{})
+    video_errors=[e for e in trend.get('errors',[]) if isinstance(e,dict) and e.get('provider')=='videos']
+    video_status=('rate_limited' if any(e.get('http_status')==429 for e in video_errors) else
+                  'provider_error' if video_errors else
+                  'disabled' if trend.get('query_context',{}).get('video_mode') in ('off','deferred') else 'completed')
     return {"mode": mode, "module_status": run["module_status"], "critic_is_mock": False,
             "trend_discovery": redact({
+                "video_status": video_status,
                 **{k: state.get('trend_result', {}).get('query_context', {}).get(k)
                    for k in ('search_plan', 'reference_date', 'lookback_start')},
                 # Reader references remain separate from Critic-approved brief evidence.
-                "video_sources": [s for s in state.get('trend_result', {}).get('sources', [])
+                "video_sources": [s for s in (state.get('trend_result', {}).get('reader_video_sources') or state.get('trend_result', {}).get('sources', []))
                                   if urlsplit(s.get('source_url', '')).hostname in
                                   {'youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'}][:10],
             }, secrets),
