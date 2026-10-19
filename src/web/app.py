@@ -1,0 +1,276 @@
+"""Session-owned web; public hosting requires an authenticated HTTPS reverse proxy."""
+import asyncio
+from collections import OrderedDict
+from contextlib import asynccontextmanager
+from datetime import datetime
+import hashlib
+import os
+from pathlib import Path
+import re
+import secrets
+import time
+from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
+
+import httpx
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from pydantic import ValidationError
+
+from src.api.app import redact
+from src.api.models import ResearchRequest
+from src.web import places, instagram
+
+STATIC = Path(__file__).parent / 'static'
+COOKIE = 'spot_session'
+
+
+def create_app(*, token=None, n8n_base=None, transport=None, place_transport=None, instagram_transport=None):
+    if token is None:
+        load_dotenv(Path(__file__).resolve().parents[2] / '.env', encoding='utf-8-sig')
+        token = os.getenv('SPOT_N8N_TOKEN') or os.getenv('SPOT_API_TOKEN', '')
+    n8n_base = n8n_base or os.getenv('SPOT_N8N_BASE_URL', 'https://raschepat.app.n8n.cloud')
+    parsed = urlsplit(n8n_base)
+    if len(token) < 24 or parsed.scheme != 'https' or not parsed.netloc or parsed.username or parsed.query or parsed.fragment or parsed.path not in ('', '/'):
+        raise RuntimeError('Configure an HTTPS n8n origin and a server-side token')
+    sensitive = [token] + [v for k,v in os.environ.items() if v and len(v)>=8 and any(w in k.upper() for w in ('KEY','TOKEN','SECRET','PASSWORD','CLIENT_ID'))]
+    client = httpx.AsyncClient(base_url=n8n_base.rstrip('/'), timeout=20, follow_redirects=False,
+                              headers={'X-SPOT-API-Key':token}, transport=transport)
+    sessions = {}
+    exports = OrderedDict()
+    instagram_lock = asyncio.Lock()
+    instagram_calls = []
+    public_origin = os.getenv('SPOT_WEB_PUBLIC_ORIGIN', '').rstrip('/')
+    try:
+        public = urlsplit(public_origin)
+        invalid_public = public_origin and (public.scheme != 'https' or not public.hostname or public.username or public.password or public.query or public.fragment or public.path or public.port not in (None,443))
+    except ValueError:
+        invalid_public = True
+    if invalid_public:
+        raise RuntimeError('SPOT_WEB_PUBLIC_ORIGIN must be an HTTPS origin')
+
+    @asynccontextmanager
+    async def lifespan(app):
+        yield
+        await client.aclose()
+
+    app = FastAPI(title='SPOT local web', docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost', '[::1]'] + ([public.hostname] if public_origin else []))
+
+    def failure(code, status):
+        return JSONResponse({'error':{'code':code}}, status_code=status)
+
+    @app.middleware('http')
+    async def protect(request, call_next):
+        # Only the configured origin may submit billable research requests.
+        if request.method == 'POST':
+            origin = request.headers.get('origin')
+            if origin != (public_origin or str(request.base_url).rstrip('/')):
+                return failure('INVALID_ORIGIN', 403)
+        response = await call_next(request)
+        response.headers['Cache-Control'] = 'no-store'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' https://www.instagram.com/embed.js; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' https: data:; frame-src https://www.youtube-nocookie.com https://www.instagram.com; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        response.headers['Referrer-Policy'] = 'no-referrer'
+        return response
+
+    def session(request):
+        sid = request.cookies.get(COOKIE)
+        record = sessions.get(sid)
+        if not record or record['expires'] < time.monotonic():
+            return None
+        return record
+
+    @app.get('/')
+    async def index(request: Request):
+        now = time.monotonic()
+        for sid in list(sessions):
+            if sessions[sid]['expires'] < now:
+                del sessions[sid]
+        response = FileResponse(STATIC/'index.html')
+        if not session(request):
+            if len(sessions) >= 256:
+                return failure('SESSION_LIMIT', 429)
+            sid = secrets.token_urlsafe(32)
+            sessions[sid] = {'expires':now+3600, 'jobs':set(), 'requests':{}, 'namespace':secrets.token_hex(8), 'lock':asyncio.Lock()}
+            response.set_cookie(COOKIE, sid, httponly=True, secure=bool(public_origin), samesite='strict', max_age=3600)
+        return response
+
+    @app.get('/assets/{name}')
+    async def asset(name: str):
+        if name not in ('app.js','style.css','experience.js','trend-board.js','planning-hints.js','leaflet.js','leaflet.css'):
+            return failure('NOT_FOUND',404)
+        return FileResponse(STATIC/name)
+
+    @app.get('/api/config')
+    async def config():
+        return {'reference_date':datetime.now(ZoneInfo('Asia/Seoul')).date().isoformat(), 'local_only':not bool(public_origin)}
+
+    async def place_request(request, operation, **kwargs):
+        record = session(request)
+        if not record:
+            return failure('SESSION_EXPIRED',401)
+        now = time.monotonic()
+        recent = [at for at in record.get('place_calls',[]) if now-at < 60]
+        if len(recent) >= 30:
+            return failure('PLACE_RATE_LIMIT',429)
+        record['place_calls'] = recent + [now]
+        try:
+            value = await operation(os.getenv('KAKAO_REST_API_KEY',''), transport=place_transport, **kwargs)
+            return JSONResponse(redact({'results':value},sensitive))
+        except places.PlaceError as exc:
+            return failure(str(exc),503 if str(exc) != 'ADDRESS_NOT_FOUND' else 404)
+
+    @app.get('/api/places/search')
+    async def place_search(request: Request, q: str = ''):
+        if not 2 <= len(q.strip()) <= 100:
+            return failure('INVALID_PLACE_QUERY',422)
+        return await place_request(request, places.search, query=q.strip())
+
+    @app.post('/api/instagram/search')
+    async def instagram_search(request: Request):
+        if not session(request):
+            return failure('SESSION_EXPIRED',401)
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body)>1024:
+                return failure('REQUEST_TOO_LARGE',413)
+        try:
+            import json
+            payload = json.loads(body)
+            hashtag = payload.get('hashtag', '') if isinstance(payload,dict) else ''
+            if not isinstance(hashtag,str):
+                raise ValueError()
+            hashtag = hashtag.strip().lstrip('#')
+            if not re.fullmatch(r'[\w]{1,60}',hashtag):
+                raise ValueError()
+        except (ValueError,TypeError):
+            return failure('INVALID_INSTAGRAM_QUERY',422)
+        async with instagram_lock:
+            now = time.monotonic()
+            instagram_calls[:] = [at for at in instagram_calls if now-at < 60]
+            if len(instagram_calls)>=6:
+                return failure('INSTAGRAM_RATE_LIMIT',429)
+            instagram_calls.append(now)
+            try:
+                result = await instagram.search(os.getenv('SPOT_INSTAGRAM_ACCESS_TOKEN',''),
+                    os.getenv('SPOT_INSTAGRAM_USER_ID',''),os.getenv('SPOT_INSTAGRAM_GRAPH_VERSION','v26.0'),
+                    hashtag,transport=instagram_transport)
+                return JSONResponse(redact(result,sensitive))
+            except instagram.InstagramError as exc:
+                return failure(str(exc),503)
+
+    async def upstream(method, path, **kwargs):
+        try:
+            response = await client.request(method, path, **kwargs)
+            if response.status_code not in (200,202):
+                status = response.status_code if response.status_code in (401,403,404,409,422,429) else 503
+                return None, failure({401:'CONNECTION_AUTH',403:'CONNECTION_AUTH',404:'JOB_NOT_FOUND',409:'REQUEST_CONFLICT',422:'INVALID_REQUEST',429:'BUSY'}.get(status,'CONNECTION_UNAVAILABLE'),status)
+            if len(response.content)>2_000_000:
+                return None, failure('INVALID_UPSTREAM',502)
+            data = response.json()
+            if not isinstance(data,dict) or not re.fullmatch('[a-f0-9]{32}',str(data.get('job_id',''))) or data.get('status') not in ('queued','running','completed','failed'):
+                return None, failure('INVALID_UPSTREAM',502)
+            return (response.status_code,redact(data,sensitive)), None
+        except (httpx.HTTPError,ValueError):
+            return None, failure('CONNECTION_UNAVAILABLE',503)
+
+    @app.post('/api/research')
+    async def submit(request: Request):
+        record = session(request)
+        if not record:
+            return failure('SESSION_EXPIRED',401)
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body)>16384:
+                return failure('REQUEST_TOO_LARGE',413)
+        try:
+            payload = ResearchRequest.model_validate_json(bytes(body)).model_dump()
+        except (ValidationError,ValueError):
+            return failure('INVALID_REQUEST',422)
+        async with record['lock']:
+            request_id = payload['request_id']
+            previous = record['requests'].get(request_id)
+            if previous is not None and previous != payload:
+                return failure('REQUEST_CONFLICT',409)
+            if previous is None and len(record['requests']) >= 4:
+                return failure('SESSION_JOB_LIMIT',429)
+            # Retain exact input even on timeout, so a manual retry reuses its id.
+            record['requests'][request_id] = payload
+            forwarded = dict(payload)
+            forwarded['request_id'] = 'web-' + record['namespace'] + '-' + hashlib.sha256(request_id.encode()).hexdigest()
+            result,error = await upstream('POST','/webhook/spot-research',json=forwarded)
+            if error is not None:
+                return error
+            status,data = result
+            record['jobs'].add(data['job_id'])
+            record.setdefault('job_requests',{})[data['job_id']] = payload
+            return JSONResponse(data,status_code=status)
+
+    @app.get('/api/research/{job_id}')
+    async def get_job(job_id: str, request: Request):
+        record = session(request)
+        if not record:
+            return failure('SESSION_EXPIRED',401)
+        if job_id not in record['jobs']:
+            return failure('JOB_NOT_FOUND',404)
+        result,error = await upstream('GET','/webhook/spot-research-status',params={'job_id':job_id})
+        if error is not None:
+            return error
+        status,data = result
+        if data['job_id'] != job_id:
+            return failure('INVALID_UPSTREAM',502)
+        if data['status'] == 'completed' and isinstance(data.get('result',{}).get('research_brief'),dict):
+            exports[job_id] = data['result']
+            exports.move_to_end(job_id)
+            if len(exports)>32:
+                exports.popitem(last=False)
+        return JSONResponse(data,status_code=status)
+
+    async def completed_export(job_id, request):
+        record=session(request)
+        if not record:
+            return None,None,failure('SESSION_EXPIRED',401)
+        if job_id not in record['jobs']:
+            return None,None,failure('JOB_NOT_FOUND',404)
+        result=exports.get(job_id)
+        if result is None:
+            response=await get_job(job_id,request)
+            if response.status_code!=200:
+                return None,None,response
+            result=exports.get(job_id)
+        if result is None:
+            return None,None,failure('REPORT_NOT_READY',409)
+        return result,record.get('job_requests',{}).get(job_id,{}),None
+
+    @app.get('/api/research/{job_id}/pdf')
+    async def pdf_export(job_id: str, request: Request):
+        result,payload,error=await completed_export(job_id,request)
+        if error is not None:
+            return error
+        from src.brief.pdf import render_pdf
+        try:
+            content=await asyncio.to_thread(render_pdf,result['research_brief'],payload,result.get('trend_discovery'))
+        except Exception:
+            # Never return report contents, parser errors or credential values.
+            return failure('PDF_NOT_READY',503)
+        return Response(content,media_type='application/pdf',headers={'Content-Disposition':'attachment; filename="SPOT-research-brief.pdf"'})
+
+    @app.get('/api/research/{job_id}/handoff')
+    async def handoff_export(job_id: str, request: Request):
+        result,payload,error=await completed_export(job_id,request)
+        if error is not None:
+            return error
+        from src.brief.handoff import render_handoff
+        try:
+            content=render_handoff(result['research_brief'],payload)
+        except (KeyError,TypeError,ValueError):
+            return failure('REPORT_NOT_READY',503)
+        return Response(content,media_type='text/plain; charset=utf-8',
+                        headers={'Content-Disposition':'attachment; filename="SPOT-heung-manager-clues.txt"'})
+
+    return app

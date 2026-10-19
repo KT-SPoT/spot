@@ -26,6 +26,7 @@ packaging==26.3
 pydantic==2.13.5
 pydantic_core==2.46.5
 python-dotenv==1.2.3
+pyproj==3.8.0
 PyYAML==6.0.3
 requests==2.34.2
 requests-toolbelt==1.0.0

@@ -20,8 +20,8 @@ This file is the **implementation mirror** of the common schema managed in Notio
     "lng": null
   },
   "campaign": {
-    "purpose": "신제품 체험 행사 사전 리서치",
-    "product": "Galaxy Z Fold8",
+    "purpose": "매장 지역·고객 맥락 리서치",
+    "product": null,
     "target_hint": null
   },
   "research": {
@@ -32,6 +32,19 @@ This file is the **implementation mirror** of the common schema managed in Notio
   }
 }
 ```
+
+### 매장 중심 입력 — 2026-10-04 / Issue #44
+
+사용자 결정에 따라 새 웹 입력은 매장/위치와 조사 기준일·기간·반경만 받는다.
+제품명·자유 조사 목적·관심 고객층 입력은 제거했다. 제품 선택과 기획 목적은
+Research Brief 이후 흥부장 요청에서 추가한다.
+
+HTTP API는 `campaign` 생략을 허용하며 위 기본값으로 정규화한다.
+`campaign.product`는 nullable/생략 가능하다. 명시한 문자열은 비어 있으면 안 된다.
+기존 제품·목적 포함 요청은 호환되지만 모델 기능·고객 호응 리서치 완료를 뜻하지 않는다.
+Scout 함수에는 기본 campaign을 포함한 정규화된 v0.1 요청이 전달된다.
+추적: [Issue #44](https://github.com/KT-SPoT/spot/issues/44).
+이 변경은 사용자 승인에 따른 구현 미러이며 공통 Notion 문서 동기화는 별도 남는다.
 
 ## ScoutResult v0.1 — common envelope
 
@@ -83,6 +96,9 @@ May add:
 - `metrics`
 - category/store/competition counts
 - metric references inside insights
+- `claim_kind=public_api_observation` on API-derived observation insights; inferred
+  preferences/intent must not use this marker. With SBIZ365 provenance, observations
+  are supplied as the quantitative baseline instead of LLM re-approval claims.
 
 ### Local
 
@@ -93,6 +109,13 @@ Insights should preserve:
 - locality tag
 - why the change matters
 
+Issue #44: optional `event_key`, `duplicate_basis`, `supporting_facets` and
+`event_grouping_note` retain grouped article provenance and individual reported
+stages/dates. Named-facility repairs or explicitly matched holiday marches may
+be grouped within seven publication days; this is conservative text grouping,
+not proof of event identity or actual store impact. `reported_repair_or_reopening`
+means reported completion/resumed traffic, not an on-site verification.
+
 ### Trend
 
 May add:
@@ -100,6 +123,32 @@ May add:
 - evidence counts
 - example source IDs
 - pattern taxonomy tags
+- Optional case-level `event_category`, `audience_hypothesis` and
+  `adaptation_hypotheses` (`kind=research_question`, `mechanism`, `statement`). These
+  are Trend-specific extensions; existing common v0.1 fields stay unchanged.
+- Collection scope is nationwide and cross-industry. A case need not match the
+  store's area, device or product category. Audience response is a hypothesis unless
+  separately evidenced; adaptation questions identify how the mechanism could be
+  used in a phone store.
+- `reference_cases[].related_case_ids` may link selected related-coverage cases
+  within the same conservative group; one group occupies one reference slot.
+- `audience_contexts` may carry survey/participation-intent evidence separately
+  from event cases. Such context is not counted as a repeated experience pattern.
+- Optional `case_detail` records bounded original-article wording checks, source
+  IDs, publication date (nullable), mechanisms and reported response expressions.
+  `status=text_corroborated` does not verify an event or audience preference.
+- Optional `audience_fit` carries `kind=research_hypothesis`, population kind,
+  observed profile, Quant context source refs, Trend mechanism source IDs,
+  mechanism basis, rationale and next check. `fit_status=hypothesis_not_proven_preference`
+  explicitly separates cohort composition from appeal. See `TREND_EVIDENCE_FIT.md`.
+- [Issue #34](https://github.com/KT-SPoT/spot/issues/34): `audience_fit` may add
+  `question_basis` entries (`axis`, `rule`, `observation`, `question`,
+  `context_source_refs`). These describe evidence-conditioned comparison design
+  for complete distributions, population kind, peak timing and corroborated Local
+  context. They do not assert age/gender preference, joint cohorts or efficacy.
+  `why_relevant` distinguishes discovery selection from subsequent adaptation
+  reasoning; adaptation hypotheses use article mechanisms when available.
+  No required v0.1 field or status changes. See `TREND_AUDIENCE_ADAPTATION.md`.
 
 ## ResearchBundle v0.1
 
@@ -139,6 +188,12 @@ Status:
 
 Retry instructions must identify the target module and reason.
 
+Issue #44: optional `checks.diagnostics` separates rule status, invalid/limitation
+finding counts, excluded modules, GPT execution status/code and case verdict
+counts. `manual_review` still indicates a human planning handoff, not a failed
+GPT execution. `truth_verified` remains false. GPT guard adjustments may record
+`reason_basis=policy_fallback` as well as `suggestion_basis`/`review_warning`.
+
 ## ResearchBrief v0.1
 
 The Brief is a research output, not a finished event plan.
@@ -154,6 +209,21 @@ It should contain:
 - manual-check items
 - source count
 
+### Optional Quant distribution cards
+
+Tracked for Integrator review in [Issue #38](https://github.com/KT-SPoT/spot/issues/38).
+The implementation may add `type=quant_distribution` cards to the existing
+`unique_local_signals` list. Each preserves `module=quant`, `population_kind`
+(`floating_population` or `sales`), `distribution_kind` (`gender`, `age`, `day`,
+`time`), `shares` of recognized keys with numeric `share_pct` (and optional
+observed `count`), nullable table-specific `reference_period`, `scope`, `sources`
+and `evidence_basis`. Sales cards contain amount shares, not transaction shares.
+The data is extracted from the validated same-run Quant archive; no fresh call is
+made to populate a graph. Population demographic cards without this `type` or
+`distribution_kind` remain supported. Required v0.1 fields are unchanged.
+See [Quant charts](QUANT_CHARTS.md). This repository proposal does not assert that
+the common Notion documentation has already been synchronized.
+
 ## Missing values
 
 - unknown value: `null`
@@ -164,3 +234,55 @@ It should contain:
 
 Never commit API keys or credentials.
 Use local environment variables and n8n Credentials where applicable.
+
+## Optional research job progress (web transport)
+
+Tracked in [Issue #32](https://github.com/KT-SPoT/spot/issues/32). The job polling
+response may include `progress: {stages, updated_at}`. This is transport metadata,
+not a new required field in SpotRequest, ScoutResult, or ResearchBrief.
+`stages` maps graph nodes (`quant`, `local`, `trend`, `merge`, `critic`, `retry`,
+`semantic`, `brief`) to actual execution states (`running`, `success`, `partial`,
+`failed`, `completed`). Consumers must tolerate missing stages/metadata. A completed
+node means execution ended, not that facts or recommendations were certified.
+See [web experience](web-experience.md) for display and compatibility rules.
+# 선택적인 탐색 메타데이터 (2026-10-03, Issue #42)
+
+Trend Scout v0.1의 기존 자유 형식 `query_context`에 `search_plan` 배열을 추가한다.
+각 항목은 `role`(broad/request/experience/timing), `query`, `reason`이다. 기존 필수 필드·상태는 바뀌지 않는다.
+연구 HTTP 완료 결과에는 선택 필드 `trend_discovery`로 `search_plan`, `reference_date`,
+`lookback_start`를 전달한다. 과거/오프라인 결과에서는 없거나 null일 수 있다.
+2026-10-05 화면 개선에서 선택적인 `video_sources` 배열(최대 10개)을 추가한다.
+이는 Trend가 수집한 YouTube 출처를 브리프 채택 여부와 별도로 표시하기 위한 메타데이터다.
+동일 행사·호응 인증 또는 Brief 근거 수에 추가되는 자료라는 의미는 아니다.
+이전 결과에서 이 필드가 없으면 브리프에 연결된 영상 출처만 사용한다.
+Research Brief v0.1 필수 스키마에는 추가하지 않는다. 후속 공통 Notion 문서 동기화는 Integrator가 담당한다.
+
+2026-10-07: `trend_discovery.video_status` is optional transport metadata
+(`completed`, `rate_limited`, `provider_error`, `disabled`). It explains video
+lookup availability separately from research/report quality. Collected video
+references are forwarded independently of the news-case shortlist.
+No required ScoutResult/ResearchBrief fields change. Regional observation,
+interpretation and question entries reuse the free-form `research_implications`
+list; collection/quality diagnostics remain in the structured result.
+
+2026-10-07 local Research Critic policy clarification: differentiation is optional.
+`differentiation=generic` does not prohibit `verdict=useful` when transfer logic
+is clear and overclaim is clear. Common but coherent planning connections remain
+baseline references; factual scope and population distinctions still apply.
+This changes evaluation policy, not required fields or verdict enum values. The
+separate synthesis path uses optional `regional_synthesis`, `connection_synthesis`
+diagnostics and `research_implications[].contribution` (`baseline`/`regional_plus`).
+It is connected as an opt-in Brief path, default off and not enabled in production. See
+[RESEARCH_SYNTHESIS_PILOT.md](RESEARCH_SYNTHESIS_PILOT.md). Common Notion-document
+synchronization is still separate.
+
+
+### Local background extensions — 2026-10-08
+기존 v0.1 envelope와 `insights`/`sources`를 유지한다. Local 모듈 확장으로 `type=local_place` 또는 `local_official_context`, `evidence_role=background`를 사용한다. `local_place.place`에는 name/category/address/lat/lng/distance_m/zone이 들어간다. `distance_m`는 매장 좌표로 계산한 직선거리이며 조회 시점의 검색 결과다. 장소 출처는 `source_type=map`, 공식 소개는 government. `query_context.place_search`에 반경·검색 분류·제한된 검색 범위를 기록한다. 방문량·선호·전체 시설 수를 주장하지 않는다.
+
+### 분석·지역 범위 검사 내부 확장 — 2026-10-08 (운영 반영 전)
+
+SpotRequest/ScoutResult v0.1 필드 및 Scout 함수 경계는 유지한다. brief 생성 입력의 `_analysis_context`는 파이프라인 내부에만 존재하고 응답에서 제거한다. 지역명·좌표·반경·기준일은 지역 혼입 판단에 사용한다.
+내부 모델 생성은 area_reading(place_evidence_ids, pattern_evidence_ids, interpretation 등)과 opportunities를 반환하며 기존 overview.area_summary, research_implications.interpretation/question/statement/basis로 매핑한다. 호환 필드 question은 v2에서 홍보 기회 문장을 담는다.
+regional_synthesis.version=`regional-analysis-v2`. 내부 reviews는 insight_id/verdict(within_scope, corrected_scope, mixed_region)/reason/corrected_insight/excluded_action_ids를 사용한다. 전체 분석 품질이나 참신함 승인으로 해석하지 않는다. 이전 결과의 기존 메타데이터는 그대로 읽는다.
+connections 비활성 경로의 case_reviews는 기존 호환 필드를 유지하되 dimensions는 중립값이며 scope_verdict에 지역 범위 판단을 기록한다. differentiation 등은 평가 점수로 사용하지 않는다.

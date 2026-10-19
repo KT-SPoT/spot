@@ -3,7 +3,7 @@
 import json
 import unittest
 from contextlib import ExitStack
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 from pathlib import Path
 
 from src.graph.graph import build_graph
@@ -24,8 +24,10 @@ class GraphSmokeTest(unittest.TestCase):
                 return_value=mock_scout_result(module, request["request_id"]),
             )) for module in ("quant", "local", "trend")]
             result = build_graph().invoke({"request": request})
-            for runner in runners:
-                runner.assert_called_once_with(request)
+            runners[0].assert_called_once_with(request, evidence_sink=ANY)
+            runners[1].assert_called_once_with(request)
+            runners[2].assert_called_once_with(request, context=result["trend_context"])
+            self.assertEqual(result["trend_context"]["population_signals"], [])
 
         bundle = result["research_bundle"]
         self.assertEqual(bundle["request_id"], request["request_id"])
@@ -42,8 +44,9 @@ class GraphSmokeTest(unittest.TestCase):
             self.assertEqual(scout_result["module"], module)
             self.assertEqual(scout_result["warnings"], ["MOCK_ONLY_NOT_REAL_DATA"])
 
-        self.assertEqual(result["critic_result"]["status"], "manual_review")
-        self.assertEqual(result["research_brief"]["status"], "mock")
+        self.assertEqual(result["critic_result"]["status"], "failed")
+        self.assertEqual(result["research_brief"]["status"], "failed")
+        self.assertEqual(result["research_brief"]["source_count"], 0)
         self.assertEqual(
             result["research_brief"]["request_id"], request["request_id"]
         )

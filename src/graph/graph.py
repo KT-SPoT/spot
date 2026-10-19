@@ -1,22 +1,31 @@
 """LangGraph integration scaffold for SPOT.
 
-Week-1 goal:
-- prove that three independently owned Scout interfaces can join into one state;
-- keep Critic / retry routing replaceable while real Scout PoCs are developed.
+Quant and Local run in parallel; Trend consumes their bounded context.
+Critic validates evidence and permits one bounded transient-error retry round.
 """
+
+import os
 
 from langgraph.graph import END, START, StateGraph
 
-from src.brief.generator import mock_brief
-from src.critic.critic import mock_critic
+from src.brief.generator import generate_brief
+from src.brief.pipeline import enrich_brief, execution_review, synthesis_enabled
+from copy import deepcopy
+from src.critic.critic import run_critic
+from src.critic.semantic import run_semantic
+from src.validation import validate_scout_result
+from src.critic.rules import evaluate_rules
 from src.graph.state import SpotState
+from src.graph.trend_context import build_trend_context
 from src.scouts.local import run_local_scout
 from src.scouts.quant import run_quant_scout
 from src.scouts.trend import run_trend_scout
 
 
 def quant_node(state: SpotState) -> dict:
-    return {"quant_result": run_quant_scout(state["request"])}
+    evidence = {}
+    result = run_quant_scout(state["request"], evidence_sink=evidence.update)
+    return {"quant_result": result, "quant_evidence": evidence or None}
 
 
 def local_node(state: SpotState) -> dict:
@@ -24,7 +33,12 @@ def local_node(state: SpotState) -> dict:
 
 
 def trend_node(state: SpotState) -> dict:
-    return {"trend_result": run_trend_scout(state["request"])}
+    return {"trend_result": run_trend_scout(state["request"], context=state.get("trend_context"))}
+
+
+def trend_context_node(state: SpotState) -> dict:
+    return {"trend_context": build_trend_context(state["request"],
+        state.get("quant_result"), state.get("local_result"), quant_evidence=state.get("quant_evidence"))}
 
 
 def merge_node(state: SpotState) -> dict:
@@ -47,37 +61,139 @@ def merge_node(state: SpotState) -> dict:
     return {"research_bundle": bundle}
 
 
-def critic_node(state: SpotState) -> dict:
-    return {"critic_result": mock_critic(state["research_bundle"])}
+def critic_node(state: SpotState, *, max_retry_rounds=1) -> dict:
+    critic = run_critic(state["research_bundle"], retry_count=state.get("retry_count", 0),
+                        max_retry_rounds=max_retry_rounds)
+    return {"critic_result": critic, "retry_targets": [item["module"] for item in critic["retry"]]}
 
 
-def brief_node(state: SpotState) -> dict:
-    request_id = state["request"].get("request_id", "unknown")
-    return {"research_brief": mock_brief(request_id)}
+def retry_node(state: SpotState) -> dict:
+    """Retry only selected modules, preserving earlier usable evidence on failure."""
+    updates = {"retry_count": state.get("retry_count", 0) + 1}
+    history = list(state.get("retry_history", []))
+    targets = set(state.get("retry_targets", []))
+
+    def accept(module, candidate):
+        previous = state.get(f"{module}_result", {})
+        valid = not validate_scout_result(candidate, expected_module=module,
+                                           request_id=state["request"]["request_id"])
+        candidate_bundle = merge_node({**state, **updates, f"{module}_result": candidate})["research_bundle"]
+        unsafe = any(item["level"] == "needs_fix" and item["module"] in (None, module)
+                     for item in evaluate_rules(candidate_bundle)["findings"])
+        previous_usable = previous.get("status") in ("success", "partial") and previous.get("sources") and previous.get("insights")
+        keep_previous = previous_usable and (not valid or unsafe or candidate.get("status") == "failed"
+                                             or "MOCK_ONLY_NOT_REAL_DATA" in candidate.get("warnings", []))
+        history.append({"module": module, "attempt": updates["retry_count"],
+                        "outcome": "retained_previous" if keep_previous else "replaced"})
+        if not keep_previous:
+            updates[f"{module}_result"] = candidate
+        return not keep_previous
+
+    if "quant" in targets:
+        evidence = {}
+        result = run_quant_scout(state["request"], evidence_sink=evidence.update)
+        if accept("quant", result):
+            updates["quant_evidence"] = evidence or None
+    if "local" in targets:
+        accept("local", run_local_scout(state["request"]))
+    upstream_changed = any(f"{module}_result" in updates for module in ("quant", "local"))
+    context = build_trend_context(state["request"], updates.get("quant_result", state.get("quant_result")),
+                                  updates.get("local_result", state.get("local_result")),
+                                  quant_evidence=updates.get("quant_evidence", state.get("quant_evidence")))
+    updates["trend_context"] = context
+    if "trend" in targets:
+        accept("trend", run_trend_scout(state["request"], context=context))
+    if upstream_changed and "trend_result" not in updates:
+        trend = deepcopy(state.get("trend_result", {}))
+        trend.setdefault("warnings", []).append("UPSTREAM_CONTEXT_CHANGED_TREND_NOT_REFRESHED")
+        updates["trend_result"] = trend
+    updates["retry_history"] = history
+    return updates
 
 
-def build_graph():
+def brief_node(state: SpotState, *, allow_synthesis=True) -> dict:
+    bundle = deepcopy(state["research_bundle"])
+    excluded = state.get("critic_result", {}).get("checks", {}).get("excluded_modules", [])
+    for module in excluded:
+        if isinstance(bundle.get("results", {}).get(module), dict):
+            bundle["results"][module]["status"] = "failed"
+            bundle["module_status"][module] = "failed"
+    brief=generate_brief(bundle, state.get("critic_result"),
+                         quant_evidence=None if "quant" in excluded else state.get("quant_evidence"))
+    updates={"research_brief":enrich_brief(brief,
+        reference_date=state['request'].get('research',{}).get('reference_date'), request=state['request']) if allow_synthesis else brief}
+    if allow_synthesis and synthesis_enabled():
+        from src.critic.critic import diagnostic_summary
+        critic=deepcopy(state['critic_result'])
+        critic['checks']['semantic_review']=execution_review(updates['research_brief'])
+        critic['checks']['diagnostics']=diagnostic_summary(critic)
+        if critic['checks']['semantic_review']['performed']:
+            critic['warnings']=[w for w in critic.get('warnings',[]) if w!='SEMANTIC_AND_FACTUAL_REVIEW_REQUIRED']
+            if 'RESEARCH_INTERPRETATION_NOT_FACTUAL_APPROVAL' not in critic['warnings']:
+                critic['warnings'].append('RESEARCH_INTERPRETATION_NOT_FACTUAL_APPROVAL')
+        updates['critic_result']=critic
+    return updates
+
+
+def build_graph(*, max_retry_rounds=1, semantic_caller=None, semantic_mode=None, progress=None):
+    if type(max_retry_rounds) is not int or max_retry_rounds not in (0, 1):
+        raise ValueError("max_retry_rounds must be 0 or 1")
     graph = StateGraph(SpotState)
+    selected_semantic_mode=semantic_mode if semantic_mode is not None else os.getenv('SPOT_SEMANTIC_MODE','off')
 
-    graph.add_node("quant", quant_node)
-    graph.add_node("local", local_node)
-    graph.add_node("trend", trend_node)
-    graph.add_node("merge", merge_node)
-    graph.add_node("critic", critic_node)
-    graph.add_node("brief", brief_node)
+    def observed(name, fn):
+        def run(state):
+            if progress:
+                progress(name, "running")
+            try:
+                result = fn(state)
+            except Exception:
+                if progress:
+                    progress(name, "failed")
+                raise
+            scout = result.get(f"{name}_result", {})
+            if progress:
+                progress(name, scout.get("status", "completed"))
+            return result
+        return run
 
-    # Fan-out: each Scout owns an independent module.
+    graph.add_node("quant", observed("quant", quant_node))
+    graph.add_node("local", observed("local", local_node))
+    graph.add_node("trend", observed("trend", trend_node))
+    graph.add_node("trend_context", trend_context_node)
+    graph.add_node("merge", observed("merge", merge_node))
+    graph.add_node("critic", observed("critic", lambda state: critic_node(state, max_retry_rounds=max_retry_rounds)))
+    graph.add_node("retry", observed("retry", retry_node))
+    def semantic_node(state):
+        from src.critic.critic import diagnostic_summary
+        critic = deepcopy(state['critic_result'])
+        if synthesis_enabled() and selected_semantic_mode=='shadow':
+            critic['checks']['semantic_review']={'profile':'research','performed':False,
+                'code':'DEFERRED_TO_BRIEF_SYNTHESIS','call_count':0,'case_reviews':[],'truth_verified':False}
+            return {'critic_result':critic}
+        critic['checks']['semantic_review'] = run_semantic(state['research_bundle'], critic,
+            caller=semantic_caller, mode=semantic_mode, quant_evidence=state.get('quant_evidence'))
+        critic['checks']['diagnostics'] = diagnostic_summary(critic)
+        if critic['checks']['semantic_review'].get('performed'):
+            critic['warnings'] = [w for w in critic['warnings'] if w != 'SEMANTIC_AND_FACTUAL_REVIEW_REQUIRED']
+            critic['warnings'].append('RESEARCH_INTERPRETATION_NOT_FACTUAL_APPROVAL')
+        return {'critic_result': critic}
+    graph.add_node("semantic", observed("semantic", semantic_node))
+    graph.add_node("brief", observed("brief", lambda state:brief_node(state,allow_synthesis=selected_semantic_mode=='shadow')))
+
+    # Gather independent measurements before context-dependent discovery.
     graph.add_edge(START, "quant")
     graph.add_edge(START, "local")
-    graph.add_edge(START, "trend")
+    graph.add_edge(["quant", "local"], "trend_context")
+    graph.add_edge("trend_context", "trend")
 
-    # Fan-in: wait for all three results before merging.
-    graph.add_edge(["quant", "local", "trend"], "merge")
+    # Trend starts only after both upstream results are available.
+    graph.add_edge("trend", "merge")
     graph.add_edge("merge", "critic")
 
-    # Week-1 smoke-test path only.
-    # Conditional retry routing will replace this direct edge.
-    graph.add_edge("critic", "brief")
+    graph.add_conditional_edges("critic", lambda state: "retry" if state["critic_result"]["status"] == "retry_required" else "semantic")
+    graph.add_edge("retry", "merge")
+    graph.add_edge("semantic", "brief")
     graph.add_edge("brief", END)
 
     return graph.compile()

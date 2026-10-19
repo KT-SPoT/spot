@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.1",
+  "request_id": "spot-myeongji-international-20260930-001",
+  "status": "manual_review",
+  "checks": {},
+  "retry": [],
+  "warnings": [
+    "MOCK_CRITIC_NOT_FOR_QUALITY_EVALUATION"
+  ]
+}

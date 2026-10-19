@@ -1,0 +1,29 @@
+# Use alongside compose.yaml after setting domains and a verified image version.
+services:
+  n8n:
+    image: ${SPOT_N8N_IMAGE:?Set a verified pinned official n8n image}
+    restart: unless-stopped
+    env_file:
+      - ./secrets/n8n.env
+    environment:
+      N8N_HOST: ${SPOT_N8N_DOMAIN:?Set SPOT_N8N_DOMAIN}
+      N8N_PROTOCOL: https
+      N8N_PORT: "5678"
+      WEBHOOK_URL: https://${SPOT_N8N_DOMAIN}/
+      N8N_EDITOR_BASE_URL: https://${SPOT_N8N_DOMAIN}/
+      N8N_PROXY_HOPS: "1"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      GENERIC_TIMEZONE: Asia/Seoul
+      TZ: Asia/Seoul
+    expose: ["5678"]
+    volumes:
+      - n8n_data:/home/node/.n8n
+  proxy:
+    environment:
+      SPOT_N8N_DOMAIN: ${SPOT_N8N_DOMAIN:?Set SPOT_N8N_DOMAIN}
+    volumes:
+      - ./Caddyfile.n8n:/etc/caddy/Caddyfile:ro
+    depends_on: [api, web, n8n]
+volumes:
+  n8n_data:

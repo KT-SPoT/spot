@@ -1,0 +1,129 @@
+"""Exports use completed, owned jobs and never submit fresh research."""
+import unittest
+import os
+from pathlib import Path
+from io import BytesIO
+from unittest.mock import patch
+import httpx
+from pypdf import PdfReader
+from fastapi.testclient import TestClient
+from src.web.app import create_app
+from src.brief.pdf import render_pdf
+from src.brief.handoff import render_handoff
+from tests.test_web import TOKEN, JOB, PAYLOAD
+
+from src.brief.generator import generate_brief
+from tests.test_research_brief import fixture
+
+BRIEF = {**generate_brief(fixture()),'source_count':1,'overview':{'area_summary':'저장된 광화문 조사 자료','primary_customer_signal':None},
+ 'unique_local_signals':[], 'local_changes':[{'module':'local','title':'지역 문화행사 보도','evidence':'예정 자료 & 확인 <필요>',
+ 'scope':'합성 테스트 지역','published_at':'2026-10-01',
+ 'sources':[{'source_id':'test-source','source_url':'https://news.example/a','title':'공식 원문'}]}],
+ 'trend_patterns':[], 'needs_manual_check':['정량 자료 미확보']}
+
+class ExportTests(unittest.TestCase):
+    @unittest.skipUnless(any(Path(p).is_file() for p in (
+        '/usr/share/fonts/truetype/nanum/NanumGothic.ttf','/mnt/c/Windows/Fonts/malgun.ttf','C:/Windows/Fonts/malgun.ttf')),
+        'Korean font required for PDF rendering')
+    def test_pdf_carries_the_same_data_clues_and_does_not_call_review_approval(self):
+        import copy
+        from src.brief.planning_prompt import build_compact_clues
+        brief=copy.deepcopy(BRIEF)
+        brief['unique_local_signals']=[{'module':'quant','title':'매출액 연령별 비중',
+            'shares':{'20s':{'share_pct':65},'60_plus':{'share_pct':15}},'reference_period':'2026-08'}]
+        brief['trend_patterns']=[{'type':'reference_case','event_name':'촬영 체험 사례',
+            'observation':'촬영 결과를 SNS로 공유한다.', 'adaptation_hypotheses':[{'mechanism':'photo_sharing'}]}]
+        brief['research_review']={'performed':True,'case_reviews':[{'verdict':'generic'}]}
+        text=''.join(''.join(p.extract_text().split()) for p in PdfReader(BytesIO(render_pdf(brief,PAYLOAD))).pages)
+        fields=build_compact_clues(brief,PAYLOAD)['fields']
+        for field in fields:
+            self.assertIn(''.join(field['label'].split()),text)
+            if field['summary']:self.assertIn(''.join(field['summary'].split()),text)
+        self.assertIn('20대65%',text)
+        self.assertEqual(fields[2]['summary'],'')
+        self.assertEqual(fields[4]['summary'],'')
+        self.assertEqual(fields[5]['summary'],'')
+        self.assertNotIn('카메라체험결과물카드',text)
+        self.assertNotIn('응용보완',text)
+        self.assertNotIn('검토승인',text)
+
+    @unittest.skipUnless(any(Path(p).is_file() for p in (os.getenv('SPOT_PDF_FONT_PATH','/no-font'),
+        '/usr/share/fonts/truetype/nanum/NanumGothic.ttf','/mnt/c/Windows/Fonts/malgun.ttf','C:/Windows/Fonts/malgun.ttf')),
+        'Korean font required for PDF rendering')
+    def test_report_sections_and_observations_preserve_zero_and_sources(self):
+        import copy
+        brief=copy.deepcopy(BRIEF)
+        brief['unique_local_signals']=[{'module':'quant','title':'유동인구 요일별 비중','shares':{'mon':{'share_pct':0},'tue':{'share_pct':75}},'sources':[{'source_url':'https://public.example/data','title':'공공 관측'}]}]
+        brief['needs_manual_check']=['local: RADIUS_NOT_VERIFIED']
+        before=copy.deepcopy(brief)
+        reader=PdfReader(BytesIO(render_pdf(brief,PAYLOAD)))
+        text='\n'.join(page.extract_text() for page in reader.pages)
+        self.assertIn('REPORT GUIDE',text)
+        self.assertIn('75%',text)
+        self.assertIn('0%',text)
+        self.assertIn('매장 조사 반경',text)
+        self.assertNotIn('RADIUS_NOT_VERIFIED',text)
+        self.assertIn('https://public.example/data',text)
+        self.assertEqual(brief,before)
+        self.assertTrue(reader.pages)
+        self.assertIn('출처와 탐색 범위',text)
+
+    @unittest.skipUnless(any(Path(p).is_file() for p in (os.getenv('SPOT_PDF_FONT_PATH','/no-font'),
+        '/usr/share/fonts/truetype/nanum/NanumGothic.ttf','/mnt/c/Windows/Fonts/malgun.ttf','C:/Windows/Fonts/malgun.ttf')),
+        'Korean font required for PDF rendering; install fonts-nanum')
+    def test_pdf_korean_empty_quant_and_clickable_sources(self):
+        content=render_pdf(BRIEF,PAYLOAD)
+        reader=PdfReader(BytesIO(content))
+        text='\n'.join(page.extract_text() for page in reader.pages)
+        self.assertIn('지역 문화행사 보도',text)
+        self.assertNotIn('정량 자료 미확보',text)
+        self.assertIn('예정 자료 & 확인 <필요>',text)
+        self.assertTrue(any(page.get('/Annots') for page in reader.pages))
+        self.assertNotIn('Instagram 공개 게시물',text)
+
+    @patch('src.brief.pdf.render_pdf',return_value=b'%PDF-1.4\nsynthetic-renderer')
+    def test_owned_cached_exports_do_not_resubmit_or_fetch(self, formatter):
+        calls=[]
+        def handler(request):
+            calls.append(request.method)
+            return httpx.Response(202 if request.method=='POST' else 200,json={
+                'job_id':JOB,'status':'queued' if request.method=='POST' else 'completed',
+                'result':{'research_brief':BRIEF}})
+        app=create_app(token=TOKEN,n8n_base='https://n8n.example',transport=httpx.MockTransport(handler))
+        with TestClient(app,base_url='http://localhost') as c:
+            c.get('/')
+            c.post('/api/research',json=PAYLOAD,headers={'Origin':'http://localhost'})
+            c.get('/api/research/'+JOB)
+            pdf=c.get('/api/research/'+JOB+'/pdf')
+            self.assertEqual(pdf.status_code,200)
+            self.assertTrue(pdf.content.startswith(b'%PDF'))
+            handoff=c.get('/api/research/'+JOB+'/handoff')
+            self.assertIn('흥부장',handoff.text)
+            self.assertRegex(handoff.text,r'3\. 타깃 상품\n\s*4\. 행사 기간')
+            self.assertRegex(handoff.text,r'5\. 직원 수\n\s*6\. 판촉물 예산')
+            self.assertEqual(calls,['POST','GET'])
+            formatter.assert_called_once()
+            c.cookies.clear();c.get('/')
+            self.assertEqual(c.get('/api/research/'+JOB+'/pdf').status_code,404)
+            self.assertEqual(c.get('/api/research/'+JOB+'/handoff').status_code,404)
+
+    def test_incomplete_export_is_not_research_and_errors_do_not_echo(self):
+        calls=[]
+        def handler(r):
+            calls.append(r.method)
+            return httpx.Response(200,json={'job_id':JOB,'status':'running'})
+        with TestClient(create_app(token=TOKEN,n8n_base='https://n8n.example',transport=httpx.MockTransport(handler)),base_url='http://localhost') as c:
+            self.assertEqual(c.get('/api/research/'+JOB+'/pdf').status_code,401)
+            c.get('/');c.post('/api/research',json=PAYLOAD,headers={'Origin':'http://localhost'})
+            self.assertEqual(c.get('/api/research/'+JOB+'/pdf').status_code,409)
+            self.assertEqual(calls,['POST','GET'])
+        self.assertRegex(render_handoff(BRIEF,PAYLOAD),r'2\. 타깃 고객\n\s*3\. 타깃 상품')
+        self.assertNotIn('미확보',render_handoff(BRIEF,PAYLOAD))
+
+    def test_public_origin_secure_cookie_and_exact_origin(self):
+        with patch.dict('os.environ',{'SPOT_WEB_PUBLIC_ORIGIN':'https://spot.example'}):
+            app=create_app(token=TOKEN,n8n_base='https://n8n.example',transport=httpx.MockTransport(lambda r:httpx.Response(202,json={'job_id':JOB,'status':'queued'})))
+            with TestClient(app,base_url='https://spot.example') as c:
+                self.assertIn('Secure',c.get('/').headers['set-cookie'])
+                self.assertEqual(c.post('/api/research',json=PAYLOAD,headers={'Origin':'https://evil.example'}).status_code,403)
+                self.assertEqual(c.post('/api/research',json=PAYLOAD,headers={'Origin':'https://spot.example'}).status_code,202)

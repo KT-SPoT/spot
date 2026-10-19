@@ -1,0 +1,16 @@
+.git
+.env
+**/*.env
+.venv
+.venv-clean
+venv
+__pycache__
+**/__pycache__
+output
+tmp
+deploy/secrets
+.codex
+.agents
+.aws
+tests
+samples

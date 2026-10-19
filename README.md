@@ -6,12 +6,16 @@ SPOT은 KT Plaza 홍보기획 전 단계에서 상권·지역 변화·트렌드�
 
 ## Architecture
 
+HTTP API와 n8n 가져오기 파일: [연결 안내](docs/N8N_API_SETUP.md).
+웹 구현 시 사용할 요청·조회·오류 처리 경계: [웹 연결 계약](docs/WEB_INTEGRATION.md).
+매장 입력·진행 상태·브리프 조회 웹: [로컬 웹 실행 안내](docs/WEB_SETUP.md).
+
 ```text
 n8n Main Entry
   -> LangGraph
-      -> Quant Scout
-      -> Local Scout
-      -> Trend Scout
+      -> Quant Scout / Local Scout (parallel)
+      -> internal context summary
+      -> Trend Scout (context-aware discovery)
       -> Critic
           -> retry selected Scout(s) when needed
           -> Research Brief
@@ -21,6 +25,13 @@ n8n Main Entry
 - **n8n**: 외부 요청 수신, 입력 검증, LangGraph API 호출, 결과 반환
 - **LangGraph**: Scout 실행, 상태 관리, Critic 판단, 재탐색 루프, Brief 생성
 - **Scout modules**: 각 담당자가 공통 JSON 계약에 맞춰 독립 구현
+
+소상공인365의 성별·연령·최다 시간대 등 관측값을 정량 기준으로 사용합니다.
+Trend는 전국의 게임·음식 팝업, 지역 축제 등 다양한 업종의 체험을 조사하고,
+관측된 인구·매출 구성과 연결해 핸드폰 매장에 응용할 조사 가설을 제시합니다.
+사례가 대상 지역·기기와 같아야 한다는 조건은 없습니다.
+GPT Critic은 Scout 근거를 다시 인증하기보다 지역·고객 연결, 응용 논리,
+제안의 구체성·차별성과 과장 여부를 검토합니다. 호응 자료는 선택적 보조 근거입니다.
 
 ## Collaboration model
 
@@ -50,14 +61,15 @@ Implementation contract: [docs/api-contract.md](docs/api-contract.md)
 
 ## 로컬 mock smoke test
 
-Week 1 smoke test는 외부 API를 호출하지 않고 다음 통합 경로를 검증합니다.
+Scout를 Mock으로 대체한 smoke test는 외부 API를 호출하지 않고 다음 통합 경로를 검증합니다.
 
 ```text
 SpotRequest
-  -> Quant / Local / Trend placeholders
+  -> Quant / Local placeholders (parallel)
+  -> internal context summary -> Trend placeholder
   -> Merge
-  -> Mock Critic
-  -> Mock Research Brief
+  -> Rule Critic
+  -> Research Brief (Mock 근거는 제외하며 근거 부족을 표시)
 ```
 
 저장소 루트에서 가상환경을 만들고 의존성을 설치한 뒤 테스트를 실행합니다.
@@ -82,6 +94,59 @@ python -m src.validation path/to/scout_result.json --module quant --request-id s
 
 검사 범위·실패 정책·PR 인수 체크리스트: [통합 준비 가이드](docs/INTEGRATION_READINESS.md).
 
+## Critic 기준 초안 및 합성 검증
+
+Scout 인수용 독립 규칙 preview를 실행할 수 있습니다. [기준표와 검증 결과](docs/critic/CRITIC_RULES_V0_1.md)를 먼저 읽으세요.
+`rule_status` 통과는 품질 최종 승인이 아니며, `quality_status`는 의미 검토 전까지 `manual_review`입니다.
+현재 graph는 실제 규칙 Critic과 제한된 일시 오류 재조사를 사용합니다.
+[현재 정책](docs/CRITIC_RETRY.md). 의미·사실 검토는 수동으로 남습니다.
+선택적 [의미 Critic shadow 평가](docs/SEMANTIC_CRITIC.md)를 연결했습니다. 기본 꺼짐이며,
+설정된 모델의 판정을 기록해 사람이 대조합니다. Brief 자동 변경·품질 승인·추가 재검색은 없습니다.
+
+```bash
+python -m src.critic.rules samples/critic/research_bundle.synthetic.json
+python -m unittest discover -s tests -v
+```
+
+`samples/critic/rule_cases.synthetic.json`에는 실제 근거와 구분된 합성 시나리오 27개가 있습니다.
+
+## Scout 통합 실행
+
+Local은 요청 지역의 네이버 뉴스, Trend는 제품·인접 카테고리 관련 뉴스와 유튜브 메타데이터를 실행 시 조회합니다.
+고정 사례는 사용하지 않으며 검색 결과는 원문·영상 확인 전까지 `partial` 후보자료입니다.
+Local은 [원문 대조·문맥 분류](docs/LOCAL_SOURCE_VERIFICATION.md)를 수행하며 직접 변화·주변 행정구역 맥락·배경을 구분해 브리프에 인용합니다. 날짜·지역 연결의 불확실성은 표시하고 원문 근거가 없는 자료는 보류합니다. 원문 대조는 실제 사건 발생이나 점포 반경 검증을 뜻하지 않습니다.
+키 설정·조회 범위·실패 정책: [실제 검색 가이드](docs/LIVE_SCOUT_RESEARCH.md).
+현재 통합 입력은 조사 중심점이 미확정인 지역명이며, 반경 분석 결과로 사용하지 않습니다.
+
+Trend가 연령·성별 입력을 얼마나 반영하는지 같은 뉴스 자료로 비교한 결과:
+[개선 전 고객층 비교](docs/TREND_AUDIENCE_VALIDATION.md),
+[근거 기반 응용 질문 구현·재검증](docs/TREND_AUDIENCE_ADAPTATION.md).
+전체 분포·유동/매출 시간대·모집단·Local 맥락을 응용 질문에 연결합니다.
+성별·연령 이름만으로 업종이나 선호를 배정하지 않습니다. 평가기는 저장된
+자료만 재생하며 새 API 호출 없이 반영 정도를 비교합니다.
+
+```bash
+python -m src.integration_smoke samples/input/myeongji_international.provisional.json --mode offline --output samples/integration/myeongji-20260930-offline
+```
+
+offline은 외부 호출을 막고 세 Scout의 자료 미확보 경로를 실행합니다.
+전체 JSON, 계약 검사, Critic 기준표 preview, 사람이 읽는 `SUMMARY.md`를 저장합니다.
+Graph의 Critic은 규칙을 검사하며 Brief는 근거 요약 초안입니다. 명령 성공은 리서치 품질 승인을 뜻하지 않습니다.
+live 실행 준비와 이번 결과: [Scout 통합 기록](docs/SCOUT_INTEGRATION_2026-09-30.md).
+
+## 근거 기반 Research Brief
+
+Graph는 Scout의 실제 근거를 요약하는 Research Brief 초안을 생성합니다.
+Critic은 실제 규칙을 검사하며, 출처 원문의 의미·사실·지역 관련성은 추가 검토가 필요합니다.
+저장된 결과로 API 재호출 없이 JSON과 Markdown 보고서를 만들 수도 있습니다.
+
+```bash
+python -m src.brief path/to/research_bundle.json --output path/to/brief
+```
+
+성비·연령대·자료 기준 시점을 위한 원문 보조자료 연결과 검증 방법:
+[Research Brief 실행 가이드](docs/RESEARCH_BRIEF.md).
+
 ## Security
 
 실제 API Key, n8n credential, token, password는 저장소에 커밋하지 않습니다.
@@ -95,3 +160,8 @@ python -m src.validation path/to/scout_result.json --module quant --request-id s
 - [Current roadmap](docs/ROADMAP.md)
 - [Decision log](docs/DECISIONS.md)
 - Role guides: [Quant](docs/roles/QUANT.md) · [Local](docs/roles/LOCAL.md) · [Trend](docs/roles/TREND.md) · [Integrator](docs/roles/INTEGRATOR.md)
+# Trend 보드·내보내기·서버 이전 준비
+
+- [뉴스·YouTube·Instagram 참고 보드 및 PDF/흥부장 프롬프트](docs/TREND_BOARD_AND_EXPORTS.md)
+- [Instagram 공식 API 설정 순서와 수집/표시 구분](docs/INSTAGRAM_SETUP.md)
+- [PC 없이 운영할 Linux 서버 구성과 남은 배포 단계](docs/HOSTING_SETUP.md)

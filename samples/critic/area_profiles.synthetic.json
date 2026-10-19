@@ -1,0 +1,31 @@
+{
+  "fixture_version": "draft-0.1",
+  "data_kind": "synthetic",
+  "description": "지명만 실제 명칭을 사용한다. 매장·시설·상권 특성은 가정이며 실제 조사 입력 또는 결과가 아니다.",
+  "profiles": [
+    {
+      "profile_id": "myeongji",
+      "store": {"name": "SYNTHETIC 명지 테스트점", "address": "부산광역시 강서구 명지동", "lat": null, "lng": null},
+      "area_anchor": "명지동",
+      "radius_m": 1000,
+      "comparison_area": null,
+      "scenario": "개발 사업명과 요청 생활권 범위를 혼동하는 가정"
+    },
+    {
+      "profile_id": "seongsu",
+      "store": {"name": "SYNTHETIC 성수 테스트점", "address": "서울특별시 성동구 성수동", "lat": null, "lng": null},
+      "area_anchor": "성수동",
+      "radius_m": 500,
+      "comparison_area": "SYNTHETIC 비교생활권 B",
+      "scenario": "넓은 행정구역의 사례를 점포 반경 사례로 간주하는 가정"
+    },
+    {
+      "profile_id": "seomyeon",
+      "store": {"name": "SYNTHETIC 서면 테스트점", "address": "부산광역시 부산진구 부전동", "lat": null, "lng": null},
+      "area_anchor": "부전동",
+      "radius_m": 1500,
+      "comparison_area": null,
+      "scenario": "점포 주소 미확정·좌표 미확보 상태에서 근접성을 단정하는 가정"
+    }
+  ]
+}

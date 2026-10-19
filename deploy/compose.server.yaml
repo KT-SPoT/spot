@@ -1,0 +1,10 @@
+# Deploy an already verified image; staged Caddy keeps the web closed until login is set.
+services:
+  api:
+    image: ${SPOT_APP_IMAGE:?Set SPOT_APP_IMAGE}
+  web:
+    image: ${SPOT_APP_IMAGE:?Set SPOT_APP_IMAGE}
+  proxy:
+    image: ${SPOT_PROXY_IMAGE:?Set SPOT_PROXY_IMAGE}
+    volumes:
+      - ./Caddyfile.stage:/etc/caddy/Caddyfile:ro

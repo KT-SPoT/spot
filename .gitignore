@@ -9,3 +9,7 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+output/
+tmp/pdfs/
+deploy/*.env
+deploy/secrets/

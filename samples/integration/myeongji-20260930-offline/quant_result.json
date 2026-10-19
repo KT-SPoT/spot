@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.1",
+  "request_id": "spot-myeongji-international-20260930-001",
+  "module": "quant",
+  "status": "failed",
+  "started_at": "2026-09-30T17:20:15.944780+09:00",
+  "finished_at": "2026-09-30T17:20:15.945127+09:00",
+  "query_context": {
+    "store_name": "명지국제신도시 상권 조사",
+    "store_address": "부산광역시 강서구 명지국제신도시",
+    "lat": null,
+    "lng": null,
+    "radius_m": 1000,
+    "provider": "소상공인365"
+  },
+  "summary": "Quant Scout 실행에 실패했습니다.",
+  "insights": [],
+  "sources": [],
+  "warnings": [],
+  "errors": [
+    {
+      "code": "MISSING_KAKAO_REST_API_KEY",
+      "message": "환경변수 KAKAO_REST_API_KEY가 없습니다."
+    }
+  ]
+}

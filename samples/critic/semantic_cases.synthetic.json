@@ -1,0 +1,72 @@
+{
+  "fixture_version": "draft-0.1",
+  "data_kind": "synthetic",
+  "description": "의미 Critic 구현 준비용 수동 판정 예제. 실제 지역 사실이 아니며 현재 자동 실행되지 않음.",
+  "cases": [
+    {
+      "case_id": "planned_as_operating",
+      "criterion": "change_stage",
+      "claim": "요청 지역의 새 체험 시설이 운영 중이다.",
+      "evidence": [{"source_id": "S-L-001", "kind": "body_excerpt", "text": "SYNTHETIC: 요청 지역에 새 체험 시설 도입이 계획되어 있으며 개장 일정은 미정이다."}],
+      "expected": {"verdict": "contradicted", "suggested_action": "qualify", "source_ids": ["S-L-001"], "reason": "계획을 운영으로 바꿀 수 없다."}
+    },
+    {
+      "case_id": "planned_with_qualification",
+      "criterion": "change_stage",
+      "claim": "시설 도입이 계획되어 있어 향후 변화로 참고할 수 있다. 운영 여부는 확인이 필요하다.",
+      "evidence": [{"source_id": "S-L-001", "kind": "body_excerpt", "text": "SYNTHETIC: 요청 지역에 새 체험 시설 도입이 계획되어 있으며 개장 일정은 미정이다."}],
+      "expected": {"verdict": "supported", "suggested_action": "keep", "source_ids": ["S-L-001"], "reason": "계획 단계와 미확인 운영 상태를 그대로 표현했다."}
+    },
+    {
+      "case_id": "adjacent_area_as_direct_fact",
+      "criterion": "locality",
+      "context": {"requested_area": "명지 국제신도시", "note": "지역명만 실제 지명을 사용한 가상 사건"},
+      "claim": "명지 국제신도시 내부에 이 가상 시설이 들어온다.",
+      "evidence": [{"source_id": "S-L-002", "kind": "body_excerpt", "text": "SYNTHETIC: 이 가상 시설의 사업 범위는 에코델타시티 내부로 한정되며 명지 국제신도시 내부는 포함하지 않는다."}],
+      "expected": {"verdict": "contradicted", "suggested_action": "qualify", "source_ids": ["S-L-002"], "reason": "인접 지역 사업을 요청 지역 내부 사업으로 표현했다."}
+    },
+    {
+      "case_id": "adjacent_area_as_context",
+      "criterion": "locality",
+      "context": {"requested_area": "명지 국제신도시", "note": "가상 사업이며 지역 연계 영향은 검증되지 않음"},
+      "claim": "에코델타시티의 가상 사업은 인접 지역 참고 맥락이다. 요청 지역에 미칠 영향은 별도 확인이 필요하다.",
+      "evidence": [{"source_id": "S-L-002", "kind": "body_excerpt", "text": "SYNTHETIC: 이 가상 시설의 사업 범위는 에코델타시티 내부로 한정되며 명지 국제신도시 내부는 포함하지 않는다."}],
+      "expected": {"verdict": "supported", "suggested_action": "keep", "source_ids": ["S-L-002"], "reason": "직접 근거와 참고 맥락을 구분하고 영향은 미확인으로 남겼다."}
+    },
+    {
+      "case_id": "demographic_as_purchase_intent",
+      "criterion": "customer_inference",
+      "claim": "30대 여성의 스마트폰 구매 의향이 가장 높다.",
+      "evidence": [{"source_id": "S-Q-001", "kind": "verified_metric", "text": "SYNTHETIC: 주거인구 여성 비율 51%, 30대 비율 24%. 성별과 연령은 별도 집계이며 구매 의향 조사는 없다."}],
+      "expected": {"verdict": "insufficient", "suggested_action": "manual_check", "source_ids": ["S-Q-001"], "reason": "별도 구성비로 결합 집단이나 구매 의향을 추정할 수 없다."}
+    },
+    {
+      "case_id": "resident_as_floating_and_period_guessed",
+      "criterion": "population_and_period",
+      "claim": "2026년 9월 유동인구 중 여성은 51%다.",
+      "evidence": [{"source_id": "S-Q-001", "kind": "verified_metric", "text": "SYNTHETIC: 주거인구 여성 비율 51%. 이 비율의 집계 기간은 미확보이며 조회일은 2026년 9월 30일이다."}],
+      "expected": {"verdict": "contradicted", "suggested_action": "qualify", "source_ids": ["S-Q-001"], "reason": "주거인구를 유동인구로 바꾸었고 조회일을 통계 기간으로 사용했다."}
+    },
+    {
+      "case_id": "coverage_count_as_independent_events",
+      "criterion": "case_independence",
+      "claim": "서로 다른 네 행사에서 반복되는 트렌드다.",
+      "evidence": [{"source_id": "S-T-001", "kind": "case_group", "text": "SYNTHETIC: 기사 네 건 모두 동일 브랜드의 동일 날짜·장소 행사 한 건을 보도했다. 독립 행사는 한 건이다."}],
+      "expected": {"verdict": "contradicted", "suggested_action": "qualify", "source_ids": ["S-T-001"], "reason": "보도 건수와 독립 행사 수가 다르다."}
+    },
+    {
+      "case_id": "comparison_without_comparator",
+      "criterion": "differentiation",
+      "claim": "다른 상권보다 제품 체험 수요가 높다.",
+      "evidence": [{"source_id": "S-Q-001", "kind": "verified_metric", "text": "SYNTHETIC: 요청 지역의 주거인구는 10000명이다. 비교 지역 자료와 제품 체험 수요 조사는 없다."}],
+      "expected": {"verdict": "insufficient", "suggested_action": "manual_check", "source_ids": ["S-Q-001"], "reason": "비교 자료와 체험 수요 근거를 확보하지 않았다."}
+    },
+    {
+      "case_id": "snippet_as_full_text_verification",
+      "criterion": "evidence_completeness",
+      "claim": "원문 전체를 대조해 현재 운영 여부를 확인했다.",
+      "evidence": [{"source_id": "S-L-003", "kind": "search_snippet", "text": "SYNTHETIC: 검색 요약에 체험관 개장 소식이 표시된다. 원문 본문은 수집하지 않았다."}],
+      "expected": {"verdict": "insufficient", "suggested_action": "manual_check", "source_ids": ["S-L-003"], "reason": "검색 요약만으로 본문 대조나 현재 운영 확인을 완료할 수 없다."}
+    }
+  ]
+}

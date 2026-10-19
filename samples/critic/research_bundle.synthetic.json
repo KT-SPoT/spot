@@ -1,0 +1,179 @@
+{
+  "schema_version": "0.1",
+  "request_id": "critic-synthetic-001",
+  "request": {
+    "schema_version": "0.1",
+    "request_id": "critic-synthetic-001",
+    "requested_at": "2026-09-30T13:00:00+09:00",
+    "store": {
+      "name": "SYNTHETIC 매장",
+      "address": "SYNTHETIC 가상 지역"
+    },
+    "campaign": {
+      "purpose": "규칙 검증"
+    },
+    "research": {
+      "reference_date": "2026-09-30",
+      "lookback_days": 180,
+      "radius_m": 1000,
+      "comparison_area": null
+    }
+  },
+  "results": {
+    "quant": {
+      "schema_version": "0.1",
+      "request_id": "critic-synthetic-001",
+      "module": "quant",
+      "status": "success",
+      "started_at": "2026-09-30T13:00:00+09:00",
+      "finished_at": "2026-09-30T13:00:01+09:00",
+      "query_context": {
+        "data_kind": "synthetic"
+      },
+      "summary": "SYNTHETIC: 판정 검증용 가상 결과. 실제 지역 사실이 아님.",
+      "insights": [
+        {
+          "insight_id": "Q-001",
+          "evidence": "SYNTHETIC: 가상 점포 수 12개",
+          "source_ids": [
+            "S-Q-001"
+          ],
+          "metric_refs": [
+            "total_store_count"
+          ]
+        }
+      ],
+      "sources": [
+        {
+          "source_id": "S-Q-001",
+          "source_name": "SYNTHETIC fixture only",
+          "source_type": "public_api",
+          "source_url": "https://example.invalid/quant/1",
+          "published_at": null,
+          "collected_at": "2026-09-30T13:00:00+09:00"
+        }
+      ],
+      "warnings": [
+        "SYNTHETIC_TEST_DATA"
+      ],
+      "errors": [],
+      "metrics": {
+        "total_store_count": 12
+      }
+    },
+    "local": {
+      "schema_version": "0.1",
+      "request_id": "critic-synthetic-001",
+      "module": "local",
+      "status": "success",
+      "started_at": "2026-09-30T13:00:00+09:00",
+      "finished_at": "2026-09-30T13:00:01+09:00",
+      "query_context": {
+        "data_kind": "synthetic"
+      },
+      "summary": "SYNTHETIC: 판정 검증용 가상 결과. 실제 지역 사실이 아님.",
+      "insights": [
+        {
+          "insight_id": "L-001",
+          "event_key": "synthetic-scheduled-event",
+          "title": "SYNTHETIC 시설 도입 예정",
+          "evidence": "SYNTHETIC: 가상 시설 도입이 예정됨. 운영 여부 확인 안 됨.",
+          "source_ids": [
+            "S-L-001"
+          ],
+          "published_at": "2026-09-01",
+          "locality_tags": [
+            "synthetic_area"
+          ],
+          "change_state": "scheduled_launch"
+        }
+      ],
+      "sources": [
+        {
+          "source_id": "S-L-001",
+          "source_name": "SYNTHETIC fixture only",
+          "source_type": "synthetic_web",
+          "source_url": "https://example.invalid/local/1",
+          "published_at": "2026-09-01",
+          "collected_at": "2026-09-30T13:00:00+09:00"
+        }
+      ],
+      "warnings": [
+        "SYNTHETIC_TEST_DATA"
+      ],
+      "errors": []
+    },
+    "trend": {
+      "schema_version": "0.1",
+      "request_id": "critic-synthetic-001",
+      "module": "trend",
+      "status": "success",
+      "started_at": "2026-09-30T13:00:00+09:00",
+      "finished_at": "2026-09-30T13:00:01+09:00",
+      "query_context": {
+        "data_kind": "synthetic"
+      },
+      "summary": "SYNTHETIC: 판정 검증용 가상 결과. 실제 지역 사실이 아님.",
+      "insights": [
+        {
+          "insight_id": "I-T-001",
+          "case_id": "T-001",
+          "observation": "SYNTHETIC: 가상 체험 사례",
+          "source_ids": [
+            "S-T-001"
+          ]
+        },
+        {
+          "insight_id": "I-T-002",
+          "case_id": "T-002",
+          "observation": "SYNTHETIC: 가상 체험 사례",
+          "source_ids": [
+            "S-T-002"
+          ]
+        }
+      ],
+      "sources": [
+        {
+          "source_id": "S-T-001",
+          "source_name": "SYNTHETIC fixture only",
+          "source_type": "synthetic_web",
+          "source_url": "https://example.invalid/trend/1",
+          "published_at": "2026-09-01",
+          "collected_at": "2026-09-30T13:00:00+09:00"
+        },
+        {
+          "source_id": "S-T-002",
+          "source_name": "SYNTHETIC fixture only",
+          "source_type": "synthetic_web",
+          "source_url": "https://example.invalid/trend/2",
+          "published_at": "2026-09-01",
+          "collected_at": "2026-09-30T13:00:00+09:00"
+        }
+      ],
+      "warnings": [
+        "SYNTHETIC_TEST_DATA"
+      ],
+      "errors": [],
+      "patterns": [
+        {
+          "pattern_id": "P-T-001",
+          "name": "SYNTHETIC 가상 반복 패턴",
+          "evidence_count": 2,
+          "example_case_ids": [
+            "T-001",
+            "T-002"
+          ],
+          "example_source_ids": [
+            "S-T-001",
+            "S-T-002"
+          ]
+        }
+      ]
+    }
+  },
+  "module_status": {
+    "quant": "success",
+    "local": "success",
+    "trend": "success"
+  }
+}

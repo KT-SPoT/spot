@@ -1,0 +1,659 @@
+{
+  "schema_version": "0.1",
+  "request_id": "spot-myeongji-international-20260930-001",
+  "request": {
+    "schema_version": "0.1",
+    "request_id": "spot-myeongji-international-20260930-001",
+    "requested_at": "2026-09-30T17:17:15+09:00",
+    "store": {
+      "name": "명지국제신도시 상권 조사",
+      "address": "부산광역시 강서구 명지국제신도시",
+      "lat": null,
+      "lng": null
+    },
+    "campaign": {
+      "purpose": "명지국제신도시 휴대폰 대리점의 신제품 체험 행사 사전 리서치",
+      "product": "Galaxy Z Fold8",
+      "target_hint": null
+    },
+    "research": {
+      "reference_date": "2026-09-30",
+      "radius_m": 1000,
+      "lookback_days": 180,
+      "comparison_area": null
+    }
+  },
+  "results": {
+    "quant": {
+      "schema_version": "0.1",
+      "request_id": "spot-myeongji-international-20260930-001",
+      "module": "quant",
+      "status": "failed",
+      "started_at": "2026-09-30T17:20:15.944780+09:00",
+      "finished_at": "2026-09-30T17:20:15.945127+09:00",
+      "query_context": {
+        "store_name": "명지국제신도시 상권 조사",
+        "store_address": "부산광역시 강서구 명지국제신도시",
+        "lat": null,
+        "lng": null,
+        "radius_m": 1000,
+        "provider": "소상공인365"
+      },
+      "summary": "Quant Scout 실행에 실패했습니다.",
+      "insights": [],
+      "sources": [],
+      "warnings": [],
+      "errors": [
+        {
+          "code": "MISSING_KAKAO_REST_API_KEY",
+          "message": "환경변수 KAKAO_REST_API_KEY가 없습니다."
+        }
+      ]
+    },
+    "local": {
+      "schema_version": "0.1",
+      "request_id": "spot-myeongji-international-20260930-001",
+      "module": "local",
+      "status": "partial",
+      "started_at": "2026-09-30T17:20:15+09:00",
+      "finished_at": "2026-09-30T17:20:15+09:00",
+      "query_context": {
+        "test_area": "부산광역시 강서구 에코델타시티·명지 생활권",
+        "requested_store": {
+          "name": "명지국제신도시 상권 조사",
+          "address": "부산광역시 강서구 명지국제신도시",
+          "lat": null,
+          "lng": null
+        },
+        "reference_date": "2026-09-30",
+        "lookback_days": 180,
+        "lookback_start": "2026-04-03",
+        "successful_queries": [
+          "에코델타시티 자율주행 모빌리티 서비스 개시 2026 3월",
+          "에코델타시티 트램 광역교통개선대책 변경 승인 2026 6월",
+          "에코델타시티 15BL 특화주택 993호 2026 7월",
+          "site:busan.go.kr/nbtnewsBU 에코델타 2026"
+        ],
+        "failed_queries": [
+          {
+            "query": "부산 명지동 2026 변화 개통 학교 입주 시설",
+            "reason": "학교 일반정보와 부동산 집계가 주로 노출되어 최근 변화 근거로 사용하지 않음"
+          },
+          {
+            "query": "site:bsgangseo.go.kr 명지동 2026 개관 착공 준공",
+            "reason": "게시일과 구체적 변화가 함께 확인되는 적격 결과를 확보하지 못함"
+          }
+        ],
+        "query_log_provenance": {
+          "mode": "curated_historical_record",
+          "executed_during_run": false,
+          "recorded_at": "2026-09-22T14:47:08+09:00",
+          "description": "successful_queries와 failed_queries는 고정 근거를 수집할 때의 기록이며, 이번 함수 실행에서 수행한 자동 검색 로그가 아니다."
+        },
+        "duplicate_policy": "동일 사건의 복수 보도는 source_ids로 묶고 insight 1건으로 계산"
+      },
+      "summary": "부산광역시 강서구 에코델타시티·명지 생활권에서 2026-04-03~2026-09-30 조회기간 내 최근 변화 2건을 확인했다: 광역교통계획의 강서선 트램 전환 승인(approved_plan), 청년·산단근로자 특화 공공임대주택 993호 선정(selected_future_project).",
+      "insights": [
+        {
+          "insight_id": "L-002",
+          "event_key": "gangseo-tram-plan-approved-2026-06",
+          "title": "광역교통계획의 강서선 트램 전환 승인",
+          "evidence": "2026년 6월 24일 보도는 에코델타시티 광역교통개선대책 변경안이 최종 승인됐고, 기존 BRT 대신 연장 6.6km 강서선 트램을 반영했다고 전했다.",
+          "published_at": "2026-06-24",
+          "source_ids": [
+            "S-L-003",
+            "S-L-004"
+          ],
+          "locality_tags": [
+            "에코델타시티",
+            "명지",
+            "교통",
+            "개발계획"
+          ],
+          "change_state": "approved_plan",
+          "why_it_matters": "명지·에코델타 생활권의 접근성과 유동 경로를 바꿀 수 있는 구체적인 교통계획 변경이다."
+        },
+        {
+          "insight_id": "L-003",
+          "event_key": "edc-15bl-special-housing-selected-2026-07",
+          "title": "청년·산단근로자 특화 공공임대주택 993호 선정",
+          "evidence": "2026년 상반기 특화주택 공모에 에코델타시티 15BL 사업이 선정됐다. 청년·산단근로자용 200호를 포함해 총 993호와 육아친화시설을 공급하며 2029년 준공을 목표로 한다.",
+          "published_at": "2026-07-03",
+          "source_ids": [
+            "S-L-005",
+            "S-L-006"
+          ],
+          "locality_tags": [
+            "에코델타시티",
+            "주거",
+            "청년",
+            "육아",
+            "개발계획"
+          ],
+          "change_state": "selected_future_project",
+          "why_it_matters": "향후 산업단지 근로자·청년·육아가구 중심의 정주 수요가 확대될 가능성을 보여주는 구체적인 공급계획이다."
+        }
+      ],
+      "sources": [
+        {
+          "source_id": "S-L-003",
+          "source_name": "뉴스핌",
+          "source_type": "news",
+          "source_url": "https://www.newspim.com/news/view/20260624000204",
+          "title": "부산시, 에코델타시티 광역교통대책 변경 승인…강서선 트램 도입 확정",
+          "published_at": "2026-06-24",
+          "collected_at": "2026-09-22T14:47:08+09:00",
+          "verification": {
+            "verified_at": "2026-09-30T00:00:00+09:00",
+            "method": "article body",
+            "excerpt": "변경안 최종 승인과 BRT 대신 6.6km 강서선 트램 반영",
+            "note": "본문의 2026-06-24 기사입력 시각과 핵심 사실을 직접 확인했다."
+          }
+        },
+        {
+          "source_id": "S-L-004",
+          "source_name": "한국일보",
+          "source_type": "news",
+          "source_url": "https://www.hankookilbo.com/news/article/amp/A2026062410270000876",
+          "title": "부산 에코델타시티에 트램 도입… 2034년까지 추진 계획",
+          "published_at": "2026-06-24",
+          "collected_at": "2026-09-22T14:47:08+09:00",
+          "verification": {
+            "verified_at": "2026-09-30T00:00:00+09:00",
+            "method": "article body",
+            "excerpt": "광역교통개선대책 변경 승인과 BRT 대신 트램 도입 계획",
+            "note": "본문의 2026-06-24 입력 시각과 계획 단계 표현을 직접 확인했다."
+          }
+        },
+        {
+          "source_id": "S-L-005",
+          "source_name": "부산광역시",
+          "source_type": "government",
+          "source_url": "https://www.busan.go.kr/nbtnewsBU/1738442",
+          "title": "부산시·부산도시공사, 부산시 최초 특화주택 공모사업 선정!",
+          "published_at": "2026-07-03",
+          "collected_at": "2026-09-22T14:47:08+09:00",
+          "verification": {
+            "verified_at": "2026-09-30T00:00:00+09:00",
+            "method": "article body",
+            "excerpt": "에코델타시티 15BL 최종 선정, 총 993호 공급, 2029년 6월 준공 목표",
+            "note": "부산시 보도자료 본문의 작성일과 부제목을 직접 확인했다."
+          }
+        },
+        {
+          "source_id": "S-L-006",
+          "source_name": "뉴스핌",
+          "source_type": "news",
+          "source_url": "https://www.newspim.com/news/view/20260703000063",
+          "title": "부산시 첫 '특화주택 공모사업' 선정…산업단지 근로자 정주 지원",
+          "published_at": "2026-07-03",
+          "collected_at": "2026-09-22T14:47:08+09:00",
+          "verification": {
+            "verified_at": "2026-09-30T00:00:00+09:00",
+            "method": "article body",
+            "excerpt": "15BL 사업 최종 선정과 총 993호 규모의 공공임대 공급 계획",
+            "note": "본문의 2026-07-03 기사입력 시각과 사업 단계·규모를 직접 확인했다."
+          }
+        }
+      ],
+      "warnings": [
+        "트램은 변경계획 승인 단계이며 개통된 시설이 아니다.",
+        "특화주택은 공모 선정 단계이며 현재 입주가 완료됐다는 의미가 아니다.",
+        "WEEK1_AREA_SCOPE: 근거는 개별 점포 반경이 아니라 에코델타시티·명지 생활권 단위다.",
+        "INSUFFICIENT_RECENT_EVIDENCE: 조회기간 내 변화가 2건으로 최소 기준 3건보다 적다."
+      ],
+      "errors": []
+    },
+    "trend": {
+      "schema_version": "0.1",
+      "request_id": "spot-myeongji-international-20260930-001",
+      "module": "trend",
+      "status": "success",
+      "started_at": "2026-09-30T17:20:15+09:00",
+      "finished_at": "2026-09-30T17:20:15+09:00",
+      "query_context": {
+        "reference_date": "2026-09-30",
+        "lookback_days": 180,
+        "period_start": "2026-04-03",
+        "period_end": "2026-09-30",
+        "store_name": "명지국제신도시 상권 조사",
+        "store_address": "부산광역시 강서구 명지국제신도시",
+        "campaign_purpose": "명지국제신도시 휴대폰 대리점의 신제품 체험 행사 사전 리서치",
+        "campaign_product": "Galaxy Z Fold8",
+        "verified_case_pool_count": 10,
+        "selected_case_count": 10,
+        "selection_mode": "curated_verified_cases"
+      },
+      "summary": "검증된 체험형 마케팅 사례 10건에서 미션 기반 참여 동선 (7건), 직접 제품·기능 체험 (6건), 세계관·테마 공간 탐색 (6건) 패턴이 반복적으로 확인되었습니다.",
+      "insights": [
+        {
+          "insight_id": "I-T-001",
+          "type": "experiential_marketing_case",
+          "case_id": "T-001",
+          "brand": "Hermès",
+          "case_name": "Mystery at the Grooms'",
+          "location": "서울 DDP",
+          "observation": "방문자가 에르메스의 탐정 역할을 맡아 공간에 흩어진 단서를 따라 제한 시간 내 숨은 말을 찾는다.",
+          "taxonomy_tags": [
+            "mission_journey",
+            "worldbuilding_exploration"
+          ],
+          "source_ids": [
+            "S-T-001-YT",
+            "S-T-001-WEB"
+          ]
+        },
+        {
+          "insight_id": "I-T-002",
+          "type": "experiential_marketing_case",
+          "case_id": "T-002",
+          "brand": "현대자동차",
+          "case_name": "Youth Adventure 2026",
+          "location": "현대 모터스튜디오 부산",
+          "observation": "캐치! 티니핑 IP를 활용한 공간에서 방문자가 수소 에너지와 차량 관련 콘텐츠를 체험하고 게임존 형태의 프로그램에 참여한다.",
+          "taxonomy_tags": [
+            "direct_product_trial",
+            "worldbuilding_exploration"
+          ],
+          "source_ids": [
+            "S-T-002-YT",
+            "S-T-002-WEB"
+          ]
+        },
+        {
+          "insight_id": "I-T-003",
+          "type": "experiential_marketing_case",
+          "case_id": "T-003",
+          "brand": "KT",
+          "case_name": "Galaxy Z Flip8·Fold8 체험공간",
+          "location": "전국 KT 주요 매장",
+          "observation": "방문자가 Galaxy Z Flip8·Fold8의 주요 기능을 직접 사용하며 미션을 수행하고 완료 단계에 따라 기념품을 받는다.",
+          "taxonomy_tags": [
+            "mission_journey",
+            "direct_product_trial"
+          ],
+          "source_ids": [
+            "S-T-003-YT",
+            "S-T-003-WEB"
+          ]
+        },
+        {
+          "insight_id": "I-T-004",
+          "type": "experiential_marketing_case",
+          "case_id": "T-004",
+          "brand": "Roblox × MUSINSA",
+          "case_name": "MY LIFE WITH ROBLOX 2026",
+          "location": "서울 성수",
+          "observation": "방문자가 성수의 무신사 공간과 Roblox 세계를 연결해 탐험하고 미니게임과 보물찾기 콘텐츠에 참여한다.",
+          "taxonomy_tags": [
+            "mission_journey",
+            "worldbuilding_exploration"
+          ],
+          "source_ids": [
+            "S-T-004-YT",
+            "S-T-004-WEB"
+          ]
+        },
+        {
+          "insight_id": "I-T-005",
+          "type": "experiential_marketing_case",
+          "case_id": "T-005",
+          "brand": "신일전자",
+          "case_name": "신일 바람 정거장",
+          "location": "서울시청 광장",
+          "observation": "방문자가 신일의 생활가전을 직접 살펴보고 경험하며 추억의 뽑기 이벤트에 참여해 쿠폰과 굿즈를 받는다.",
+          "taxonomy_tags": [
+            "direct_product_trial"
+          ],
+          "source_ids": [
+            "S-T-005-YT",
+            "S-T-005-WEB"
+          ]
+        },
+        {
+          "insight_id": "I-T-006",
+          "type": "experiential_marketing_case",
+          "case_id": "T-006",
+          "brand": "Dyson",
+          "case_name": "Supersonic Travel Lounge",
+          "location": "서울 성수",
+          "observation": "방문자가 여권과 항공권을 받고 여행지를 선택한 뒤 공항 콘셉트 공간을 이동하며 스탬프 미션을 수행하고 Supersonic Travel 제품을 직접 체험한다.",
+          "taxonomy_tags": [
+            "mission_journey",
+            "direct_product_trial",
+            "worldbuilding_exploration"
+          ],
+          "source_ids": [
+            "S-T-006-YT",
+            "S-T-006-WEB"
+          ]
+        },
+        {
+          "insight_id": "I-T-007",
+          "type": "experiential_marketing_case",
+          "case_id": "T-007",
+          "brand": "Oakley",
+          "case_name": "Push As You Are - Oakley Meta Pop-up",
+          "location": "서울 성수",
+          "observation": "방문자가 스탬프 투어를 진행하며 Oakley Meta AI 글래스를 직접 착용하고 주요 기능을 체험한다.",
+          "taxonomy_tags": [
+            "mission_journey",
+            "direct_product_trial"
+          ],
+          "source_ids": [
+            "S-T-007-YT",
+            "S-T-007-WEB"
+          ]
+        },
+        {
+          "insight_id": "I-T-008",
+          "type": "experiential_marketing_case",
+          "case_id": "T-008",
+          "brand": "Riot Games",
+          "case_name": "TFT Wild Fanfest",
+          "location": "더현대 서울",
+          "observation": "방문자가 TFT의 신비의 숲 세계관을 구현한 공간에서 7개 미션을 수행하고 스탬프를 모아 리워드 프로그램에 참여한다.",
+          "taxonomy_tags": [
+            "mission_journey",
+            "worldbuilding_exploration"
+          ],
+          "source_ids": [
+            "S-T-008-YT",
+            "S-T-008-WEB"
+          ]
+        },
+        {
+          "insight_id": "I-T-009",
+          "type": "experiential_marketing_case",
+          "case_id": "T-009",
+          "brand": "Samsung Electronics",
+          "case_name": "2026 Mexico K-Expo AI Experience",
+          "location": "Mexico City World Trade Center",
+          "observation": "방문자가 Galaxy Z 시리즈와 Galaxy AI를 직접 사용해 사진·영상 촬영과 콘텐츠 제작을 체험한다.",
+          "taxonomy_tags": [
+            "direct_product_trial"
+          ],
+          "source_ids": [
+            "S-T-009-WEB"
+          ]
+        },
+        {
+          "insight_id": "I-T-010",
+          "type": "experiential_marketing_case",
+          "case_id": "T-010",
+          "brand": "서울관광재단",
+          "case_name": "Light Up Your SEOUL - 서울의 밤, 반짝임을 켜다",
+          "location": "스타필드 코엑스몰 라이브플라자",
+          "observation": "방문자가 서울의 밤을 테마로 구성된 공간을 둘러보고 야간관광 설문과 별도 현장 미션에 참여해 엽서·포스터 등의 리워드를 받는다.",
+          "taxonomy_tags": [
+            "mission_journey",
+            "worldbuilding_exploration"
+          ],
+          "source_ids": [
+            "S-T-010-WEB"
+          ]
+        }
+      ],
+      "patterns": [
+        {
+          "pattern_id": "P-T-001",
+          "taxonomy_tag": "mission_journey",
+          "name": "미션 기반 참여 동선",
+          "description": "방문자가 단서, 미션, 스탬프 등의 과제를 수행하며 공간을 순차적으로 이동하도록 설계하는 경험 구조",
+          "evidence_count": 7,
+          "example_case_ids": [
+            "T-001",
+            "T-003",
+            "T-004",
+            "T-006",
+            "T-007",
+            "T-008",
+            "T-010"
+          ],
+          "example_source_ids": [
+            "S-T-001-WEB",
+            "S-T-003-WEB",
+            "S-T-004-WEB",
+            "S-T-006-WEB",
+            "S-T-007-WEB",
+            "S-T-008-WEB",
+            "S-T-010-WEB"
+          ]
+        },
+        {
+          "pattern_id": "P-T-003",
+          "taxonomy_tag": "direct_product_trial",
+          "name": "직접 제품·기능 체험",
+          "description": "제품이나 핵심 기능을 설명으로 보여주는 데 그치지 않고 방문자가 직접 사용·착용·조작하게 하는 경험 구조",
+          "evidence_count": 6,
+          "example_case_ids": [
+            "T-002",
+            "T-003",
+            "T-005",
+            "T-006",
+            "T-007",
+            "T-009"
+          ],
+          "example_source_ids": [
+            "S-T-002-WEB",
+            "S-T-003-WEB",
+            "S-T-005-WEB",
+            "S-T-006-WEB",
+            "S-T-007-WEB",
+            "S-T-009-WEB"
+          ]
+        },
+        {
+          "pattern_id": "P-T-002",
+          "taxonomy_tag": "worldbuilding_exploration",
+          "name": "세계관·테마 공간 탐색",
+          "description": "브랜드나 IP의 세계관을 오프라인 공간으로 구현하고 방문자가 그 공간을 탐색하도록 만드는 경험 구조",
+          "evidence_count": 6,
+          "example_case_ids": [
+            "T-001",
+            "T-002",
+            "T-004",
+            "T-006",
+            "T-008",
+            "T-010"
+          ],
+          "example_source_ids": [
+            "S-T-001-WEB",
+            "S-T-002-WEB",
+            "S-T-004-WEB",
+            "S-T-006-WEB",
+            "S-T-008-WEB",
+            "S-T-010-WEB"
+          ]
+        }
+      ],
+      "sources": [
+        {
+          "source_id": "S-T-001-YT",
+          "source_name": "Hermès - Mystery at the Grooms' YouTube",
+          "source_type": "youtube",
+          "source_url": "https://www.youtube.com/watch?v=4JsAObYs6iM",
+          "published_at": "2026-06-08",
+          "collected_at": "2026-09-30T13:43:21+09:00"
+        },
+        {
+          "source_id": "S-T-001-WEB",
+          "source_name": "Hermès - Mystery at the Grooms' verification",
+          "source_type": "official_web",
+          "source_url": "https://www.hermes.com/kr/ko/content/401129-mystery-at-the-grooms-kr/",
+          "published_at": null,
+          "published_at_note": "Hermès 공식 행사 페이지에 게시일이 표시되지 않아 확인 불가. 행사 기간(2026-06-06~06-16)만 명시됨.",
+          "collected_at": "2026-09-30T13:43:21+09:00",
+          "verification_status": "verified",
+          "evidence_summary": "공식 페이지는 DDP 행사에서 방문자가 에르메스 탐정이 되어 흩어진 단서를 따라 제한 시간 안에 숨은 말을 찾는 인터랙티브 게임이라고 설명한다."
+        },
+        {
+          "source_id": "S-T-002-YT",
+          "source_name": "현대자동차 - Youth Adventure 2026 YouTube",
+          "source_type": "youtube",
+          "source_url": "https://www.youtube.com/watch?v=qOcUFhwaKkY",
+          "published_at": "2026-06-01",
+          "collected_at": "2026-09-30T13:43:21+09:00"
+        },
+        {
+          "source_id": "S-T-002-WEB",
+          "source_name": "현대자동차 - Youth Adventure 2026 verification",
+          "source_type": "official_web",
+          "source_url": "https://www.hyundai.com/worldwide/en/brand-journal/lifestyle/teenieping-again-chu",
+          "published_at": "2026-04-30",
+          "published_at_note": "Hyundai Worldwide Brand Journal에 April 30, 2026으로 명시됨.",
+          "collected_at": "2026-09-30T13:43:21+09:00",
+          "verification_status": "verified",
+          "evidence_summary": "현대자동차 공식 글은 부산 모터스튜디오까지 전시를 확대했고, 어린이가 수소 에너지와 NEXO를 보고·만지고·탐색하는 인터랙티브 프로그램이라고 설명한다."
+        },
+        {
+          "source_id": "S-T-003-YT",
+          "source_name": "KT - Galaxy Z Flip8·Fold8 체험공간 YouTube",
+          "source_type": "youtube",
+          "source_url": "https://www.youtube.com/watch?v=aJjrC8FII8g",
+          "published_at": "2026-07-24",
+          "collected_at": "2026-09-30T13:43:21+09:00"
+        },
+        {
+          "source_id": "S-T-003-WEB",
+          "source_name": "KT - Galaxy Z Flip8·Fold8 체험공간 verification",
+          "source_type": "news",
+          "source_url": "https://www.sentv.co.kr/article/view/sentv202607240038",
+          "published_at": null,
+          "published_at_note": "2026-09-30 재확인 시 서울경제TV 원문이 502로 응답해 게시일을 독립 검증하지 못함. URL 식별자만으로 날짜를 추정하지 않음.",
+          "collected_at": "2026-09-30T13:43:21+09:00",
+          "verification_status": "needs_recheck",
+          "evidence_summary": "현재 자동 재검증에서는 원문 본문을 확보하지 못해 기존 관찰 문구의 원문 재확인이 필요하다. YouTube 원출처와 수집 기록은 유지하되 병합 전 수동 재확인을 권장한다."
+        },
+        {
+          "source_id": "S-T-004-YT",
+          "source_name": "Roblox × MUSINSA - MY LIFE WITH ROBLOX 2026 YouTube",
+          "source_type": "youtube",
+          "source_url": "https://www.youtube.com/watch?v=ClSmrCm869I",
+          "published_at": "2026-07-27",
+          "collected_at": "2026-09-30T13:43:21+09:00"
+        },
+        {
+          "source_id": "S-T-004-WEB",
+          "source_name": "Roblox × MUSINSA - MY LIFE WITH ROBLOX 2026 verification",
+          "source_type": "official_web",
+          "source_url": "https://m.musinsa.com/content/1528923777154874918",
+          "published_at": null,
+          "published_at_note": "무신사 콘텐츠 페이지에 행사 기간은 표시되지만 콘텐츠 게시일은 노출되지 않아 확인 불가.",
+          "collected_at": "2026-09-30T13:43:21+09:00",
+          "verification_status": "verified",
+          "evidence_summary": "무신사 공식 콘텐츠는 성수의 여러 팝업과 로블록스 공간을 연결하고, 게임 플레이·보물찾기·현장 체험 등 미션을 수행해 스탬프와 리워드를 받는 구조를 설명한다."
+        },
+        {
+          "source_id": "S-T-005-YT",
+          "source_name": "신일전자 - 신일 바람 정거장 YouTube",
+          "source_type": "youtube",
+          "source_url": "https://www.youtube.com/watch?v=PC2DGzZPjiY",
+          "published_at": "2026-09-08",
+          "collected_at": "2026-09-30T13:43:21+09:00"
+        },
+        {
+          "source_id": "S-T-005-WEB",
+          "source_name": "신일전자 - 신일 바람 정거장 verification",
+          "source_type": "official_web",
+          "source_url": "https://www.shinil.co.kr/ko/press/press.html?b_class=2&b_no=131&mode=VIEW_FORM",
+          "published_at": "2026-09-21",
+          "published_at_note": "신일전자 페이지 등록일은 2026-09-21 09:48:17. 제목의 [260908]과 본문은 행사 종료 발표 시점을 가리키지만 source 게시일은 등록일을 사용.",
+          "collected_at": "2026-09-30T13:43:21+09:00",
+          "verification_status": "verified",
+          "evidence_summary": "신일전자 공식 보도자료는 방문객이 선풍기·서큘레이터 등 제품을 직접 살펴보고 경험하며, 추억의 뽑기 이벤트와 쿠폰·굿즈 제공 프로그램에 참여했다고 설명한다."
+        },
+        {
+          "source_id": "S-T-006-YT",
+          "source_name": "Dyson - Supersonic Travel Lounge YouTube",
+          "source_type": "youtube",
+          "source_url": "https://www.youtube.com/watch?v=XVQrSzl2uls",
+          "published_at": "2026-04-23",
+          "collected_at": "2026-09-30T13:43:21+09:00"
+        },
+        {
+          "source_id": "S-T-006-WEB",
+          "source_name": "Dyson - Supersonic Travel Lounge verification",
+          "source_type": "news",
+          "source_url": "https://www.asiae.co.kr/article/enterprise-CEO/2026042316120439640",
+          "published_at": "2026-04-23",
+          "published_at_note": "아시아경제 기사 입력 시각 2026-04-23 16:12 확인.",
+          "collected_at": "2026-09-30T13:43:21+09:00",
+          "verification_status": "verified",
+          "evidence_summary": "기사에는 방문객이 패스포트와 항공권을 받고 여행지를 고른 뒤 공항 콘셉트 공간에서 스탬프 미션을 수행하고 슈퍼소닉 트래블 제품을 체험한다고 적혀 있다."
+        },
+        {
+          "source_id": "S-T-007-YT",
+          "source_name": "Oakley - Push As You Are - Oakley Meta Pop-up YouTube",
+          "source_type": "youtube",
+          "source_url": "https://www.youtube.com/watch?v=qqEX2RVc9wE",
+          "published_at": "2026-06-15",
+          "collected_at": "2026-09-30T13:43:21+09:00"
+        },
+        {
+          "source_id": "S-T-007-WEB",
+          "source_name": "Oakley - Push As You Are - Oakley Meta Pop-up verification",
+          "source_type": "press_release",
+          "source_url": "https://www.newswire.co.kr/newsRead.php?no=1036026",
+          "published_at": "2026-06-08",
+          "published_at_note": "뉴스와이어 기사에 2026-06-08 09:59로 명시됨.",
+          "collected_at": "2026-09-30T13:43:21+09:00",
+          "verification_status": "verified",
+          "evidence_summary": "보도자료는 성수 팝업에서 스탬프 투어를 통해 오클리 메타 AI 글래스를 직접 착용하고 제품 기능을 경험할 기회를 제공한다고 설명한다."
+        },
+        {
+          "source_id": "S-T-008-YT",
+          "source_name": "Riot Games - TFT Wild Fanfest YouTube",
+          "source_type": "youtube",
+          "source_url": "https://www.youtube.com/watch?v=MVlGbr52ac0",
+          "published_at": "2026-08-21",
+          "collected_at": "2026-09-30T13:43:21+09:00"
+        },
+        {
+          "source_id": "S-T-008-WEB",
+          "source_name": "Riot Games - TFT Wild Fanfest verification",
+          "source_type": "official_web",
+          "source_url": "https://teamfighttactics.leagueoflegends.com/ko-kr/news/notices/tft-wild-fanfest-hyundai-seoul-guide/",
+          "published_at": "2026-07-28",
+          "published_at_note": "Riot Games 공지 메타데이터에 2026-07-28T01:00:00Z로 명시됨.",
+          "collected_at": "2026-09-30T13:43:21+09:00",
+          "verification_status": "verified",
+          "evidence_summary": "라이엇 공식 공지는 신비의 숲을 현실 공간으로 구현하고, 방문자가 7개 미션을 수행해 스탬프를 모은 뒤 리워드존에서 보상을 받는 체험존을 설명한다."
+        },
+        {
+          "source_id": "S-T-009-WEB",
+          "source_name": "Samsung Electronics - 2026 Mexico K-Expo AI Experience verification",
+          "source_type": "official_web",
+          "source_url": "https://news.samsung.com/kr/%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90-2026-%EB%A9%95%EC%8B%9C%EC%BD%94-k-%EB%B0%95%EB%9E%8C%ED%9A%8C%EC%84%9C-ai-%EC%97%B0%EA%B2%B0-%EA%B2%BD%ED%97%98-%EC%84%A0%EB%B3%B4%EC%97%AC",
+          "published_at": "2026-09-27",
+          "published_at_note": "Samsung Newsroom Korea에 2026/09/27로 명시됨.",
+          "collected_at": "2026-09-30T13:43:21+09:00",
+          "verification_status": "verified",
+          "evidence_summary": "삼성전자 뉴스룸은 관람객이 갤럭시 Z 시리즈와 Galaxy AI로 사진·영상 촬영과 콘텐츠 제작을 직접 체험했다고 설명한다."
+        },
+        {
+          "source_id": "S-T-010-WEB",
+          "source_name": "서울관광재단 - Light Up Your SEOUL - 서울의 밤, 반짝임을 켜다 verification",
+          "source_type": "official_web",
+          "source_url": "https://sto.or.kr/press/16684_/16684",
+          "published_at": "2026-09-23",
+          "published_at_note": "서울관광재단 보도자료 작성일 2026-09-23 확인.",
+          "collected_at": "2026-09-30T13:43:21+09:00",
+          "verification_status": "verified",
+          "evidence_summary": "서울관광재단은 서울의 밤을 주제로 4개 테마 공간을 구성하고 야간관광 설문과 별도 현장 미션 참여자에게 엽서·포스터 등 리워드를 제공한다고 설명한다."
+        }
+      ],
+      "warnings": [
+        "CURATED_VERIFIED_CASE_POOL_USED",
+        "NO_LIVE_API_CALL",
+        "REQUEST_RELEVANCE_FILTER_NOT_IMPLEMENTED"
+      ],
+      "errors": []
+    }
+  },
+  "module_status": {
+    "quant": "failed",
+    "local": "partial",
+    "trend": "success"
+  }
+}

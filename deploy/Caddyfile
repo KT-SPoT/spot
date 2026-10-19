@@ -1,0 +1,13 @@
+{$SPOT_WEB_DOMAIN} {
+    import /run/secrets/web_login
+    reverse_proxy web:8768
+}
+{$SPOT_API_DOMAIN} {
+    @research path /v1/research/jobs /v1/research/jobs/* /health
+    handle @research {
+        reverse_proxy api:8765
+    }
+    handle {
+        respond 404
+    }
+}
