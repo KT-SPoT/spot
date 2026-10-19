@@ -1,5 +1,6 @@
 """Planning handoff from completed observations; no model call or external delivery."""
 import math
+import re
 from urllib.parse import urlsplit
 from src.brief.pdf_editorial import select_local, trend_reading
 
@@ -208,8 +209,63 @@ def build_planning_clues(brief, request, planning=None):
 
 
 def render_handoff(brief, request, planning=None):
-    model=build_planning_clues(brief,request,planning)
-    lines=[model['title'],model['store'],'조사에서 발견한 사실과 그 사실에서 연결한 아이디어. 연결 아이디어는 고객 호응·행사 효과의 증거가 아닙니다.']
-    for field in model['fields']:lines.extend(['',f"{field['number']}. {field['label']}",*field['lines']])
-    for opportunity in model['opportunities']:lines.extend(['','숨은 기회 후보',opportunity['basis'],opportunity['hint']])
+    model=build_compact_clues(brief,request)
+    lines=[model['title'],model['store']]
+    for field in model['fields']:lines.extend(['',f"{field['number']}. {field['label']}",field['summary']])
     return '\n'.join(lines)+'\n'
+
+
+def build_compact_clues(brief, request):
+    """Six short observations; unspecified product, staffing and cost stay blank."""
+    from src.brief.experience_connections import reported_actions
+    quant=[c for c in brief.get('unique_local_signals',[]) if c.get('module')=='quant']
+    ages=('under_10','teens','20s','30s','40s','50s','60_plus')
+    days=('mon','tue','wed','thu','fri','sat','sun')
+    times=('05_09','09_12','12_14','14_18','18_23','23_05')
+    def peak(card,keys):
+        rows=[(k,v.get('share_pct')) for k,v in card.get('shares',{}).items() if k in keys and isinstance(v,dict)]
+        rows=[(k,v) for k,v in rows if isinstance(v,(int,float)) and not isinstance(v,bool) and math.isfinite(v) and 0<=v<=100]
+        maximum=max((v for _,v in rows),default=0)
+        return [(k,v) for k,v in rows if v==maximum] if maximum>0 else []
+    def pick(keys):
+        for population in ('매출','유동인구','주거인구','직장인구'):
+            card=next((c for c in quant if population in str(c.get('title','')) and peak(c,keys)),None)
+            if card:return ('매출액' if population=='매출' else population),card,peak(card,keys)
+        return '',{},[]
+    def values(rows,day=False):
+        return ' / '.join(f"{LABELS[k]}{'요일' if day else ''} {v:g}%" for k,v in rows)
+    facility=next((str(c.get('value')) for c in quant if c.get('title')=='최다 주요시설 유형' and c.get('value')),None)
+    summary=['','','','','','']
+    if facility:summary[0]=f'{facility}가 주요 시설 유형인 상권.'
+    else:
+        present=[c.get('title') for c in quant if c.get('title') in ('주거인구','직장인구') and isinstance(c.get('value'),(int,float)) and not isinstance(c.get('value'),bool) and c['value']>0]
+        if present:summary[0]='·'.join(present)+'가 분포하는 상권.'
+    population,card,age=pick(ages)
+    if age:summary[1]=f"{population}{'은' if population=='매출액' else '는'} {values(age)}가 가장 높음."
+    gender_population,_,gender=pick(('male','female'))
+    if gender:summary[1]+=(' ' if summary[1] else '')+f'{gender_population} 성별 비중은 {values(gender)}가 가장 높음.'
+    day_population,_,day=pick(days);time_population,_,time=pick(times)
+    parts=[]
+    if day:parts.append(f'{day_population} 요일 비중은 {values(day,True)}가 가장 높음')
+    if time:parts.append(f'{time_population} 시간대 비중은 {values(time)}가 가장 높음')
+    summary[3]='. '.join(parts)+('.' if parts else '')
+    ideas={'photo_sharing':'촬영·결과물 공유',
+           'collectible_reward':'굿즈·기념품 제공 또는 판매',
+           'direct_product_trial':'직접 사용·비교 체험',
+           'mission_journey':'미션·스탬프 참여'}
+    for case in brief.get('trend_patterns',[]):
+        if case.get('type')!='reference_case':continue
+        review=next((r for r in brief.get('research_review',{}).get('case_reviews',[]) if r.get('case_id')==case.get('case_id')),None)
+        if review and (review.get('verdict') not in ('useful','generic') or
+                       review.get('dimensions',{}).get('transfer_logic')!='clear' or
+                       review.get('dimensions',{}).get('overclaim')!='clear'):continue
+        actions=reported_actions(case)
+        if not actions:continue
+        # A generated adaptation question is not evidence of an age connection.
+        observed=str(case.get('observation') or '')
+        matched=[LABELS[k] for k,_ in age if re.search(r'(?<!\d)'+re.escape(LABELS[k]), observed)]
+        if not matched:continue
+        summary[5]=f"{'·'.join(matched)} 언급 행사: ‘{case.get('event_name') or '전국 행사'}’ — {ideas[actions[0][0]]}."
+        break
+    return {'title':'흥부장 기획 단서','store':request.get('store',{}).get('name') or '조사 매장',
+            'fields':[{'number':i+1,'label':label,'summary':summary[i]} for i,label in enumerate(('상권','타깃 고객','타깃 상품','행사 기간','직원 수','판촉물 예산'))]}

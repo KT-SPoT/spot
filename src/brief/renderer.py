@@ -1,6 +1,7 @@
 """Render the evidence draft as a readable Markdown report."""
 
 from src.brief.generator import AGE_LABELS
+from src.brief.publication import publication_text
 
 
 def _cell(value):
@@ -18,7 +19,7 @@ def _date_basis(card):
 
 
 def render_markdown(brief):
-    status = {"manual_review": "검토 필요", "failed": "근거 미확보"}.get(brief["status"], brief["status"])
+    status = {"manual_review": "리서치 결과", "failed": "조사 기록"}.get(brief["status"], brief["status"])
     lines = ["# SPOT Research Brief", "", f"- 요청: {brief['request_id']}",
              f"- 상태: {status} — 조사 초안",
              f"- 인용한 고유 출처 URL: {brief['source_count']}개", "",
@@ -32,13 +33,9 @@ def render_markdown(brief):
             value = (format(raw, ',') if isinstance(raw, (int, float)) else str(raw)) + card['unit']
             lines.append("| " + " | ".join(map(_cell, (card["title"], value,
                          card.get("reference_period"), card.get("scope"), _refs(card)))) + " |")
-    if not any("value" in card for card in brief["unique_local_signals"]):
-        lines.append("| 자료 미확보 | — | 확인 필요 | 확인 필요 | — |")
 
     lines.extend(["", "## 성별·연령·요일·시간대 구성", ""])
     demographic_cards = [card for card in brief["unique_local_signals"] if "shares" in card]
-    if not demographic_cards:
-        lines.append("성별·연령 비율을 확인할 원문 보조자료가 없습니다. 주요 성별·연령이라는 문구로 비율을 추정하지 않습니다.")
     for card in demographic_cards:
         lines.extend(["", f"### {card['title']}", "",
                       f"자료 기준: {_cell(card.get('reference_period'))} / {_cell(card['scope'])} / 근거: {_refs(card)}", "",
@@ -54,6 +51,11 @@ def render_markdown(brief):
                 count = entry.get("count")
                 lines.append(f"| {label} | {format(count, ',') if isinstance(count, (int, float)) else '확인 필요'} | {entry['share_pct']:g}% |")
     signal = brief["overview"]["primary_customer_signal"]
+    lines.extend(['','## 지역 관측과 기획 인사이트',''])
+    for row in brief['research_implications']:
+        if not row.get('observation'):continue
+        lines.extend(['', '### '+row['title'], '', row['observation'], '', row['interpretation'], '', row['question']])
+        for card in row.get('basis',[]):lines.append('- 지역 관측 출처: '+_refs(card))
     if signal:
         lines.extend(["", "주요 인구 신호: " + signal, "",
                       "유동·주거·직장 인구는 서로 다른 모집단입니다. 행사 고객을 확정하지 않습니다."])
@@ -70,8 +72,6 @@ def render_markdown(brief):
                           f"- 근거: {_refs(card)}"])
 
     lines.extend(["", "## 최근 지역 변화", ""])
-    if not brief["local_changes"]:
-        lines.append("출처가 연결된 지역 변화 근거가 없습니다.")
     for card in brief["local_changes"]:
         stage = {"approved_plan": "계획 승인", "selected_future_project": "미래 사업 선정",
                  "scheduled": "계획·예정(완료 확인 아님)", "launched": "시작",
@@ -99,7 +99,7 @@ def render_markdown(brief):
         if card.get("why_it_matters"):
             lines.extend(["", "자료 해석(검토 필요): " + card["why_it_matters"]])
 
-    lines.extend(["", "## 체험 트렌드 패턴", ""])
+    lines.extend(["", "## 전국 체험 참고", ""])
     if not brief["trend_patterns"]:
         lines.append("사례와 출처가 연결된 트렌드 패턴이 없습니다.")
     for card in brief["trend_patterns"]:
@@ -109,37 +109,11 @@ def render_markdown(brief):
                           f"- 범위: {card['scope']}", f"- 근거: {_refs(card)}"])
             continue
         if card.get("type") == "reference_case":
-            lines.extend(["", f"### 참고 후보: {card.get('event_name', '체험 후보')}", "",
+            lines.extend(["", f"### 전국 체험 참고: {card.get('event_name', '체험 후보')}", "",
                           str(card.get("observation", "")), "",
-                          f"- 선정 점수: {card.get('reference_priority_score')} (규칙 기반 비교값; 효과·품질 점수 아님)",
                           f"- 범위: {card['scope']}", f"- 근거: {_refs(card)}"])
-            lines.extend("- 선정 이유: " + text for text in card.get("why_relevant", []))
-            if card.get("audience_hypothesis"):
-                lines.append("- 고객층 조사 가설: " + card["audience_hypothesis"])
-            for hypothesis in card.get("adaptation_hypotheses", []):
-                lines.append("- 매장 응용 가설: " + hypothesis["statement"])
-            detail = card.get('case_detail', {})
-            if detail:
-                label = {'text_corroborated': '제목·본문 표현 대조', 'unavailable': '원문 접근 불가',
-                         'unconfirmed': '원문 연결 미확인', 'rejected': '원문 날짜·정체성 확인 필요'}.get(detail['status'], '미확인')
-                lines.append('- 원문 확인: ' + label + '; 실제 호응 검증 아님')
-                for mechanism in detail.get('reported_mechanisms', []):
-                    lines.append('- 본문 참여 방식 표현: ' + ', '.join(mechanism['matched_terms']) + '; 근거: ' + ', '.join(mechanism['source_ids']))
-                for signal in detail.get('response_signals', []):
-                    lines.append('- 본문 반응 표현: ' + _cell(signal.get('reported_value', '정성·홍보 표현')) + '; ' + signal['limitation'])
-                if not detail.get('response_signals'):
-                    lines.append('- 호응 근거: 미확보. 참여 방식의 참고·응용 가설 활용을 막는 조건은 아닙니다.')
-            population_labels = {'floating_population': '유동인구', 'sales': '매출 비중',
-                                 'resident_population': '주거인구', 'worker_population': '직장인구'}
-            if card.get('audience_fit'):
-                lines.append('- 구성 해석: 주요 성별과 주요 연령은 각각의 분포입니다. 두 조건의 교차 비율이나 행사 선호를 뜻하지 않습니다.')
-            for fit in card.get('audience_fit', []):
-                profile = fit['observed_profile']
-                age = AGE_LABELS.get(profile.get('dominant_age'), '연령 미확인')
-                gender = {'male': '남성', 'female': '여성'}.get(profile.get('dominant_gender'), '성별 미확인')
-                label = population_labels.get(fit['population_kind'], fit['population_kind'])
-                lines.append(f"- 고객층 연결 가설 ({label}, 주요 연령 {age}·주요 성별 {gender}): {fit['rationale']} {fit['next_check']}")
-            lines.extend("- 한계: " + text for text in card.get("limitations", []))
+            for hypothesis in card.get('adaptation_hypotheses',[]):
+                lines.append('- 지역 관측과 연결: '+hypothesis['statement'])
             if card.get("article_count", 1) > 1:
                 lines.append(f"- 관련 보도: {card['article_count']}건을 후보 묶음 1개로 표시")
                 for facet in card.get("supporting_facets", []):
@@ -155,32 +129,11 @@ def render_markdown(brief):
             lines.append(f"- 연결된 보도: {card.get('article_count', card['evidence_count'])}건; 보도 묶음 간에도 동일 행사일 수 있어 원문 확인 필요")
 
     lines.extend(["", "## Why here / why now", "", brief["why_here_now"], "",
-                  "## 기획 전 조사 질문", ""])
+                  "## 홍보 기회와 적용 방향", ""])
     for item in brief["research_implications"]:
         lines.append("- " + item["statement"])
-    if not brief["research_implications"]:
-        lines.append("근거를 먼저 보완해야 합니다.")
-    review = brief.get('research_review', {})
-    if review.get('performed'):
-        lines.extend(['', '## Critic: 고객 연결·차별성 검토', '',
-                      '조사 가설의 구체성과 응용 논리 검토입니다. 사실·성과의 인증이 아닙니다.'])
-        labels = {'useful': '활용 가능한 응용 가설', 'generic': '응용 가설 구체화 필요',
-                  'needs_context': '연결 맥락 보완 필요', 'overstated': '과장 표현 수정 필요'}
-        dimensions = {'local_customer_fit': '지역·고객 연결', 'transfer_logic': '응용 논리',
-                      'differentiation': '차별성', 'overclaim': '과장 여부'}
-        ratings = {'clear': '적절', 'weak': '약함', 'missing': '미확보', 'distinctive': '구체적 차별 요소',
-                   'contextual': '맥락 반영', 'generic': '일반적', 'risk': '수정 필요'}
-        for row in review.get('case_reviews', []):
-            lines.extend(['', f"### {row.get('event_name', row['case_id'])} — {labels[row['verdict']]}", '',
-                          row['reason'], '', '- 보완 방향: ' + row['suggestion'],
-                          '- 검토: ' + ' / '.join(dimensions[k] + ': ' + ratings[v] for k, v in row['dimensions'].items()),
-                          '- 근거: ' + ', '.join('trend:' + s for s in row['source_ids'])])
-            if row.get('review_warning'):
-                lines.append('- 제안 보정: 모델의 미확인 교차 고객군·구매층 표현을 제외하고 관측값을 구분하는 검토 질문으로 대체했습니다.')
-    elif review:
-        lines.extend(['', 'Critic 차별성 검토가 완료되지 않았습니다. 조사 자료는 유지하며 확인 코드: ' + review.get('code', '미확인')])
-    lines.extend(['', '## 검토 필요 사항', ''])
-    lines.extend("- " + str(item) for item in brief["needs_manual_check"])
+    # Full Critic verdicts and collection diagnostics remain in structured data,
+    # separate from the report's selected observations and interpretations.
     lines.extend(["", "## 출처", ""])
     sources = {}
     for card in brief["unique_local_signals"] + brief["local_changes"] + brief["trend_patterns"]:
@@ -193,4 +146,4 @@ def render_markdown(brief):
         name = _cell(source.get("source_name") or source_id).replace("[", "\\[").replace("]", "\\]")
         url = source["source_url"].replace("(", "%28").replace(")", "%29")
         lines.append(f"- {module}:{source_id} — [{name}]({url}); 게시일: {_cell(source.get('published_at'))}; 수집일: {_cell(source.get('collected_at'))}")
-    return "\n".join(lines) + "\n"
+    return "\n".join(publication_text(line) for line in lines) + "\n"

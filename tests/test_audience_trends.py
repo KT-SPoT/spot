@@ -37,7 +37,7 @@ class AudienceTrendTests(unittest.TestCase):
         self.assertIn('월 축제', queries[2])
         self.assertNotIn('부산', ' '.join(queries))
         self.assertNotIn('30대', ' '.join(queries))
-        self.assertNotIn('40대', ' '.join(queries))
+        self.assertIn('40대', queries[1])
         swapped = copy.deepcopy(ctx)
         for p in swapped['population_signals']:
             p['dominant_gender'] = 'female' if p['dominant_gender'] == 'male' else 'male'

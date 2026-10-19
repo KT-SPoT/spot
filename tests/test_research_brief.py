@@ -97,7 +97,7 @@ class ResearchBriefTest(unittest.TestCase):
         self.assertNotIn("shares", json.dumps(brief))
         markdown = render_markdown(brief)
         self.assertIn("확인 필요", markdown)
-        self.assertIn("성별·연령 비율을 확인할 원문 보조자료가 없습니다", markdown)
+        self.assertNotIn("미확보", markdown)
 
     def test_failed_and_mock_scouts_cannot_contribute_evidence(self):
         bundle = fixture()
@@ -157,6 +157,20 @@ class ResearchBriefTest(unittest.TestCase):
             section["derived_selected_area"]["latest_store_count"] = 99
             with self.assertRaisesRegex(ValueError, "telecom_store_count"):
                 generate_brief(bundle, quant_evidence=archive)
+
+    def test_overview_prefers_sales_age_over_floating_age(self):
+        bundle=fixture()
+        cards=[{'module':'quant','population_kind':'sales','distribution_kind':'age',
+                'shares':{'20s':{'share_pct':48},'60_plus':{'share_pct':7}},
+                'reference_period':None,'scope':'synthetic selected area',
+                'statement':'매출액 연령별 비중: 제공 표의 구성비',
+                'sources':bundle['results']['quant']['sources']}]
+        bundle['results']['quant']['metrics']['dominant_floating_age']='60_plus'
+        with patch('src.brief.generator.distribution_cards',return_value=cards):
+            brief=generate_brief(bundle)
+        self.assertIn('20대 48%',brief['overview']['primary_customer_signal'])
+        self.assertIn('매출액',brief['overview']['primary_customer_signal'])
+        self.assertNotIn('60대',brief['overview']['primary_customer_signal'])
 
     def test_population_shares_keep_separate_populations_and_counts(self):
         bundle = fixture()

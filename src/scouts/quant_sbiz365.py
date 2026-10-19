@@ -10,6 +10,7 @@ import json
 import math
 import re
 from html import unescape
+from http.client import HTTPException
 from http.cookiejar import CookieJar
 from typing import Any, Iterable
 from urllib.error import HTTPError, URLError
@@ -73,12 +74,15 @@ def _request_text(
         headers=headers,
         method=method,
     )
-    with opener.open(request, timeout=timeout) as response:
-        return (
-            response.status,
-            response.headers.get("Content-Type", ""),
-            _read_text(response),
-        )
+    try:
+        with opener.open(request, timeout=timeout) as response:
+            return (
+                response.status,
+                response.headers.get("Content-Type", ""),
+                _read_text(response),
+            )
+    except (ConnectionError, HTTPException) as exc:
+        raise _request_failure("소상공인365 요청 실패", exc) from None
 
 
 def collect_sbiz365_reports(

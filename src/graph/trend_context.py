@@ -34,7 +34,7 @@ def build_trend_context(request, quant=None, local=None, *, quant_evidence=None)
                 sources.append({k: deepcopy(source[k]) for k in
                     ("source_id", "source_name", "source_type", "published_at", "collected_at") if k in source})
         if sources:
-            output["sources"][module] = sources[:20]
+            output["sources"][module] = sources[:60]
             valid[module] = result
     if "quant" in valid:
         result = valid["quant"]
@@ -105,15 +105,20 @@ def build_trend_context(request, quant=None, local=None, *, quant_evidence=None)
         output["limitations"].append("소상공인365 관측값을 조사 기준으로 사용합니다. 비율이 없는 항목·표의 미표시 기준 시점은 추정하지 않습니다.")
     if "local" in valid:
         available_ids = {s["source_id"] for s in output["sources"]["local"]}
-        for item in valid["local"].get("insights", []):
-            if item.get("verification_status") not in ("text_corroborated", "context_corroborated"):
+        for item in sorted(valid["local"].get("insights", []), key=lambda c: c.get("type") == "local_place"):
+            if item.get("verification_status") not in ("text_corroborated", "context_corroborated", "provider_observation"):
                 continue
             ids = item.get("source_ids")
             if not isinstance(ids, list) or not ids or any(not isinstance(sid, str) for sid in ids) or not set(ids).issubset(available_ids):
                 continue
             output["local_signals"].append({k: deepcopy(item[k]) for k in
                 ("insight_id", "title", "evidence", "evidence_role", "change_state", "source_ids",
-                 "published_at", "date_basis", "context_note", "verification_status") if k in item})
+                 "published_at", "date_basis", "context_note", "verification_status", "place", "evidence_basis") if k in item})
             if len(output["local_signals"]) >= 10:
                 break
+    bundle={'request_id':request['request_id'],'request':request,'results':valid}
+    brief=generate_brief(bundle,quant_evidence=quant_evidence if 'quant' in valid else None)
+    output['regional_lenses']=[{k:deepcopy(row[k]) for k in
+                              ('title','observation','interpretation','question','search_terms','mechanisms')}
+                              for row in brief.get('research_implications',[]) if row.get('search_terms')]
     return output

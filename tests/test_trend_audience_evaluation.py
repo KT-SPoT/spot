@@ -18,7 +18,8 @@ def inputs():
     rows=[article('서울 게임 별빛 팝업 미니게임 체험','https://example.org/game'),
           article('대구 음식 달빛 팝업 시식 체험','https://example.org/food'),
           article('제주 솔바람 축제 스탬프 미션 체험','https://example.org/festival')]
-    return request,context,{query:deepcopy(rows) for query in build_queries(request,context)}
+    contexts=[context,{'population_signals':[]}]+[profile(context,age,'male') for age in ('20s','40s','60_plus')]
+    return request,context,{query:deepcopy(rows) for c in contexts for query in build_queries(request,c)}
 
 
 class AudienceEvaluationTests(unittest.TestCase):
@@ -43,7 +44,7 @@ class AudienceEvaluationTests(unittest.TestCase):
         young,_=replay(request,profile(context,'20s','male'),cache)
         older,_=replay(request,profile(context,'60_plus','female'),cache)
         compared=compare(young,older)
-        self.assertEqual(compared['changed_score_count'],2)
+        self.assertEqual(compared['changed_score_count'],0) # Age mentions are discovery cues, not regional fit scores.
         self.assertEqual({c['event_category'] for c in older['reference_cases']},{'game','food','festival'})
         self.assertFalse(any(c.get('proven_preference') for c in older['reference_cases']))
 

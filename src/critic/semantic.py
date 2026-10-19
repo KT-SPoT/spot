@@ -258,18 +258,19 @@ def validate_response(raw, payload, *, action_normalizations=None):
 
 class ChatCaller:
     """Single Chat Completions JSON call; transport never retries or redirects."""
-    def __init__(self, endpoint, model, key, *, transport=None, prompt=None):
+    def __init__(self, endpoint, model, key, *, transport=None, prompt=None, response_format=None):
         parts = urlsplit(endpoint)
         if not model or not key or parts.scheme != 'https' or not parts.hostname or parts.username or parts.query or parts.fragment:
             raise SemanticError('INVALID_CONFIGURATION')
         self.endpoint, self.model, self.key, self.transport = endpoint, model, key, transport
         self.prompt = prompt or PROMPT
+        self.response_format = response_format or {'type': 'json_object'}
 
     def __call__(self, payload):
         body = {'model': self.model, 'messages': [
             {'role': 'system', 'content': self.prompt},
             {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}],
-            'response_format': {'type': 'json_object'}, 'max_completion_tokens': 4000}
+            'response_format': self.response_format, 'max_completion_tokens': 4000}
         started = time.monotonic()
         with httpx.Client(timeout=20, follow_redirects=False, transport=self.transport) as client:
             with client.stream('POST', self.endpoint, headers={'Authorization': f'Bearer {self.key}'}, json=body) as response:

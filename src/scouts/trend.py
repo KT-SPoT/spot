@@ -24,6 +24,15 @@ AGE_LABELS = {"under_10":"10세 미만", "teens":"10대", "20s":"20대", "30s":"
 MAX_QUERIES = 3
 
 
+def primary_profile(context):
+    """Sales is the planning lens; population is an explicitly separate fallback."""
+    profiles=[p for p in context.get('population_signals', []) if p.get('source_ids') and p.get('dominant_age') in AGE_LABELS]
+    for kind in ('sales', 'floating_population', 'resident_population', 'worker_population'):
+        profile=next((p for p in profiles if p.get('population_kind')==kind), None)
+        if profile:return profile
+    return {}
+
+
 def product_alias(product):
     alias = product
     for old,new in (("galaxy","갤럭시"),("fold","폴드"),("flip","플립"),("iphone","아이폰")):
@@ -32,7 +41,7 @@ def product_alias(product):
 
 
 def discovery_plan(request, context):
-    """Three auditable searches, no inferred age/gender interests or device specs."""
+    """Broad + observed cohort + calendar; age is a search lens, not a preference."""
     campaign = request.get('campaign') or {}
     clean = lambda value: ' '.join(re.findall(r'[가-힣A-Za-z0-9]+', str(value or '')))
     product = clean(campaign.get('product'))[:60]
@@ -42,15 +51,38 @@ def discovery_plan(request, context):
     focus = '' if purpose in defaults else ' '.join(purpose.split()[:4])[:40]
     _, end, _ = search.window(request)
     targeted = ' '.join(part for part in (product, focus, '행사') if part)[:110] if product or focus else '오프라인 체험 행사'
+    profile=primary_profile(context)
+    age=AGE_LABELS.get(profile.get('dominant_age'))
+    if age:targeted=f'{age} {targeted}'
+    lenses=[l for l in context.get('regional_lenses',[]) if l.get('search_terms')]
+    if lenses:
+        return [
+            {'role':'regional','query':lenses[0]['search_terms'][0],'reason':lenses[0]['observation']+' '+lenses[0]['question']},
+            {'role':'audience' if age else 'experience','query':targeted,'reason':'별도의 연령 구성에 따른 전국 사례 탐색'},
+            {'role':'regional' if len(lenses)>1 else 'timing',
+             'query':lenses[1]['search_terms'][0] if len(lenses)>1 else f'{end.year} {end.month}월 축제',
+             'reason':lenses[1]['observation']+' '+lenses[1]['question'] if len(lenses)>1 else '조사 기준월의 전국 행사 일정 탐색'},
+        ]
     return [
         {'role':'broad', 'query':'팝업', 'reason':'업종을 미리 지정하지 않고 전국 행사 참고 사례 탐색'},
-        {'role':'request' if product or focus else 'experience', 'query':targeted, 'reason':'전국 참여 방식 탐색; 기존 제품·질문 입력 요청은 검색 호환 유지. 지역 관측은 사례 응용 검토에 반영하며 성별·연령으로 취향을 추정하지 않음'},
+        {'role':'audience' if age else 'experience', 'query':targeted, 'reason':f"{profile.get('population_kind') or '고객층 미확보'} 기준의 전국 행사 탐색. 연령 언급은 선호나 실제 참여자 검증이 아님; 성별로 업종을 지정하지 않음"},
         {'role':'timing', 'query':f'{end.year} {end.month}월 축제', 'reason':'요청 자료 기준월의 전국 일정·행사 보도 탐색; 실제 행사 일정은 원문에서 확인'},
     ]
 
 
 def build_queries(request, context):
     return list(dict.fromkeys(row['query'] for row in discovery_plan(request, context)))[:MAX_QUERIES]
+
+
+def video_event_query(title):
+    """Prefer a quoted event name over a long news headline."""
+    phrases=re.findall(r"['‘’\"“”]([^'‘’\"“”]+)['‘’\"“”]",title)
+    names=[' '.join(re.findall(r'[가-힣A-Za-z0-9]+',p)) for p in phrases]
+    names=[p for p in names if 4<=len(p)<=55 and len(p.split())<=6 and not re.fullmatch(r'\d+대(?: 이상)?',p)]
+    if names:
+        names.sort(key=lambda p:any(w in p for w in ('페스타','페스티벌','축제','팝업','전시')),reverse=True)
+        return names[0]
+    return ' '.join(re.findall(r'[가-힣A-Za-z0-9]+',title)[:6])[:70]
 
 
 def event_category(title):
@@ -74,11 +106,17 @@ def diversified_references(cases, limit=5):
         representative = deepcopy(group[0])
         representative['related_case_ids'] = [c['case_id'] for c in group]
         representatives.append(representative)
+    representatives.sort(key=lambda c:(-c.get('context_match_score',0),-c.get('reference_priority_score',0)))
     selected, seen = [], set()
+    # Reserve space for context-linked cases before category coverage. Otherwise
+    # one familiar example per industry can crowd out new cohort-query results.
+    selected=[c for c in representatives if c.get('context_match_score',0)>0][:min(2,limit)]
+    seen={c['event_category'] for c in selected}
     ordered = [c for c in representatives if c['event_category'] != 'other'] + [c for c in representatives if c['event_category'] == 'other']
     for case in ordered:
         category = case['event_category']
-        if category not in seen:
+        if len(selected)>=limit:break
+        if case not in selected and category not in seen:
             selected.append(case)
             seen.add(category)
         if len(selected) >= limit:
@@ -117,6 +155,8 @@ def audience_hypothesis(context):
 
 def context_fit(text, context):
     reasons, refs, notes = [], [], []
+    preferred=primary_profile(context)
+    priority=0
     for signal in context.get('population_signals',[]):
         age = AGE_LABELS.get(signal.get('dominant_age'))
         gender = {'male':'남성','female':'여성'}.get(signal.get('dominant_gender'))
@@ -134,7 +174,13 @@ def context_fit(text, context):
             refs.extend({'module':'local','source_id':sid} for sid in signal.get('source_ids',[]))
             notes.append('같은 단어가 등장해도 동일 지역·실제 생활권 영향·수요를 확정하지 않습니다.')
     refs = list({(r['module'],r['source_id']):r for r in refs}.values())
-    return min(len(reasons),2), reasons, refs, list(dict.fromkeys(notes))
+    lens_hits=0
+    for lens in context.get('regional_lenses',[]):
+        words=[w for term in lens.get('search_terms',[]) for w in term.split()
+               if w not in ('팝업','체험','행사','투어')]
+        if any(w in text for w in words):lens_hits+=1
+    # Age/category word overlap is discovery metadata, not regional transfer.
+    return lens_hits*3, reasons, refs, list(dict.fromkeys(notes))
 
 
 def library_references(request,start,end):
@@ -187,14 +233,35 @@ def run_trend_scout(request, *, context=None, detail_reader=None):
     if not context.get('local_signals'):
         output['warnings'].append('LOCAL_CONTEXT_UNAVAILABLE')
     by_url={}
+    reader_videos={}
     video_mode = os.getenv('SPOT_TREND_VIDEO_MODE', 'on')
     output['query_context']['video_mode'] = video_mode
     providers = (search.news, search.videos) if video_mode == 'on' else (search.news,)
     if video_mode != 'on':
         output['warnings'].append('YOUTUBE_LOOKUP_DISABLED' if video_mode == 'off' else 'INVALID_TREND_VIDEO_MODE')
     for provider in providers:
-        for query in queries:
+        provider_queries=queries
+        if provider is search.videos:
+            # Search videos about discovered events, not the same latest broad
+            # popup results for every store. Keep the existing three-call cap.
+            candidates=[i for i in by_url.values() if any(w in i['title'].lower() for w in OFFLINE_CUES)]
+            candidates.sort(key=lambda i:i.get('published_at',''),reverse=True)
+            candidates.sort(key=lambda i:(-context_fit(i['title']+' '+i['description'],context)[0], -sum(w in i['title'] for w in ('체험','팝업','미션','시연'))))
+            event_queries=list(dict.fromkeys(video_event_query(i['title']) for i in candidates))[:MAX_QUERIES-1]
+            profile=primary_profile(context)
+            cohort=AGE_LABELS.get(profile.get('dominant_age'))
+            audience_query=f'{cohort} 팝업' if cohort else '오프라인 체험 행사'
+            provider_queries=list(dict.fromkeys(event_queries+[audience_query])) if event_queries else queries
+            output['query_context']['video_search_queries']=provider_queries
+        for query in provider_queries:
             for item in search.collect(output,provider,query,start,end):
+                if provider is search.videos and query in event_queries:
+                    terms=[w for w in query.split() if len(w)>=2 and not re.fullmatch(r'\d+(?:대|년|월|일)?',w)
+                           and w not in ('팝업','체험','페스티벌','총정리','오프라인','마라톤','운영','축제','공유','개최','행사','브랜드','직접','이상','서울','부산','대구','광주','홍대')]
+                    if terms and not any(w in item['title']+' '+item['description'] for w in terms):
+                        continue
+                if provider is search.videos and any(w in item['title'].lower() for w in OFFLINE_CUES) and not any(w in item['title'].lower() for w in ('최저가','구매링크','구매 링크','언박싱','unboxing')):
+                    reader_videos[item['source_url']]={k:item[k] for k in ('source_url','source_name','source_type','published_at','collected_at','title') if k in item}
                 url=item['source_url']
                 if url not in by_url:
                     by_url[url]=dict(item,matched_queries=[])
@@ -206,7 +273,9 @@ def run_trend_scout(request, *, context=None, detail_reader=None):
         text=item['title']+' '+item['description']
         title_match,_=relevance.find_product_match(item['title'].lower(),item['title'].lower().replace(' ',''),product)
         category=phone and any(w in item['title'].lower() for w in ('스마트폰','갤럭시','아이폰','galaxy','iphone'))
-        cue_text=item['title'] if item['source_type']=='news' else text
+        # Video descriptions often contain unrelated recommendations/links.
+        # Require an offline-event cue in the headline for either provider.
+        cue_text=item['title']
         if not any(w in cue_text.lower() for w in OFFLINE_CUES):
             continue
         if any(w in item['title'].lower() for w in ('최저가', '구매링크', '구매 링크', '언박싱', 'unboxing')):
@@ -254,6 +323,7 @@ def run_trend_scout(request, *, context=None, detail_reader=None):
             'source_ids':[sid],'taxonomy_tags':tags,'verification_status':'candidate',
             'request_relevance':item['request_relevance'],'product_match_level':item['product_match_level'],
             'reference_priority_score':item['score'],'fit_signals':item['relevance_reasons'],
+            'context_match_score':context_fit(text,context)[0],
             'context_source_refs':refs,'why_relevant':why,
             'event_category':item['event_category'], 'evidence_role':item['evidence_role'],
             'audience_hypothesis':audience_hypothesis(context),
@@ -261,6 +331,8 @@ def run_trend_scout(request, *, context=None, detail_reader=None):
             'limitations':['원문·영상·실제 행사 여부와 대상 고객은 확인하지 않았습니다.','인구 구성과 단어 겹침은 효과·취향·수요를 증명하지 않습니다.']+item['context_limitations'],
             'origin':'live_search_candidate'})
     output['reference_cases']=diversified_references(output['insights'])
+    # The video player is a reader library, independent of news selection caps.
+    output['reader_video_sources']=[{**s,'source_id':f'V-T-{i+1:03}'} for i,s in enumerate(list(reader_videos.values())[:10])]
     mode = os.getenv('SPOT_TREND_DETAIL_MODE', 'off')
     reader = detail_reader or (check_detail if mode == 'article' else None)
     if os.getenv('SPOT_SCOUT_MODE') == 'offline':
