@@ -99,6 +99,21 @@ reference periods remain deterministic data-handling concerns. Trend cases may b
 outside the store area and product category; locality restrictions apply to Local
 claims, not to nationwide Trend references.
 
+### Optional two-stage Brief interpretation — 2026-10-07
+
+`SPOT_BRIEF_SYNTHESIS=connections`, live Scout mode, research Critic profile and
+shadow semantic mode enable an alternative interpretation path inside the Brief
+node: sourced regional reading -> independent review -> Local/Trend connections
+-> independent review. It preserves accepted baseline findings and attaches each
+selected planning lens's source IDs deterministically. Generic but useful results
+remain valid. The previous case Critic is deferred to avoid a duplicate model call.
+The path makes at most four model calls and no additional Scout searches.
+Default off and explicit semantic disable keep existing behavior. A failed
+connection stage retains the accepted regional reading; a failed regional stage
+retains the original Brief. The Seoul production service explicitly enabled this
+path on 2026-10-07; the default for other environments remains off.
+See [pilot and validation](RESEARCH_SYNTHESIS_PILOT.md).
+
 ## Target retry flow
 
 ```text
@@ -117,3 +132,8 @@ Trend / recency insufficient
 Retry limit exceeded
   → manual_review
 ```
+
+## Regional analysis v2 (implementation, not deployed yet)
+
+The active connections path passes public region context from the graph request into synthesis. The generation schema requires separate selection of place and consumption-pattern evidence, then maps the combined interpretation and opportunity into the existing Brief fields. The regional Critic corrects geographic contamination and scope confusion; originality and generality are not acceptance gates. Numeric/source/cohort integrity remains deterministic. The reader Area Summary and PDF prefer the generated v2 overview rather than reconstructing place lists.
+The compatibility semantic research path uses the same geographic policy. No new Scout provider or graph retry loop is introduced. See ANALYSIS_AGENT_HANDOFF.md for user intent and output/analysis-agent-v2 for actual generation diagnostics.

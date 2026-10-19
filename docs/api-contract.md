@@ -256,3 +256,33 @@ Trend Scout v0.1의 기존 자유 형식 `query_context`에 `search_plan` 배열
 동일 행사·호응 인증 또는 Brief 근거 수에 추가되는 자료라는 의미는 아니다.
 이전 결과에서 이 필드가 없으면 브리프에 연결된 영상 출처만 사용한다.
 Research Brief v0.1 필수 스키마에는 추가하지 않는다. 후속 공통 Notion 문서 동기화는 Integrator가 담당한다.
+
+2026-10-07: `trend_discovery.video_status` is optional transport metadata
+(`completed`, `rate_limited`, `provider_error`, `disabled`). It explains video
+lookup availability separately from research/report quality. Collected video
+references are forwarded independently of the news-case shortlist.
+No required ScoutResult/ResearchBrief fields change. Regional observation,
+interpretation and question entries reuse the free-form `research_implications`
+list; collection/quality diagnostics remain in the structured result.
+
+2026-10-07 local Research Critic policy clarification: differentiation is optional.
+`differentiation=generic` does not prohibit `verdict=useful` when transfer logic
+is clear and overclaim is clear. Common but coherent planning connections remain
+baseline references; factual scope and population distinctions still apply.
+This changes evaluation policy, not required fields or verdict enum values. The
+separate synthesis path uses optional `regional_synthesis`, `connection_synthesis`
+diagnostics and `research_implications[].contribution` (`baseline`/`regional_plus`).
+It is connected as an opt-in Brief path, default off and not enabled in production. See
+[RESEARCH_SYNTHESIS_PILOT.md](RESEARCH_SYNTHESIS_PILOT.md). Common Notion-document
+synchronization is still separate.
+
+
+### Local background extensions — 2026-10-08
+기존 v0.1 envelope와 `insights`/`sources`를 유지한다. Local 모듈 확장으로 `type=local_place` 또는 `local_official_context`, `evidence_role=background`를 사용한다. `local_place.place`에는 name/category/address/lat/lng/distance_m/zone이 들어간다. `distance_m`는 매장 좌표로 계산한 직선거리이며 조회 시점의 검색 결과다. 장소 출처는 `source_type=map`, 공식 소개는 government. `query_context.place_search`에 반경·검색 분류·제한된 검색 범위를 기록한다. 방문량·선호·전체 시설 수를 주장하지 않는다.
+
+### 분석·지역 범위 검사 내부 확장 — 2026-10-08 (운영 반영 전)
+
+SpotRequest/ScoutResult v0.1 필드 및 Scout 함수 경계는 유지한다. brief 생성 입력의 `_analysis_context`는 파이프라인 내부에만 존재하고 응답에서 제거한다. 지역명·좌표·반경·기준일은 지역 혼입 판단에 사용한다.
+내부 모델 생성은 area_reading(place_evidence_ids, pattern_evidence_ids, interpretation 등)과 opportunities를 반환하며 기존 overview.area_summary, research_implications.interpretation/question/statement/basis로 매핑한다. 호환 필드 question은 v2에서 홍보 기회 문장을 담는다.
+regional_synthesis.version=`regional-analysis-v2`. 내부 reviews는 insight_id/verdict(within_scope, corrected_scope, mixed_region)/reason/corrected_insight/excluded_action_ids를 사용한다. 전체 분석 품질이나 참신함 승인으로 해석하지 않는다. 이전 결과의 기존 메타데이터는 그대로 읽는다.
+connections 비활성 경로의 case_reviews는 기존 호환 필드를 유지하되 dimensions는 중립값이며 scope_verdict에 지역 범위 판단을 기록한다. differentiation 등은 평가 점수로 사용하지 않는다.
