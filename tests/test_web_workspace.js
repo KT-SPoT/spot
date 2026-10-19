@@ -9,6 +9,8 @@ class Element {
   removeAttribute(name){delete this.attributes[name];}
   showModal(){this.open=true;}
   close(){this.open=false;}
+  click(){this.clicked=true;}
+  remove(){this.removed=true;}
   querySelectorAll(tag){const nodes=[];const walk=node=>{if(node.tag===tag)nodes.push(node);for(const child of node.children||[])walk(child);};walk(this);return nodes;}
   set innerHTML(value){throw new Error('Unsafe HTML path');}
 }
@@ -18,7 +20,7 @@ async function scenario(status){
   const views=names.map(name=>{const e=get('view-'+name);e.id='view-'+name;return e;});
   const nav=names.map(name=>{const e=new Element('button');e.dataset.view=name;return e;});
   const newButton=new Element('button'),date=new Element('input');
-  const document={getElementById:get,createElement:tag=>new Element(tag),createTextNode:text=>({tag:'#text',textContent:text}),querySelector:()=>date,querySelectorAll:selector=>selector==='.view'?views:selector==='[data-new]'?[newButton]:nav};
+  const document={body:new Element('body'),getElementById:get,createElement:tag=>new Element(tag),createTextNode:text=>({tag:'#text',textContent:text}),querySelector:()=>date,querySelectorAll:selector=>selector==='.view'?views:selector==='[data-new]'?[newButton]:nav};
   const storage=new Map([['spot-work',JSON.stringify({activeJob:'a'.repeat(32),pending:null,lastRequest:{store:{name:'범용 테스트 매장',address:'서울의 테스트 주소'},campaign:{product:'테스트 제품'}}})]]);
   const source={source_id:'S-Q-1',source_name:'Official <img>',source_url:'https://example.org/data'};
   const trendCard={type:'reference_case',event_name:'합성 축제 미션',observation:'미션 체험',sources:[source],why_relevant:['전체 분포를 읽은 응용 검토'],adaptation_hypotheses:[{statement:'같은 방문 흐름에서 기능 차이를 비교할 수 있을까?'}],audience_fit:[{population_kind:'floating_population',rationale:'유동·매출 최다 시간대는 각각의 관측입니다.',next_check:'도입 체험과 제품 가치 비교를 다른 상황에서 검토할 수 있을까? <script>'}]};
@@ -31,6 +33,19 @@ async function scenario(status){
   assert.equal(get('context-label').textContent,'범용 테스트 매장 × 테스트 제품');
   newButton.events.click();assert.equal(get('request-dialog').open,true);get('close-request').events.click();assert.equal(get('request-dialog').open,false);
   if(status==='completed'){
+    // Export must still work if the optional hints presentation script is absent.
+    const originalFetch=context.fetch;
+    context.fetch=async(path,options)=>path.endsWith('/handoff')?{ok:true,blob:async()=>new Blob(['상권 조사 단서'])}:originalFetch(path,options);
+    await get('download-handoff').events.click();
+    const exported=document.body.children.at(-1);
+    assert.equal(exported.download,'SPOT-heung-manager-clues.txt');
+    assert.equal(exported.clicked,true);
+    assert.equal(get('download-handoff').disabled,false);
+    context.fetch=async()=>({ok:false,status:401});
+    await get('download-handoff').events.click();
+    assert(get('notice').textContent.includes('접속이 만료'));
+    assert.equal(get('download-handoff').disabled,false);
+    context.fetch=originalFetch;
     assert.equal(get('overview-content').hidden,false);
     assert.equal(get('quant-cards').className,'quant-dashboard');
     const card=get('quant-cards').children[0].children[0];assert(card.children[1].children[0].textContent==='0');

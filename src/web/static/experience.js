@@ -117,12 +117,13 @@ const SPOTExperience = (() => {
   }
   function category(source) {
     const hint=[source.source_type,source.type,source.source_name,source.title].filter(Boolean).join(' ');
+    if(source.source_type==='map')return '지도·장소';
     if(/report|보고서|연구보고/i.test(hint)||/\.pdf(?:\?|$)/i.test(source.source_url||''))return '보고서';
     if(/public|government|공공|소상공인|통계/i.test(hint)||/\.go\.kr(?:\/|$)/i.test(source.source_url||''))return '공공데이터';
     if(/news|뉴스|신문|일보|기사/i.test(hint)||source.verification?.method==='article_text_check')return '뉴스';
     return '기타';
   }
-  function overviewMap(request){
+  function overviewMap(request,places=[]){
     const host=$('area-map'),caption=$('area-map-caption');
     if(areaMap){areaMap.remove();areaMap=null;}
     host.replaceChildren();
@@ -137,6 +138,9 @@ const SPOTExperience = (() => {
     const pin=L.circleMarker([lat,lng],{radius:9,color:'#fff',weight:3,fillColor:'#3868f5',fillOpacity:1}).addTo(areaMap);
     const label=make('strong',request.store.name||'조사 위치');pin.bindTooltip(label,{permanent:true,direction:'top',offset:[0,-10]});
     caption.textContent=`요청 위치 · ${numeric(radius)?'조사 반경 '+radius.toLocaleString('ko-KR')+'m':'반경 미확인'} / 공공자료의 집계 범위는 개별 출처에서 확인하세요.`;
+    for(const card of places){const p=card.place;if(!p||!numeric(p.lat)||!numeric(p.lng))continue;
+      const marker=L.circleMarker([p.lat,p.lng],{radius:5,color:'#826a48',fillOpacity:0.9}).addTo(areaMap);
+      marker.bindTooltip(make('span',`${p.name} · ${p.category} · 약 ${p.distance_m}m`));}
     setTimeout(()=>areaMap?.invalidateSize(),0);
   }
   function storyPreview(target,items,module,evidence){
@@ -156,24 +160,28 @@ const SPOTExperience = (() => {
       const button=make('button','근거 보기 ↗','text-button',footer);button.type='button';button.addEventListener('click',()=>evidence(card,module));
     });
   }
-  function overview(quant,local,trend,request,evidence){
+  function overview(quant,local,trend,request,evidence,context=[]){
     const metrics=$('overview-metrics'),tags=$('area-tags');metrics.replaceChildren();tags.replaceChildren();
     const number=value=>typeof value==='number'&&Number.isFinite(value)&&value>=0;
     const metric=ref=>quant.find(c=>c.metric_refs?.includes(ref)&&c.sources?.length);
     const population=metric('daily_avg_floating_population'),time=metric('peak_floating_time_band');
-    const age=typeof SPOTQuantCharts!=='undefined'?SPOTQuantCharts.chartCard(quant,'floating_population','age'):null;
-    const ageRows=typeof SPOTQuantCharts!=='undefined'?SPOTQuantCharts.rows(age,'age','floating_population').filter(r=>r.value!==null):[];
+    const salesAge=typeof SPOTQuantCharts!=='undefined'?SPOTQuantCharts.chartCard(quant,'sales','age'):null;
+    const salesRows=typeof SPOTQuantCharts!=='undefined'?SPOTQuantCharts.rows(salesAge,'age','sales').filter(r=>r.value!==null):[];
+    const ageKind=salesRows.some(r=>r.value>0)?'sales':'floating_population';
+    const age=typeof SPOTQuantCharts!=='undefined'?SPOTQuantCharts.chartCard(quant,ageKind,'age'):null;
+    const ageRows=typeof SPOTQuantCharts!=='undefined'?SPOTQuantCharts.rows(age,'age',ageKind).filter(r=>r.value!==null):[];
     const max=Math.max(0,...ageRows.map(r=>r.value)),top=ageRows.filter(r=>r.value===max),ageLabel=top.map(r=>r.label).join(' · ');
-    const ageComplete=ageRows.length>0&&ageRows.length===SPOTQuantCharts.rows(age,'age','floating_population').length;
-    if(ageRows.length)$('area-title').textContent=ageRows.length===SPOTQuantCharts.rows(age,'age','floating_population').length?`${ageLabel} 방문 비중이 가장 높은 지역`:`확보된 연령 중 ${ageLabel} ${max}%`;
+    const ageComplete=ageRows.length>0&&ageRows.length===SPOTQuantCharts.rows(age,'age',ageKind).length;
+    const ageBasis=ageKind==='sales'?'매출액':'유동인구';
+
     const cases=trend.filter(c=>c.type==='reference_case'),patterns=trend.filter(c=>c.type==='pattern');
     const chosen=cases.length?cases:patterns.length?patterns:trend;
-    const definitions=[['일평균 유동인구',number(population?.value)?population.value.toLocaleString('ko-KR')+'명':'미확보',population,'quant','◫'],[ageRows.length&&!ageComplete?'확보 연령 중 최다':'주요 연령대',ageRows.length?`${ageLabel} · ${max}%`:'미확보',age,'quant','◉'],['주요 유동 시간',time?.value??'미확보',time,'quant','◷'],[cases.length?'전국 참고 사례':'체험 패턴',String(chosen.length)+'건',chosen[0],'trend','↗']];
+    const definitions=[['일평균 유동인구',number(population?.value)?population.value.toLocaleString('ko-KR')+'명':'미확보',population,'quant','◫'],[ageKind==='sales'?(ageComplete?'매출액 기준 주요 연령':'매출액 확보 연령 중 최다'):'유동인구 참고 연령',ageRows.length?`${ageLabel} · ${max}%`:'미확보',age,'quant','◉'],['주요 유동 시간',time?.value??'미확보',time,'quant','◷'],[cases.length?'전국 참고 사례':'체험 패턴',String(chosen.length)+'건',chosen[0],'trend','↗']];
     definitions.forEach(([title,value,card,module,icon],i)=>{const tile=make('article',undefined,'overview-metric metric-tone-'+i,metrics);make('span',icon,'metric-icon',tile);const text=make('div',undefined,'',tile);make('p',title,'',text);make('strong',String(value),'',text);if(card){const button=make('button','근거 ↗','text-button',text);button.type='button';button.addEventListener('click',()=>evidence(card,module));}});
-    for(const [i,text] of [ageRows.length?ageLabel+' 방문 비중 '+max+'%':null,local.length?'지역 변화 '+local.length+'건':null,chosen.length?'전국 체험 '+chosen.length+'건':null].entries())if(text)make('span',text,'tag-tone-'+i,tags);
+    for(const [i,text] of [ageRows.length?ageLabel+' '+ageBasis+' 비중 '+max+'%':null,local.length?'지역 변화 '+local.length+'건':null,chosen.length?'전국 체험 '+chosen.length+'건':null].entries())if(text)make('span',text,'tag-tone-'+i,tags);
     if(typeof SPOTQuantCharts!=='undefined')SPOTQuantCharts.preview(document,$('overview-population'),quant,evidence);
     else make('p','고객 분포를 확인할 자료가 미확보됐어요.','empty',$('overview-population'));
-    storyPreview($('overview-local'),local,'local',evidence);storyPreview($('overview-trend'),chosen,'trend',evidence);overviewMap(request);
+    storyPreview($('overview-local'),local,'local',evidence);storyPreview($('overview-trend'),chosen,'trend',evidence);overviewMap(request,context.filter(c=>c.type==='local_place'));
   }
   function library(target,groups,sourceRow) {
     target.replaceChildren();const sources=[],seen=new Set();
@@ -188,11 +196,32 @@ const SPOTExperience = (() => {
       for(const [source,module] of filtered)sourceRow(source,list,module);
       if(!filtered.length)make('p','이 분류에 연결된 출처가 없습니다.','empty',list);
     }
-    for(const label of ['전체','뉴스','공공데이터','보고서','기타']){
+    for(const label of ['전체','뉴스','공공데이터','보고서','지도·장소','기타']){
       const count=sources.filter(([s])=>label==='전체'||category(s)===label).length;
       const button=make('button',`${label} (${count})`,'',tabs);button.type='button';button.dataset.category=label;button.addEventListener('click',()=>select(label));
     }
     select('전체');
+  }
+  function regionalSummary(brief={}) {
+    if(brief.regional_synthesis?.version==='regional-analysis-v2'&&brief.regional_synthesis?.performed&&brief.regional_synthesis?.area_summary_applied!==false&&brief.overview?.area_summary)return brief.overview.area_summary;
+    const signals=brief.unique_local_signals||[];
+    const places=signals.filter(c=>c.type==='local_place'&&c.sources?.length&&c.place).map(c=>c.place);
+    if(places.length){const groups=new Map();for(const p of places){if(!groups.has(p.category))groups.set(p.category,[]);groups.get(p.category).push(p);}
+      const clauses=[...groups].slice(0,4).map(([category,rows])=>`${category} 시설로 ${rows.sort((a,b)=>a.distance_m-b.distance_m).slice(0,2).map(p=>p.name).join('·')}`);
+      return '매장 주변에서 '+clauses.join(', ')+' 등이 검색됩니다.\n서로 다른 시설의 접근 환경을 함께 살펴볼 수 있는 지역입니다. 시설 목록은 검색된 장소이며, 방문량이나 전체 시설 분포를 뜻하지 않습니다.';
+    }
+    const facility=signals.find(c=>c.module==='quant'&&c.title==='최다 주요시설 유형'&&c.value&&c.sources?.length);
+    const parts=facility?[`선택한 조사 영역의 주요시설 중 ${facility.value} 유형이 가장 많이 집계된 지역입니다.`]:[];
+    const background=signals.filter(c=>c.module==='local'&&c.evidence_role==='background'&&c.sources?.length);
+    const local=(brief.local_changes||[]).filter(c=>c.sources?.length),seen=new Set();
+    for(const card of [...background,...local]){
+      const title=String(card.title||'').replace(/\s+/g,' ').trim();
+      if(!title||seen.has(title))continue;seen.add(title);
+      const date=String(card.published_at||card.sources[0].published_at||'').slice(0,10);
+      parts.push(`${date?date+' 보도':'지역 보도'}에서는 ‘${title}’ 소식을 다룹니다.`);
+      if(seen.size===2)break;
+    }
+    return parts.join('\n')||'선택한 매장 주변을 조사한 결과입니다. 아래 지도에서 조사 위치와 범위를 확인할 수 있습니다.';
   }
   function display(brief,request,sourceRow,evidence) {
     const signals=brief.unique_local_signals||[],quant=signals.filter(c=>c.module==='quant'),local=brief.local_changes||[],context=signals.filter(c=>c.module!=='quant'),trend=brief.trend_patterns||[];
@@ -201,34 +230,44 @@ const SPOTExperience = (() => {
       $('quant-cards').replaceChildren();
       make('p',quantFailure.slice(7),'empty',$('quant-cards'));
     }
-    const population=quant.filter(c=>c.population_kind||c.shares||/성별|연령|시간대/.test(c.title||''));
-    const trendHighlights=trend.filter(c=>c.type==='reference_case');
-    const highlights=[...population.slice(0,1).map(c=>[c,'quant']),...local.slice(0,1).map(c=>[c,'local']),...(trendHighlights.length?trendHighlights:trend).slice(0,1).map(c=>[c,'trend'])];
-    if(!highlights.length)highlights.push(...quant.slice(0,2).map(c=>[c,'quant']));
-    const sentence=card=>String(card.statement||card.evidence||card.observation||card.title||card.event_name||card.name||'').slice(0,180);
-    const parts=[];
-    if(population[0])parts.push(`공공 상권 자료에서 ${sentence(population[0])}${/[.!?。]$/.test(sentence(population[0]))?'':'입니다.'}`);
-    if(population[1])parts.push(`${sentence(population[1])}${/[.!?。]$/.test(sentence(population[1]))?'':'입니다.'}`);
-    if(local[0])parts.push(`지역 자료에서는 ‘${local[0].title||sentence(local[0])}’ 내용을 다룹니다.`);
-    else if(quant.length)parts.push('지역의 직접적인 변화는 추가 확인이 필요합니다.');
-    if(!parts.length&&quant[0])parts.push(sentence(quant[0]));
-    if(trend.some(c=>c.type==='reference_case'))parts.push('전국 체험 사례의 참여 방식을 매장 캠페인에 접목할 수 있을지 검토합니다.');
-    $('area-summary').textContent=parts.join(' ')||'이 지역을 요약할 근거가 아직 충분하지 않습니다.';
+    $('area-title').textContent=request?.store?.name||'조사 지역';
+    $('area-summary').textContent=regionalSummary(brief);
     $('key-insights').replaceChildren();
-    highlights.forEach(([card,module],index)=>{
-      const button=make('button',undefined,'key-insight',$('key-insights'));button.type='button';
-      const title=card.title||card.event_name||card.name||sentence(card);
-      make('span',String(index+1).padStart(2,'0'),'',button);make('strong',title+(card.value!==undefined?` · ${card.value}${card.unit||''}`:''),'',button);
-      make('small',module==='trend'?(card.type==='reference_case'?'전국 참고 사례':'체험 패턴'):module==='quant'?'공공 관측값':'지역 자료','',button);
-      const detail=card.why_it_matters||card.statement||card.evidence||card.observation||card.description||card.summary;
-      if(detail)make('p',detail,'key-insight-detail',button);
-      button.addEventListener('click',()=>evidence(card,module));
+    const seen=new Set();
+    const insights=(brief.research_implications||[]).filter(row=>{
+      const text=String(row.interpretation||'').trim();
+      if(!text||seen.has(text))return false;
+      seen.add(text);return true;
+    }).slice(0,3);
+    insights.forEach((row,index)=>{
+      const basis=(row.basis||[]).filter(c=>c.sources?.length);
+      const button=make(basis.length?'button':'article',undefined,'key-insight',$('key-insights'));
+      if(basis.length)button.type='button';
+      make('span',String(index+1).padStart(2,'0'),'',button);
+      make('strong',row.title||'지역 관측에서 찾은 기획 단서','',button);
+      make('small','기획 인사이트','',button);
+      make('p',row.interpretation,'key-insight-detail',button);
+      if(brief.regional_synthesis?.version==='regional-analysis-v2'&&row.question)make('p',row.question,'key-insight-opportunity',button);
+      if(basis.length)button.addEventListener('click',()=>evidence({
+        title:row.title,statement:row.interpretation,
+        sources:basis.flatMap(c=>c.sources||[]),
+        context_sources:Object.fromEntries([...new Set(basis.map(c=>c.module))].map(m=>[m,basis.filter(c=>c.module===m).flatMap(c=>c.sources||[])]))
+      },basis[0].module));
     });
-    if(!highlights.length)make('p','핵심 인사이트를 제시할 근거가 미확보됐어요.','muted',$('key-insights'));
-    overview(quant,local,trend,request,evidence);
+    if(!insights.length)make('p','상권 구성과 지역 소식을 아래에서 살펴보세요.','muted',$('key-insights'));
+    overview(quant,local,trend,request,evidence,context);
+    const localOverview=$('local-overview');if(localOverview){localOverview.replaceChildren();
+      make('h2','매장 주변은 어떤 곳인가요?','',localOverview);make('p',regionalSummary(brief),'local-area-description',localOverview);
+      const places=context.filter(c=>c.type==='local_place'),official=context.filter(c=>c.type==='local_official_context');
+      for(const c of official){make('h3',c.title,'',localOverview);make('p',c.evidence,'',localOverview);const a=make('a','공식 안내 원문 ↗','text-button',localOverview);a.href=c.sources[0].source_url;a.target='_blank';a.rel='noopener noreferrer';}
+      if(places.length){make('h3','주요 장소 · 매장과의 직선거리','',localOverview);const list=make('div',undefined,'local-place-grid',localOverview);
+        for(const c of places){const p=c.place;const row=make('article',undefined,'local-place',list);make('small',`${p.category} · ${p.zone}`,'',row);make('h4',p.name,'',row);make('p',`약 ${p.distance_m}m · ${p.address}`,'',row);const a=make('a','지도에서 보기 ↗','text-button',row);a.href=c.sources[0].source_url;a.target='_blank';a.rel='noopener noreferrer';}}
+    }
+    // Original context cards were rendered by app.js; remove the new place rows here.
+    const contextHost=$('context-cards');[...contextHost.children].forEach((row,i)=>{if(['local_place','local_official_context'].includes(context[i]?.type))row.hidden=true;});
     editorial($('local-cards'),local);editorial($('context-cards'),context);
     library($('local-sources'),[[local.concat(context),'local']],sourceRow);
     library($('source-list'),[[quant,'quant'],[local.concat(context),'local'],[trend,'trend'],...trend.flatMap(c=>Object.entries(c.context_sources||{}).map(([module,sources])=>[[{sources}],module]))],sourceRow);
   }
-  return {workspace,progress,display};
+  return {workspace,progress,display,regionalSummary};
 })();

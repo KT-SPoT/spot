@@ -100,7 +100,7 @@ def create_app(*, token=None, n8n_base=None, transport=None, place_transport=Non
 
     @app.get('/assets/{name}')
     async def asset(name: str):
-        if name not in ('app.js','style.css','experience.js','trend-board.js','leaflet.js','leaflet.css'):
+        if name not in ('app.js','style.css','experience.js','trend-board.js','planning-hints.js','leaflet.js','leaflet.css'):
             return failure('NOT_FOUND',404)
         return FileResponse(STATIC/name)
 
